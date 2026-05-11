@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "id": null,
+      "title": "Job With No Id",
+      "absolute_url": "https://example.com/job",
+      "location": {"name": "Dublin"},
+      "updated_at": "2024-12-01T10:30:00-05:00"
+    },
+    {
+      "id": 88888001,
+      "title": "Job With Bad URL",
+      "absolute_url": "not-a-url",
+      "location": {"name": "Dublin"},
+      "updated_at": "2024-12-01T10:30:00-05:00"
+    },
+    {
+      "id": 88888002,
+      "title": "Analytics Lead From Offices Fallback",
+      "absolute_url": "https://example.com/job/2",
+      "location": {"name": ""},
+      "updated_at": "2024-12-01T10:30:00-05:00",
+      "offices": [{"id": 1, "name": "Dublin HQ", "location": "Ireland"}]
+    }
+  ],
+  "meta": {"total": 3}
+}
