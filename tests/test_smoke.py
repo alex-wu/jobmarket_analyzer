@@ -38,10 +38,10 @@ def test_cli_fetch_errors_on_missing_preset() -> None:
     assert "preset" in result.stderr.lower()
 
 
-def test_cli_normalise_skeleton_exits_ok() -> None:
-    result = runner.invoke(app, ["normalise", "--preset", "x.yaml"])
-    assert result.exit_code == 0
-    assert "normalise" in result.stdout
+def test_cli_normalise_errors_on_missing_preset() -> None:
+    result = runner.invoke(app, ["normalise", "--preset", "definitely_missing.yaml"])
+    assert result.exit_code == 2
+    assert "preset" in result.stderr.lower()
 
 
 def test_cli_publish_skeleton_exits_ok() -> None:
@@ -120,8 +120,6 @@ def test_benchmark_register_decorator_registers_valid_adapter() -> None:
         benchmarks._REGISTRY.pop("smoke_bench", None)
 
 
-def test_normalise_run_is_passthrough_at_p0() -> None:
-    df = pd.DataFrame({"x": [1, 2, 3]})
-    out = run(df)
-    assert out.equals(df)
-    assert out is not df  # P0 stub copies, doesn't return the same object
+def test_normalise_run_is_empty_safe() -> None:
+    out = run(pd.DataFrame(), rates={"EUR": 1.0})
+    assert out.empty

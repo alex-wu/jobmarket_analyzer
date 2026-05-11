@@ -11,10 +11,13 @@ import pytest
 from jobpipe import sources
 from jobpipe.runner import (
     EmptyRunError,
+    NoRawRunError,
     PresetError,
     fetch_sources,
+    find_latest_raw,
     load_preset,
     run_fetch,
+    run_normalise,
     write_raw_parquet,
 )
 from jobpipe.sources import SourceConfig, SourceFetchError
@@ -36,6 +39,7 @@ def _valid_posting_row(idx: int) -> dict[str, object]:
         "salary_max_eur": 60_000.0,
         "salary_period": "annual",
         "salary_annual_eur_p50": 55_000.0,
+        "salary_imputed": False,
         "posted_at": now,
         "ingested_at": now,
         "posting_url": f"https://example.test/jobs/{idx}",
@@ -206,3 +210,62 @@ def test_run_fetch_end_to_end(
     assert out.exists()
     df = pd.read_parquet(out)
     assert len(df) == 4
+
+
+def test_find_latest_raw_returns_most_recent_bundle(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    older = raw_root / "demo__20260101T000000Z-aaaaaaaa"
+    newer = raw_root / "demo__20260601T000000Z-bbbbbbbb"
+    older.mkdir(parents=True)
+    newer.mkdir(parents=True)
+    pd.DataFrame([_valid_posting_row(0)]).to_parquet(older / "postings_raw.parquet", index=False)
+    pd.DataFrame([_valid_posting_row(1)]).to_parquet(newer / "postings_raw.parquet", index=False)
+
+    # Force mtime so the test isn't flaky on fast filesystems.
+    import os
+
+    older_ts = datetime(2026, 1, 1, tzinfo=UTC).timestamp()
+    newer_ts = datetime(2026, 6, 1, tzinfo=UTC).timestamp()
+    os.utime(older, (older_ts, older_ts))
+    os.utime(newer, (newer_ts, newer_ts))
+
+    out = find_latest_raw("demo", tmp_path)
+    assert out == newer / "postings_raw.parquet"
+
+
+def test_find_latest_raw_raises_when_no_bundle(tmp_path: Path) -> None:
+    (tmp_path / "raw").mkdir()
+    with pytest.raises(NoRawRunError, match="demo"):
+        find_latest_raw("demo", tmp_path)
+
+
+def test_run_normalise_end_to_end(
+    fake_source_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Stub ECB fetch — no live HTTP in unit tests.
+    monkeypatch.setattr(
+        "jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85, "USD": 1.10}
+    )
+
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": True, "n_rows": 3}},
+        },
+    )
+    raw_out = run_fetch(preset_path, out_root=tmp_path / "data")
+    assert raw_out.exists()
+
+    enriched_out = run_normalise(preset_path, out_root=tmp_path / "data")
+    assert enriched_out.exists()
+    assert enriched_out.parent.parent.name == "enriched"
+    # Same run_id directory as the raw bundle.
+    assert enriched_out.parent.name == raw_out.parent.name
+
+    df = pd.read_parquet(enriched_out)
+    # Fake rows are country=IE → EUR rate=1, salary stays 50k/60k.
+    assert len(df) == 3
+    assert df["salary_min_eur"].iloc[0] == pytest.approx(50_000.0)

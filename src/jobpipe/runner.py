@@ -4,8 +4,9 @@ Fan-out is fail-isolated per adapter: one source's failure does not abort the
 run; the runner concatenates whatever succeeded. A run with zero rows across
 all enabled sources is a loud failure (raised as :class:`EmptyRunError`).
 
-P1 covers source fan-out + raw Parquet write. Normalisation, benchmarks, and
-publish step land in P2+.
+P1 covers source fan-out + raw Parquet write. P2 adds the normalise
+orchestrator that consumes the latest raw bundle and writes the strict-schema
+enriched Parquet. Benchmarks and publish land in P4 / P5.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import pandas as pd
 import yaml
 
 import jobpipe.sources.adzuna  # noqa: F401  -- register("adzuna") side-effect
-from jobpipe import sources
+from jobpipe import fx, normalise, sources
 from jobpipe.schemas import PostingSchema
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ class EmptyRunError(RuntimeError):
 
 class PresetError(ValueError):
     """Raised when the preset YAML is malformed or references unknown adapters."""
+
+
+class NoRawRunError(FileNotFoundError):
+    """Raised when ``run_normalise`` cannot find any raw bundle for the preset."""
 
 
 def load_preset(path: Path) -> dict[str, Any]:
@@ -111,3 +116,51 @@ def run_fetch(preset_path: Path, out_root: Path = Path("data")) -> Path:
     preset = load_preset(preset_path)
     df = fetch_sources(preset)
     return write_raw_parquet(df, preset["preset_id"], out_root)
+
+
+def find_latest_raw(preset_id: str, out_root: Path) -> Path:
+    """Return the most-recent ``data/raw/<preset_id>__*/postings_raw.parquet``.
+
+    Raises :class:`NoRawRunError` when no run directory matches.
+    """
+    raw_root = out_root / "raw"
+    candidates = sorted(
+        (p for p in raw_root.glob(f"{preset_id}__*") if p.is_dir()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for d in candidates:
+        parquet = d / "postings_raw.parquet"
+        if parquet.exists():
+            return parquet
+    raise NoRawRunError(
+        f"no raw bundle for preset {preset_id!r} under {raw_root}; run `jobpipe fetch` first"
+    )
+
+
+def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
+    """Top-level entry point for the ``jobpipe normalise`` CLI command.
+
+    Resolves the latest raw bundle for the preset, fetches ECB rates, calls
+    :func:`jobpipe.normalise.run`, and writes the enriched Parquet under
+    ``data/enriched/<same run_id>/postings.parquet`` — same run_id as the
+    raw input, so the two are trivially traceable.
+    """
+    preset = load_preset(preset_path)
+    raw_path = find_latest_raw(preset["preset_id"], out_root)
+    raw_df = pd.read_parquet(raw_path)
+    logger.info("normalise: %d raw rows from %s", len(raw_df), raw_path)
+
+    rates = fx.load_rates()
+    enriched = normalise.run(raw_df, rates)
+    logger.info(
+        "normalise: %d rows after dedupe (%d collapsed)",
+        len(enriched),
+        len(raw_df) - len(enriched),
+    )
+
+    out_dir = out_root / "enriched" / raw_path.parent.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "postings.parquet"
+    enriched.to_parquet(out, index=False)
+    return out

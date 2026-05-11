@@ -162,6 +162,16 @@ def _normalise_row(
     salary_min = raw.get("salary_min")
     salary_max = raw.get("salary_max")
     posted_at = raw.get("created") or ingested_at.isoformat()
+    # Adzuna returns '0' / '1' as strings (occasionally absent). Coerce to bool, None when absent.
+    raw_predicted = raw.get("salary_is_predicted")
+    salary_imputed: bool | None
+    if raw_predicted in (None, ""):
+        salary_imputed = None
+    else:
+        try:
+            salary_imputed = bool(int(str(raw_predicted)))
+        except (TypeError, ValueError):
+            salary_imputed = None
 
     return {
         "posting_id": posting_id,
@@ -181,6 +191,7 @@ def _normalise_row(
             if salary_min is not None and salary_max is not None
             else None
         ),
+        "salary_imputed": salary_imputed,
         "posted_at": pd.to_datetime(posted_at, utc=True, errors="coerce"),
         "ingested_at": pd.Timestamp(ingested_at),
         "posting_url": raw.get("redirect_url", ""),

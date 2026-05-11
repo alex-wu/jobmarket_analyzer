@@ -1,6 +1,7 @@
 """Pandera schemas — the contract between adapters and the rest of the pipeline.
 
-Strict mode is activated from P2 onward. P0/P1 use partial validation.
+Strict mode is active from P2 onward; ``BenchmarkSchema`` is still relaxed
+until benchmark adapters land in P4.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ class PostingSchema(pa.DataFrameModel):
         isin=["annual", "monthly", "weekly", "daily", "hourly"],
     )
     salary_annual_eur_p50: Series[float] = pa.Field(nullable=True, ge=0, le=1e7)
+    salary_imputed: Series[bool] = pa.Field(nullable=True)
 
     posted_at: Series[pa.DateTime] = pa.Field(nullable=False)
     ingested_at: Series[pa.DateTime] = pa.Field(nullable=False)
@@ -43,7 +45,7 @@ class PostingSchema(pa.DataFrameModel):
     raw_payload: Series[str] = pa.Field(nullable=True)
 
     class Config:
-        strict = False  # P2 will flip this to True
+        strict = True
         coerce = True
 
 

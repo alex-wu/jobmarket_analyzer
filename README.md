@@ -67,7 +67,7 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 
 - [x] **P0** — scaffolding, git init, CI green
 - [x] **P1** — Adzuna source adapter + raw Parquet
-- [ ] **P2** — normalisation + dedupe + strict schema
+- [x] **P2** — normalisation + dedupe + strict schema
 - [ ] **P3** — ATS + community source adapters
 - [ ] **P4** — benchmark adapters + ESCO/ISCO tagging
 - [ ] **P5** — GH Actions refresh + Release upload

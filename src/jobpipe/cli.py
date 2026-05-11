@@ -18,7 +18,13 @@ from pathlib import Path
 import typer
 
 from jobpipe import __version__
-from jobpipe.runner import EmptyRunError, PresetError, run_fetch
+from jobpipe.runner import (
+    EmptyRunError,
+    NoRawRunError,
+    PresetError,
+    run_fetch,
+    run_normalise,
+)
 
 app = typer.Typer(
     name="jobpipe",
@@ -76,10 +82,29 @@ def fetch(
 
 @app.command()
 def normalise(
-    preset: Path = typer.Option(..., "--preset"),  # noqa: B008
+    preset: Path = typer.Option(..., "--preset", help="Path to a run preset YAML."),  # noqa: B008
+    out_root: Path = typer.Option(  # noqa: B008
+        Path("data"),
+        "--out-root",
+        help="Where data/raw and data/enriched live. Defaults to ./data.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable INFO logging."),
 ) -> None:
-    """Normalise + dedupe + ISCO-tag; write enriched Parquet under data/enriched/."""
-    typer.echo(f"[P0 skeleton] normalise preset={preset}")
+    """Normalise + dedupe; write enriched Parquet under <out_root>/enriched/."""
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    try:
+        out = run_normalise(preset, out_root=out_root)
+    except PresetError as exc:
+        typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except NoRawRunError as exc:
+        typer.secho(f"normalise failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(str(out))
 
 
 @app.command()

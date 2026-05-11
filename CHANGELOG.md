@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — P2 (2026-05-11)
+- `src/jobpipe/fx.py`: ECB daily reference-rate loader (`load_rates`) with 24h on-disk cache, plus the pure `convert_to_eur` step that rewrites the misnamed `salary_*_eur` columns into actual EUR. Covers all 19 Adzuna countries through `COUNTRY_CURRENCY`.
+- `src/jobpipe/dedupe.py`: URL canonicalisation (lowercase host, strip `utm_*`/`gclid`/etc., drop trailing slash + fragment), sha1-based `posting_hash`, cross-source `cross_source` collapse.
+- `src/jobpipe/normalise.run(raw, rates)`: real pipeline — FX → recompute `salary_annual_eur_p50` as post-FX midpoint → cross-source dedupe → strict-schema validation. Replaces the P0 passthrough; signature now requires a rates dict.
+- `src/jobpipe/runner.py`: `find_latest_raw()` resolves the newest raw bundle by preset; `run_normalise()` orchestrates raw → enriched, preserving the run_id so raw↔enriched is trivially traceable.
+- CLI `jobpipe normalise --preset … [--out-root … --verbose]` wired to `run_normalise`; explicit exit-code 2 on `PresetError` / `NoRawRunError`.
+- `salary_imputed: bool` column on `PostingSchema`. Adzuna populates it from `salary_is_predicted` (the prior live run had ~60% imputed salaries — dashboards can now distinguish posted vs estimated).
+- `PostingSchema.Config.strict = True` — P0/P1 scaffolding relaxation is now lifted; extra columns abort validation.
+- Tests: `tests/test_fx.py`, `tests/test_dedupe.py`, `tests/test_normalise.py`. `tests/test_runner.py` gains `find_latest_raw` + end-to-end `run_normalise` cases.
+
 ### Fixed — P1 (2026-05-11)
 - `AdzunaAdapter.fetch()` now collapses within-source duplicate `posting_id`s before returning. A single Adzuna posting can match multiple keywords ("data analyst" + "analytics engineer"), which previously broke `PostingSchema`'s uniqueness check during live runs. Cross-source dedupe remains P2 work.
 
