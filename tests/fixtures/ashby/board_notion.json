@@ -1,0 +1,92 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "11111111-aaaa-bbbb-cccc-000000000001",
+      "title": "Senior Data Analyst, EMEA",
+      "location": "Dublin, Ireland",
+      "secondaryLocations": [],
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/notion/11111111",
+      "publishedAt": "2024-12-01T10:00:00Z",
+      "isRemote": false,
+      "department": "Data",
+      "team": "Analytics",
+      "compensation": {
+        "compensationTierSummary": "€85,000-€110,000 EUR",
+        "compensationTiers": [
+          {
+            "id": "tier-1",
+            "title": "EMEA",
+            "tierSummary": "€85k-€110k",
+            "components": [
+              {
+                "summary": "Salary",
+                "componentType": "Salary",
+                "interval": "1 YEAR",
+                "currencyCode": "EUR",
+                "minValue": 85000,
+                "maxValue": 110000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "11111111-aaaa-bbbb-cccc-000000000002",
+      "title": "Forward Deployed Engineer",
+      "location": "New York, NY",
+      "jobUrl": "https://jobs.ashbyhq.com/notion/22222222",
+      "publishedAt": "2024-11-20T08:15:00Z",
+      "isRemote": false,
+      "compensation": null
+    },
+    {
+      "id": "11111111-aaaa-bbbb-cccc-000000000003",
+      "title": "Analytics Engineer",
+      "location": "Remote (Europe)",
+      "jobUrl": "https://jobs.ashbyhq.com/notion/33333333",
+      "publishedAt": "2024-12-05T14:45:00Z",
+      "isRemote": true,
+      "compensation": {
+        "compensationTiers": [
+          {
+            "components": [
+              {
+                "componentType": "Salary",
+                "interval": "1 HOUR",
+                "currencyCode": "EUR",
+                "minValue": 40,
+                "maxValue": 55
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "11111111-aaaa-bbbb-cccc-000000000004",
+      "title": "Data Analyst, Risk",
+      "location": "Dublin, Ireland",
+      "jobUrl": "https://jobs.ashbyhq.com/notion/44444444",
+      "publishedAt": "2024-12-02T11:00:00Z",
+      "isRemote": false,
+      "compensation": {
+        "compensationTiers": [
+          {
+            "components": [
+              {
+                "componentType": "Salary",
+                "interval": "1 YEAR",
+                "currencyCode": "USD",
+                "minValue": 110000,
+                "maxValue": 140000
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

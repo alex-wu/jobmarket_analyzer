@@ -23,6 +23,7 @@ import yaml
 # Side-effect imports — each module's @register decorator populates the sources registry.
 # Ruff treats the trailing dotted import as redundant with its siblings, hence the targeted noqa.
 import jobpipe.sources.adzuna
+import jobpipe.sources.ashby
 import jobpipe.sources.greenhouse
 import jobpipe.sources.lever  # noqa: F401
 from jobpipe import fx, normalise, sources
