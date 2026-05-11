@@ -25,7 +25,8 @@ import yaml
 import jobpipe.sources.adzuna
 import jobpipe.sources.ashby
 import jobpipe.sources.greenhouse
-import jobpipe.sources.lever  # noqa: F401
+import jobpipe.sources.lever
+import jobpipe.sources.personio  # noqa: F401
 from jobpipe import fx, normalise, sources
 from jobpipe.schemas import PostingSchema
 
