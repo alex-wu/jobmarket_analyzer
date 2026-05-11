@@ -66,7 +66,7 @@ Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectur
 Phase-gated build per [DECISIONS.md](DECISIONS.md):
 
 - [x] **P0** — scaffolding, git init, CI green
-- [ ] **P1** — Adzuna source adapter + raw Parquet
+- [x] **P1** — Adzuna source adapter + raw Parquet
 - [ ] **P2** — normalisation + dedupe + strict schema
 - [ ] **P3** — ATS + community source adapters
 - [ ] **P4** — benchmark adapters + ESCO/ISCO tagging

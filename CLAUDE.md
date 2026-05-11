@@ -7,11 +7,12 @@ Guidance for Claude Code (claude.ai/code) sessions in this repo. Read first.
 Active phased build. v1 = data-analyst roles, Ireland/Eurozone, GitHub Pages dashboard. Phase plan and acceptance criteria in [README.md](README.md) and [DECISIONS.md](DECISIONS.md). Current phase target: see the unchecked boxes in the README phase plan.
 
 **Authoritative docs (in priority order):**
-1. [DECISIONS.md](DECISIONS.md) — locked architectural choices and their WHY
-2. [docs/architecture.md](docs/architecture.md) — dataflow diagram
-3. [README.md](README.md) — quickstart + phase plan
-4. The plan file at `~/.claude/plans/i-want-to-create-polymorphic-quokka.md` — the original implementation plan
-5. [docs/history/](docs/history/) — superseded specs, kept for context
+1. **The newest log in [docs/sessions/](docs/sessions/)** — start here. Captures what landed last session, issues hit, and the next-session handover. Read [docs/sessions/README.md](docs/sessions/README.md) for the convention; **write a new log before ending your session**.
+2. [DECISIONS.md](DECISIONS.md) — locked architectural choices and their WHY
+3. [docs/architecture.md](docs/architecture.md) — dataflow diagram
+4. [README.md](README.md) — quickstart + phase plan
+5. The plan file at `~/.claude/plans/i-want-to-create-polymorphic-quokka.md` — the original implementation plan
+6. [docs/history/](docs/history/) — superseded specs, kept for context
 
 When this file conflicts with the user's global `~/.claude/CLAUDE.md`, the global wins for style/git/safety; this file wins for project-specific architecture and conventions.
 

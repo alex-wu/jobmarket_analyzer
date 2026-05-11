@@ -1,0 +1,66 @@
+{
+  "count": 3,
+  "mean": 52000,
+  "results": [
+    {
+      "id": "1234567890",
+      "title": "Senior Data Analyst",
+      "description": "We are seeking a senior data analyst...",
+      "company": { "display_name": "Acme Analytics Ltd" },
+      "location": {
+        "area": ["UK", "England", "London"],
+        "display_name": "London, England"
+      },
+      "category": { "label": "IT Jobs" },
+      "salary_min": 55000,
+      "salary_max": 70000,
+      "salary_is_predicted": "0",
+      "contract_type": "permanent",
+      "contract_time": "full_time",
+      "created": "2026-05-08T10:30:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/land/ad/1234567890",
+      "latitude": 51.5074,
+      "longitude": -0.1278
+    },
+    {
+      "id": "1234567891",
+      "title": "Data Analyst",
+      "description": "Junior to mid-level data analyst role...",
+      "company": { "display_name": "Beta Insights" },
+      "location": {
+        "area": ["UK", "Scotland", "Edinburgh"],
+        "display_name": "Edinburgh, Scotland"
+      },
+      "category": { "label": "IT Jobs" },
+      "salary_min": 38000,
+      "salary_max": 48000,
+      "salary_is_predicted": "1",
+      "contract_type": "permanent",
+      "contract_time": "full_time",
+      "created": "2026-05-09T09:15:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/land/ad/1234567891",
+      "latitude": 55.9533,
+      "longitude": -3.1883
+    },
+    {
+      "id": "1234567892",
+      "title": "BI Analyst (Remote)",
+      "description": "Business intelligence analyst, fully remote...",
+      "company": { "display_name": "Gamma Data" },
+      "location": {
+        "area": ["UK"],
+        "display_name": "United Kingdom"
+      },
+      "category": { "label": "IT Jobs" },
+      "salary_min": null,
+      "salary_max": null,
+      "salary_is_predicted": "0",
+      "contract_type": "permanent",
+      "contract_time": "full_time",
+      "created": "2026-05-10T14:00:00Z",
+      "redirect_url": "https://www.adzuna.co.uk/land/ad/1234567892",
+      "latitude": 54.0,
+      "longitude": -2.0
+    }
+  ]
+}

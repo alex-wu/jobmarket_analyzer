@@ -20,11 +20,16 @@ isco_focus:
 
 sources:
   adzuna:
-    enabled: false        # → true at P1
-    countries: ["ie"]      # Adzuna currently does NOT serve "ie"; we keep it
-                           # for the day they add it. v1 leans on ATS + Remotive.
+    enabled: true
+    # Adzuna does NOT serve "ie" in 2026. We use "gb" as a labour-market proxy
+    # (English-language, geographically adjacent, similar wage levels) until
+    # Adzuna adds Ireland. Real Irish coverage comes from ATS + Remotive in P3.
+    countries: ["gb"]
     keywords: ["data analyst", "analytics engineer", "bi analyst"]
     max_results: 500
+    results_per_page: 50
+    max_pages: 5
+    min_interval_hours: 24    # refresh.yml honours this; raise if free tier bites
 
   greenhouse:
     enabled: false        # → true at P3

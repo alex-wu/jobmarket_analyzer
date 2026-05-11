@@ -6,16 +6,19 @@ Three commands wire the phased build:
 * ``jobpipe normalise``  — run :mod:`jobpipe.normalise`, write enriched Parquet.
 * ``jobpipe publish``    — partition + export + manifest for GitHub Release upload.
 
-P0 ships skeletons that exit 0 with a stub message. Phases P1+ fill them in.
+P1 wires ``fetch`` to :mod:`jobpipe.runner`. ``normalise`` and ``publish`` are
+still skeletons until P2 / P5.
 """
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
 
 from jobpipe import __version__
+from jobpipe.runner import EmptyRunError, PresetError, run_fetch
 
 app = typer.Typer(
     name="jobpipe",
@@ -47,14 +50,28 @@ def main(
 @app.command()
 def fetch(
     preset: Path = typer.Option(..., "--preset", help="Path to a run preset YAML."),  # noqa: B008
-    use_cassettes: bool = typer.Option(
-        False,
-        "--use-cassettes",
-        help="Replay HTTP from tests/cassettes/ instead of making live calls.",
+    out_root: Path = typer.Option(  # noqa: B008
+        Path("data"),
+        "--out-root",
+        help="Where data/raw/... lands. Defaults to ./data.",
     ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable INFO logging."),
 ) -> None:
-    """Fan out enabled source adapters; write raw Parquet under data/raw/."""
-    typer.echo(f"[P0 skeleton] fetch preset={preset} use_cassettes={use_cassettes}")
+    """Fan out enabled source adapters; write raw Parquet under <out_root>/raw/."""
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    try:
+        out = run_fetch(preset, out_root=out_root)
+    except PresetError as exc:
+        typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except EmptyRunError as exc:
+        typer.secho(f"run failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(str(out))
 
 
 @app.command()

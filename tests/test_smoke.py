@@ -32,10 +32,10 @@ def test_cli_version_flag_prints_version() -> None:
     assert jobpipe.__version__ in result.stdout
 
 
-def test_cli_fetch_skeleton_exits_ok() -> None:
-    result = runner.invoke(app, ["fetch", "--preset", "x.yaml"])
-    assert result.exit_code == 0
-    assert "fetch" in result.stdout
+def test_cli_fetch_errors_on_missing_preset() -> None:
+    result = runner.invoke(app, ["fetch", "--preset", "definitely_missing.yaml"])
+    assert result.exit_code == 2
+    assert "preset" in result.stderr.lower()
 
 
 def test_cli_normalise_skeleton_exits_ok() -> None:
@@ -61,8 +61,9 @@ def test_schemas_are_importable() -> None:
     assert BenchmarkSchema is not None
 
 
-def test_source_registry_is_empty_at_p0() -> None:
-    assert sources.names() == []
+def test_source_registry_lists_known_adapters() -> None:
+    # P1 registers adzuna; subsequent phases register more.
+    assert "adzuna" in sources.names()
 
 
 def test_source_registry_get_raises_for_unknown() -> None:
