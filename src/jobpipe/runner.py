@@ -21,10 +21,10 @@ import pandas as pd
 import yaml
 
 # Side-effect imports — each module's @register decorator populates the sources registry.
-# The first dotted import binds the ``jobpipe`` name; later dotted imports look unused to ruff,
-# hence the targeted noqa.
+# Ruff treats the trailing dotted import as redundant with its siblings, hence the targeted noqa.
 import jobpipe.sources.adzuna
-import jobpipe.sources.greenhouse  # noqa: F401
+import jobpipe.sources.greenhouse
+import jobpipe.sources.lever  # noqa: F401
 from jobpipe import fx, normalise, sources
 from jobpipe.schemas import PostingSchema
 
