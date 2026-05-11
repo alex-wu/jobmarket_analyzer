@@ -1,0 +1,30 @@
+# Curated list of companies with Dublin/Ireland offices and public ATS endpoints.
+# Used by the greenhouse / lever / ashby / personio source adapters.
+#
+# Adding a company = adding a slug to the right list. Slug = the path component
+# in the public board URL. Find it via:
+#   Greenhouse:  https://boards.greenhouse.io/<slug>
+#   Lever:       https://jobs.lever.co/<slug>
+#   Ashby:       https://jobs.ashbyhq.com/<slug>
+#   Personio:    https://<slug>.jobs.personio.de/
+#
+# These are placeholder examples — verified URLs are added per company in P3.
+
+greenhouse:
+  # - stripe
+  # - intercom
+  # - hubspot
+  # - workday
+  []
+
+lever:
+  # - <slug>
+  []
+
+ashby:
+  # - <slug>
+  []
+
+personio:
+  # - <slug>
+  []

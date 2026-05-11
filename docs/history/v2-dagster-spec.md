@@ -1,3 +1,7 @@
+> **SUPERSEDED** — Archived 2026-05-11. This Dagster-centric, local-first specification has been replaced by a GitHub-Actions + Observable Framework architecture documented in the root `README.md` and `DECISIONS.md`. Kept for historical reference: it captures earlier scope decisions (JobSpy ingestion, BLS OEWS benchmarks, US focus, Dagster orchestration) that were intentionally rejected for the v1 portfolio build. See `DECISIONS.md` for the WHY.
+
+---
+
 # Job Market Intelligence Pipeline — Requirements & Build Plan 
 **Document type:** Implementation specification for Claude Code
 **Target executor:** Claude Code (agentic coding session)
