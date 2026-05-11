@@ -6,7 +6,7 @@
 ![Pages](https://github.com/USER/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Status:** P0 scaffolding (pre-MVP). See [DECISIONS.md](DECISIONS.md) for architecture rationale and [docs/architecture.md](docs/architecture.md) for the dataflow diagram.
+**Status:** P3 complete — Adzuna + 4 ATS adapters (Greenhouse, Lever, Ashby, Personio) feeding normalised Parquet. Benchmarks + dashboard land in P4–P6. See [DECISIONS.md](DECISIONS.md) for architecture rationale and [docs/architecture.md](docs/architecture.md) for the dataflow diagram.
 
 **v1 preset:** data-analyst roles, Ireland-focused with Eurozone context. The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography is a YAML file, not a code change.
 
@@ -14,7 +14,7 @@
 
 ## What it does
 
-1. **Ingest** — Pluggable source adapters fetch postings from public APIs: Adzuna (Eurozone), Greenhouse / Lever / Ashby / Personio (public boards for Dublin tech), Remotive (EU filter), Hacker News Algolia.
+1. **Ingest** — Pluggable source adapters fetch postings from public APIs: Adzuna (Eurozone) and Greenhouse / Lever / Ashby / Personio (public boards for Dublin tech). Hacker News Algolia lands in P4 alongside LLM-assisted extraction. Remotive is excluded — see [ADR-009](DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources).
 2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, deduplicate by URL + title + company.
 3. **Benchmark** — Pluggable benchmark adapters pull official wage statistics (CSO PxStat for Ireland, OECD SDMX, Eurostat).
 4. **Publish** — Partitioned Parquet bundle uploaded to a GitHub Release as a free CDN. Manifest records provenance.
@@ -30,14 +30,14 @@ Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.12 (uv will install), 
 git clone https://github.com/USER/jobmarket_analyzer.git
 cd jobmarket_analyzer
 uv sync
-cp .env.example .env   # then fill in ADZUNA_APP_ID and ADZUNA_APP_KEY
+cp .env.example .env   # then fill in ADZUNA_APP_ID / ADZUNA_APP_KEY (optional — ATS adapters work credential-free)
 
-# Run the v1 preset end-to-end against recorded HTTP fixtures
-uv run jobpipe fetch --preset config/runs/data_analyst_ireland.yaml --use-cassettes
+# Run the v1 preset end-to-end against the live APIs (Adzuna is skipped if creds are absent)
+uv run jobpipe fetch --preset config/runs/data_analyst_ireland.yaml --verbose
 uv run jobpipe normalise --preset config/runs/data_analyst_ireland.yaml
-uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml
+uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml    # P5 wires Release upload
 
-# Build the dashboard against the local Parquet bundle
+# Build the dashboard against the local Parquet bundle (P6)
 cd site && npm ci && npx framework dev
 ```
 
@@ -68,8 +68,8 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 - [x] **P0** — scaffolding, git init, CI green
 - [x] **P1** — Adzuna source adapter + raw Parquet
 - [x] **P2** — normalisation + dedupe + strict schema
-- [ ] **P3** — ATS + community source adapters
-- [ ] **P4** — benchmark adapters + ESCO/ISCO tagging
+- [x] **P3** — ATS source adapters (Greenhouse, Lever, Ashby, Personio). Remotive excluded ([ADR-009](DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources)); HN Algolia deferred to P4.
+- [ ] **P4** — benchmark adapters + ESCO/ISCO tagging + HN Algolia (LLM-assisted)
 - [ ] **P5** — GH Actions refresh + Release upload
 - [ ] **P6** — Observable Framework site + GH Pages
 - [ ] **P7** — polish, second preset, screenshots

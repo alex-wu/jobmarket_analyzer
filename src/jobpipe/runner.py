@@ -20,7 +20,13 @@ from uuid import uuid4
 import pandas as pd
 import yaml
 
-import jobpipe.sources.adzuna  # noqa: F401  -- register("adzuna") side-effect
+# Side-effect imports — each module's @register decorator populates the sources registry.
+# Ruff treats the trailing dotted import as redundant with its siblings, hence the targeted noqa.
+import jobpipe.sources.adzuna
+import jobpipe.sources.ashby
+import jobpipe.sources.greenhouse
+import jobpipe.sources.lever
+import jobpipe.sources.personio  # noqa: F401
 from jobpipe import fx, normalise, sources
 from jobpipe.schemas import PostingSchema
 

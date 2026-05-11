@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workzag-jobs>
+  <position>
+    <id>4001001</id>
+    <subcompany>ExampleCo</subcompany>
+    <office>Dublin</office>
+    <department>Analytics</department>
+    <recruitingCategory>Data</recruitingCategory>
+    <name>Senior Data Analyst</name>
+    <employmentType>permanent</employmentType>
+    <seniority>experienced</seniority>
+    <schedule>full-time</schedule>
+    <yearsOfExperience>3-5 years</yearsOfExperience>
+    <occupation>Data Analyst</occupation>
+    <occupationCategory>Analytics</occupationCategory>
+    <createDate>2024-12-01 10:30:00</createDate>
+  </position>
+  <position>
+    <id>4001002</id>
+    <subcompany>ExampleCo</subcompany>
+    <office>Munich</office>
+    <department>Engineering</department>
+    <recruitingCategory>Engineering</recruitingCategory>
+    <name>Backend Engineer</name>
+    <employmentType>permanent</employmentType>
+    <createDate>2024-11-15 09:00:00</createDate>
+  </position>
+  <position>
+    <id>4001003</id>
+    <subcompany>ExampleCo</subcompany>
+    <office>Dublin, Ireland</office>
+    <department>Data</department>
+    <name>Analytics Engineer (Remote-friendly)</name>
+    <createDate>2024-12-05 14:45:00</createDate>
+  </position>
+  <position>
+    <id></id>
+    <office>Dublin</office>
+    <name>Position Without Id</name>
+    <createDate>2024-12-01 10:30:00</createDate>
+  </position>
+  <position>
+    <id>4001005</id>
+    <office>Dublin</office>
+    <name></name>
+    <createDate>2024-12-01 10:30:00</createDate>
+  </position>
+</workzag-jobs>

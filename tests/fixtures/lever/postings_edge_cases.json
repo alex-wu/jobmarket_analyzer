@@ -1,0 +1,23 @@
+[
+  {
+    "id": "",
+    "text": "Job With No Id",
+    "categories": {"location": "Dublin"},
+    "createdAt": 1701432000000,
+    "hostedUrl": "https://jobs.lever.co/x/none"
+  },
+  {
+    "id": "edge-002",
+    "text": "Job With Bad URL",
+    "categories": {"location": "Dublin"},
+    "createdAt": 1701432000000,
+    "hostedUrl": "not-a-url"
+  },
+  {
+    "id": "edge-003",
+    "text": "Analytics Lead With Iso Date",
+    "categories": {"location": "Dublin, Ireland"},
+    "createdAt": "2024-12-01T10:00:00Z",
+    "hostedUrl": "https://jobs.lever.co/x/edge-003"
+  }
+]

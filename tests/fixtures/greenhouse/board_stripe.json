@@ -1,0 +1,15 @@
+{
+  "jobs": [
+    {
+      "id": 77777001,
+      "title": "Data Analyst, Risk",
+      "absolute_url": "https://boards.greenhouse.io/stripe/jobs/77777001",
+      "location": {"name": "Dublin, Ireland"},
+      "updated_at": "2024-12-02T11:00:00-05:00",
+      "offices": [{"id": 1, "name": "Dublin"}],
+      "departments": [{"id": 1, "name": "Risk"}],
+      "content": "<p>Risk analytics, Dublin.</p>"
+    }
+  ],
+  "meta": {"total": 1}
+}

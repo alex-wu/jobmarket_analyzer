@@ -1,0 +1,47 @@
+[
+  {
+    "id": "abc-001",
+    "text": "Senior Data Analyst",
+    "categories": {
+      "location": "Dublin, Ireland",
+      "commitment": "Full-time",
+      "team": "Data"
+    },
+    "createdAt": 1701432000000,
+    "hostedUrl": "https://jobs.lever.co/palantir/abc-001",
+    "applyUrl": "https://jobs.lever.co/palantir/abc-001/apply",
+    "descriptionPlain": "Data analyst role, Dublin office."
+  },
+  {
+    "id": "abc-002",
+    "text": "Forward Deployed Engineer",
+    "categories": {
+      "location": "New York, NY",
+      "commitment": "Full-time"
+    },
+    "createdAt": 1700000000000,
+    "hostedUrl": "https://jobs.lever.co/palantir/abc-002",
+    "applyUrl": "https://jobs.lever.co/palantir/abc-002/apply",
+    "descriptionPlain": "FDE role in NYC."
+  },
+  {
+    "id": "abc-003",
+    "text": "Analytics Engineer",
+    "categories": {
+      "location": "Remote - Europe"
+    },
+    "createdAt": 1702000000000,
+    "hostedUrl": "https://jobs.lever.co/palantir/abc-003",
+    "descriptionPlain": "Remote EU analytics."
+  },
+  {
+    "id": "abc-004",
+    "text": "Marketing Manager",
+    "categories": {
+      "location": "Dublin"
+    },
+    "createdAt": 1701700000000,
+    "hostedUrl": "https://jobs.lever.co/palantir/abc-004",
+    "descriptionPlain": "Marketing role in Dublin."
+  }
+]

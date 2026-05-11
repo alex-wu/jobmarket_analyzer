@@ -1,0 +1,55 @@
+{
+  "jobs": [
+    {
+      "id": 12345001,
+      "title": "Senior Data Analyst",
+      "absolute_url": "https://boards.greenhouse.io/intercom/jobs/12345001",
+      "location": {"name": "Dublin"},
+      "updated_at": "2024-12-01T10:30:00-05:00",
+      "internal_job_id": 999001,
+      "offices": [
+        {"id": 1, "name": "Dublin", "location": "Ireland"}
+      ],
+      "departments": [{"id": 11, "name": "Analytics"}],
+      "content": "<p>Lead our analytics team in Dublin.</p>"
+    },
+    {
+      "id": 12345002,
+      "title": "Engineering Manager",
+      "absolute_url": "https://boards.greenhouse.io/intercom/jobs/12345002",
+      "location": {"name": "San Francisco"},
+      "updated_at": "2024-11-20T08:15:00-05:00",
+      "internal_job_id": 999002,
+      "offices": [
+        {"id": 2, "name": "SF", "location": "United States"}
+      ],
+      "departments": [{"id": 12, "name": "Engineering"}],
+      "content": "<p>Manage an engineering team in SF.</p>"
+    },
+    {
+      "id": 12345003,
+      "title": "Analytics Engineer",
+      "absolute_url": "https://boards.greenhouse.io/intercom/jobs/12345003",
+      "location": {"name": "Remote (Europe)"},
+      "updated_at": "2024-12-05T14:45:00-05:00",
+      "internal_job_id": 999003,
+      "offices": [],
+      "departments": [{"id": 11, "name": "Analytics"}],
+      "content": "<p>Remote-first role across the EU.</p>"
+    },
+    {
+      "id": 12345004,
+      "title": "Customer Success Lead",
+      "absolute_url": "https://boards.greenhouse.io/intercom/jobs/12345004",
+      "location": {"name": "Dublin, Ireland"},
+      "updated_at": "2024-11-28T09:00:00-05:00",
+      "internal_job_id": 999004,
+      "offices": [
+        {"id": 1, "name": "Dublin", "location": "Ireland"}
+      ],
+      "departments": [{"id": 14, "name": "CX"}],
+      "content": "<p>Customer-success role, Dublin-based.</p>"
+    }
+  ],
+  "meta": {"total": 4}
+}

@@ -29,6 +29,7 @@ dependencies = [
     "python-dateutil>=2.9",
     "typer>=0.13",
     "openai>=1.55",
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]
@@ -90,7 +91,7 @@ warn_redundant_casts = true
 files = ["src/jobpipe"]
 
 [[tool.mypy.overrides]]
-module = ["pandera.*", "rapidfuzz.*", "duckdb.*"]
+module = ["pandera.*", "rapidfuzz.*", "duckdb.*", "defusedxml.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

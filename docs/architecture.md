@@ -11,7 +11,7 @@ flowchart TD
     subgraph pipeline["Python pipeline (uv env)"]
         direction TB
         preset["preset YAML<br/>(config/runs/*.yaml)"] --> runner["runner.run_preset()"]
-        runner -->|fan-out, fail-isolated| sources["SourceAdapters<br/>adzuna · greenhouse · lever · ashby<br/>personio · remotive · hn_algolia"]
+        runner -->|fan-out, fail-isolated| sources["SourceAdapters<br/>adzuna · greenhouse · lever · ashby<br/>personio · hn_algolia (P4)"]
         sources --> raw["data/raw/&lt;run_id&gt;/<br/>postings_raw.parquet"]
         raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · dedupe · ISCO-tag"]
         normalise --> enriched["data/enriched/&lt;run_id&gt;/<br/>postings.parquet"]

@@ -62,8 +62,9 @@ def test_schemas_are_importable() -> None:
 
 
 def test_source_registry_lists_known_adapters() -> None:
-    # P1 registers adzuna; subsequent phases register more.
-    assert "adzuna" in sources.names()
+    # P1 registers adzuna; P3 adds the ATS adapters.
+    for name in ("adzuna", "ashby", "greenhouse", "lever", "personio"):
+        assert name in sources.names(), f"missing {name} in registry"
 
 
 def test_source_registry_get_raises_for_unknown() -> None:

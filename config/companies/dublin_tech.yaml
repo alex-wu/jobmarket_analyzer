@@ -3,28 +3,32 @@
 #
 # Adding a company = adding a slug to the right list. Slug = the path component
 # in the public board URL. Find it via:
-#   Greenhouse:  https://boards.greenhouse.io/<slug>
-#   Lever:       https://jobs.lever.co/<slug>
-#   Ashby:       https://jobs.ashbyhq.com/<slug>
-#   Personio:    https://<slug>.jobs.personio.de/
+#   Greenhouse:  https://boards.greenhouse.io/<slug>           → API: boards-api.greenhouse.io/v1/boards/<slug>/jobs
+#   Lever:       https://jobs.lever.co/<slug>                   → API: api.lever.co/v0/postings/<slug>?mode=json
+#   Ashby:       https://jobs.ashbyhq.com/<slug>                → API: api.ashbyhq.com/posting-api/job-board/<slug>
+#   Personio:    https://<slug>.jobs.personio.de/               → API: https://<slug>.jobs.personio.de/xml
 #
-# These are placeholder examples — verified URLs are added per company in P3.
+# Curating a slug:
+#   1. Confirm the API URL returns 200 with non-empty payload (manual or via WebFetch).
+#   2. Confirm the company actually posts Dublin/Ireland roles (or is remote-EU friendly).
+#   3. Slugs that 404 are skipped at runtime — no need to rip them out immediately,
+#      but tidy them up periodically.
 
+# Starter set — verified via WebFetch on 2026-05-11. Expand as you go.
 greenhouse:
-  # - stripe
-  # - intercom
-  # - hubspot
-  # - workday
-  []
+  - intercom   # Dublin HQ
+  - stripe     # Dublin office, confirmed IE postings
 
 lever:
-  # - <slug>
-  []
+  - palantir   # No current Dublin postings but the API returns data; kept as
+               # a representative slug for future EU expansion
+  - mistral    # Paris-HQ; included for Eurozone reach
 
 ashby:
-  # - <slug>
-  []
+  - notion     # Confirmed Dublin-based role
+  - linear     # EU-friendly remote roles
+  - ramp       # Active board
 
 personio:
-  # - <slug>
-  []
+  - personio   # The vendor's own board (Munich-headquartered; useful for DE volume
+               # and as a sanity-check feed structure)
