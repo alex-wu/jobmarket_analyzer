@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — P3 (2026-05-11)
+- Four ATS source adapters, each mirroring the Adzuna template (fail-isolated per slug, tenacity retries, `SourceFetchError` on persistent HTTP failures):
+  - `src/jobpipe/sources/greenhouse.py` — `boards-api.greenhouse.io/v1/boards/<slug>/jobs`.
+  - `src/jobpipe/sources/lever.py` — `api.lever.co/v0/postings/<slug>?mode=json`, handles both ms-epoch and ISO 8601 `createdAt`.
+  - `src/jobpipe/sources/ashby.py` — `api.ashbyhq.com/posting-api/job-board/<slug>?includeCompensation=true`, parses structured compensation, annualises in-adapter (hourly × 2080, monthly × 12, etc.), drops mixed-currency comp to avoid spurious FX reinterpretation.
+  - `src/jobpipe/sources/personio.py` — `<slug>.jobs.personio.de/xml`, parsed via `defusedxml` for entity-expansion safety; per-slug XML parse errors are logged + skipped.
+- `src/jobpipe/sources/_companies.py` — shared helpers: `load_companies_file(path, ats_key)` (YAML loader) and `match_country(text, allowed_codes)` (loose ISO-2 derivation with `remote-europe` / `remote-worldwide` pseudo-code support).
+- `defusedxml>=0.7` added as a top-level dependency for safe XML parsing.
+- `config/companies/dublin_tech.yaml` populated with a starter set of 2–3 verified slugs per ATS (Greenhouse: intercom/stripe; Lever: palantir/mistral; Ashby: notion/linear/ramp; Personio: personio).
+- Preset `config/runs/data_analyst_ireland.yaml` flips greenhouse/lever/ashby/personio to `enabled: true`.
+- Tests: per-adapter MockTransport-driven suites (~12 tests each) + fixtures under `tests/fixtures/<adapter>/`. Each adapter file ≥92% line+branch coverage; overall coverage at 95.75%.
+
+### Decided — P3 scope shifts (2026-05-11)
+- **Remotive excluded** (see [DECISIONS.md ADR-009](DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources)). Their ToS §8 prohibits redistribution and commercial database-building of job listings; the public-API README's attribution back-link advice does not override.
+- **HN Algolia deferred to P4** alongside LLM-assisted comment parsing. "Who is hiring?" comments are free-text and benefit substantially from LLM-based title/salary extraction.
+
 ### Added — P2 (2026-05-11)
 - `src/jobpipe/fx.py`: ECB daily reference-rate loader (`load_rates`) with 24h on-disk cache, plus the pure `convert_to_eur` step that rewrites the misnamed `salary_*_eur` columns into actual EUR. Covers all 19 Adzuna countries through `COUNTRY_CURRENCY`.
 - `src/jobpipe/dedupe.py`: URL canonicalisation (lowercase host, strip `utm_*`/`gclid`/etc., drop trailing slash + fragment), sha1-based `posting_hash`, cross-source `cross_source` collapse.

@@ -68,8 +68,8 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 - [x] **P0** — scaffolding, git init, CI green
 - [x] **P1** — Adzuna source adapter + raw Parquet
 - [x] **P2** — normalisation + dedupe + strict schema
-- [ ] **P3** — ATS + community source adapters
-- [ ] **P4** — benchmark adapters + ESCO/ISCO tagging
+- [x] **P3** — ATS source adapters (Greenhouse, Lever, Ashby, Personio). Remotive excluded ([ADR-009](DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources)); HN Algolia deferred to P4.
+- [ ] **P4** — benchmark adapters + ESCO/ISCO tagging + HN Algolia (LLM-assisted)
 - [ ] **P5** — GH Actions refresh + Release upload
 - [ ] **P6** — Observable Framework site + GH Pages
 - [ ] **P7** — polish, second preset, screenshots

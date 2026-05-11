@@ -136,3 +136,29 @@ Adapters self-register via a `@register("name")` decorator. Presets (`config/run
 - Forces a stable normalised schema (`PostingSchema`, `BenchmarkSchema`) as the contract.
 
 ---
+
+## ADR-009 · Remotive excluded from ingest sources
+
+**Status:** Accepted, 2026-05-11.
+
+**Context:** Remotive operates a public remote-jobs API (`https://remotive.com/api/remote-jobs`) and was originally scoped into P3 alongside the ATS adapters. The carry-over open question from the previous session was whether their ToS permits our use case (public OSS dashboard, redistributing the data via GitHub Releases as Parquet).
+
+A pre-flight WebFetch of `https://remotive.com/terms-of-use` returned a Section 8 ("Prohibited Conduct") that, quoted verbatim, prohibits:
+
+> "Copy, reproduce, redistribute, publish, or make available to any third party any job listings, company data, or other content from the Site, whether in whole or in part, by any means including but not limited to screenshots, downloads, email forwarding, or posting to social media, forums, messaging groups, or other platforms."
+
+and:
+
+> "Use job listings or data obtained through your subscription for any commercial purpose, including operating a competing service, reselling access, or building a database of job listings."
+
+The README at `github.com/remotive-io/remote-jobs-api` advises attribution back-links as an etiquette norm, but that document is not the binding terms-of-use.
+
+**Decision:** Exclude Remotive from v1. Do not write the adapter; keep the preset entry with `enabled: false` and a comment pointing here. The pluggable adapter pattern means re-adding it later is a single new file plus an ADR update.
+
+**Consequences:**
+- ~one source's worth of remote-EU posting volume is unavailable in v1.
+- We avoid a defensible-but-borderline use of redistributed data on a public dashboard.
+- If a future legal review or explicit written permission from Remotive changes the calculus, supersede this ADR rather than rewriting it.
+- HN Algolia is the other "community" source originally scoped into P3; it is deferred to P4 alongside LLM-assisted comment parsing. That is a scope-shift, not an architectural decision, so it lives in `README.md` and the session log rather than as its own ADR.
+
+---

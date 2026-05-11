@@ -1,8 +1,8 @@
 # v1 preset — data-analyst roles, Ireland-focused with Eurozone context.
 #
 # All sources start with `enabled: false` at P0. Each phase flips one source on:
-#   P1 enables adzuna; P3 enables greenhouse/lever/ashby/personio/remotive/hn_algolia;
-#   P4 enables the benchmarks block.
+#   P1 enables adzuna; P3 enables greenhouse/lever/ashby/personio;
+#   P4 enables the benchmarks block + hn_algolia (LLM-assisted comment parsing).
 #
 # Adding a new role/geo = copy this file, change ids/keywords/countries.
 
@@ -10,7 +10,7 @@ preset_id: data_analyst_ireland
 title: "Data Analyst — Ireland"
 description: >
   Job postings for data-analyst-flavoured roles in Ireland, with Eurozone-wide
-  context via Adzuna and Remotive. Salary benchmarked against CSO Ireland and OECD.
+  context via Adzuna. Salary benchmarked against CSO Ireland and OECD.
 
 # ISCO-08 4-digit codes the dashboard surfaces front-and-centre.
 isco_focus:
@@ -23,7 +23,7 @@ sources:
     enabled: true
     # Adzuna does NOT serve "ie" in 2026. We use "gb" as a labour-market proxy
     # (English-language, geographically adjacent, similar wage levels) until
-    # Adzuna adds Ireland. Real Irish coverage comes from ATS + Remotive in P3.
+    # Adzuna adds Ireland. Real Irish coverage comes from ATS adapters below.
     countries: ["gb"]
     keywords: ["data analyst", "analytics engineer", "bi analyst"]
     max_results: 500
@@ -32,32 +32,40 @@ sources:
     min_interval_hours: 24    # refresh.yml honours this; raise if free tier bites
 
   greenhouse:
-    enabled: false        # → true at P3
+    enabled: true
     companies_file: config/companies/dublin_tech.yaml
     keywords: ["analyst", "analytics"]
-
-  lever:
-    enabled: false        # → true at P3
-    companies_file: config/companies/dublin_tech.yaml
-    keywords: ["analyst", "analytics"]
-
-  ashby:
-    enabled: false        # → true at P3
-    companies_file: config/companies/dublin_tech.yaml
-    keywords: ["analyst", "analytics"]
-
-  personio:
-    enabled: false        # off by default — German-skewed
-    companies_file: config/companies/dublin_tech.yaml
-
-  remotive:
-    enabled: false        # → true at P3
-    keywords: ["data analyst"]
     countries: ["ie", "remote-europe"]
 
+  lever:
+    enabled: true
+    companies_file: config/companies/dublin_tech.yaml
+    keywords: ["analyst", "analytics"]
+    countries: ["ie", "remote-europe"]
+
+  ashby:
+    enabled: true
+    companies_file: config/companies/dublin_tech.yaml
+    keywords: ["analyst", "analytics"]
+    countries: ["ie", "remote-europe"]
+    include_compensation: true
+
+  personio:
+    enabled: true
+    companies_file: config/companies/dublin_tech.yaml
+    keywords: ["analyst", "analytics", "analytiker"]
+    countries: ["ie", "de"]   # Personio is German-skewed; include DE for slug fan-out
+
+  remotive:
+    # Excluded — see DECISIONS.md ADR-009.
+    # Remotive ToS §8 prohibits redistribution + commercial database-building;
+    # the public-API README's attribution back-link advice does not override.
+    enabled: false
+
   hn_algolia:
-    enabled: false        # → true at P3
-    keywords: ["data analyst Dublin OR Ireland"]
+    # Deferred to P4 alongside LLM extraction — "Who is hiring?" comments are
+    # free-text and benefit substantially from LLM-assisted title/salary parsing.
+    enabled: false
 
 benchmarks:
   cso:
