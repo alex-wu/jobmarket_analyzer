@@ -118,3 +118,9 @@ exclude_lines = [
 ]
 show_missing = true
 skip_covered = false
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "pandas>=2.2,<3",
+]

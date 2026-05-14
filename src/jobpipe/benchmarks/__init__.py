@@ -25,7 +25,12 @@ class BenchmarkAdapter(Protocol):
     name: str
     config_model: type[BenchmarkConfig]
 
-    def fetch(self, config: BenchmarkConfig) -> pd.DataFrame: ...
+    def fetch(
+        self,
+        config: BenchmarkConfig,
+        *,
+        rates: dict[str, float] | None = None,
+    ) -> pd.DataFrame: ...
 
 
 _REGISTRY: dict[str, BenchmarkAdapter] = {}

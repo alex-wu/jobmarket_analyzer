@@ -1,0 +1,65 @@
+{
+  "version": "2.0",
+  "class": "dataset",
+  "label": "Structure of earnings survey - annual earnings",
+  "source": "ESTAT",
+  "updated": "2026-02-09T23:00:00+0100",
+  "id": ["freq", "nace_r2", "isco08", "worktime", "age", "sex", "indic_se", "geo", "time"],
+  "size": [1, 1, 4, 1, 1, 1, 1, 2, 2],
+  "dimension": {
+    "freq": {
+      "label": "Frequency",
+      "category": {"index": {"A": 0}, "label": {"A": "Annual"}}
+    },
+    "nace_r2": {
+      "label": "NACE Rev. 2",
+      "category": {"index": {"B-S_X_O": 0}, "label": {"B-S_X_O": "All NACE except O"}}
+    },
+    "isco08": {
+      "label": "ISCO-08 occupation",
+      "category": {
+        "index": {"OC2": 0, "OC25": 1, "OC2511": 2, "OC2521": 3},
+        "label": {
+          "OC2": "Professionals",
+          "OC25": "ICT professionals",
+          "OC2511": "Systems analysts",
+          "OC2521": "Database designers and administrators"
+        }
+      }
+    },
+    "worktime": {
+      "label": "Working time",
+      "category": {"index": {"FT": 0}, "label": {"FT": "Full-time"}}
+    },
+    "age": {
+      "label": "Age",
+      "category": {"index": {"TOTAL": 0}, "label": {"TOTAL": "Total"}}
+    },
+    "sex": {
+      "label": "Sex",
+      "category": {"index": {"T": 0}, "label": {"T": "Total"}}
+    },
+    "indic_se": {
+      "label": "Indicator",
+      "category": {"index": {"MEAN_E_EUR": 0}, "label": {"MEAN_E_EUR": "Mean annual earnings, EUR"}}
+    },
+    "geo": {
+      "label": "Country",
+      "category": {
+        "index": {"IE": 0, "DE": 1},
+        "label": {"IE": "Ireland", "DE": "Germany"}
+      }
+    },
+    "time": {
+      "label": "Year",
+      "category": {
+        "index": {"2018": 0, "2022": 1},
+        "label": {"2018": "2018", "2022": "2022"}
+      }
+    }
+  },
+  "value": {
+    "0": 50000, "1": 55000, "2": 70000, "3": 75000, "4": 55000, "5": 60000, "6": 80000, "7": 85000,
+    "8": 52000, "9": 58000, "10": 72000, "11": 78000, "12": 58000, "13": 62000, "14": 82000, "15": 88000
+  }
+}

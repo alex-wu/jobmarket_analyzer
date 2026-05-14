@@ -69,17 +69,27 @@ sources:
 
 benchmarks:
   cso:
-    enabled: false        # → true at P4
-    countries: ["ie"]
-    isco_codes: ["2521", "2511"]
+    enabled: true
+    countries: ["IE"]
+    isco_codes: ["2521", "2511", "2423"]
+    min_interval_hours: 168    # CSO PxStat is quarterly; weekly recheck is plenty
 
   oecd:
-    enabled: false        # → true at P4
+    # Adapter ships disabled. The live endpoint at sdmx.oecd.org is fronted by
+    # Cloudflare bot protection, which returns 403 + HTML to unauthenticated
+    # GitHub-Actions workers. Flip back to true once we have a workaround
+    # (auth header, mirror CSV, fixed-egress proxy). The adapter is fully
+    # implemented and fixture-tested.
+    enabled: false
     countries: ["IE", "DE", "FR", "NL", "ES"]
+    isco_codes: ["2521", "2511", "2423"]
+    min_interval_hours: 720    # monthly cadence (OECD ELS series is annual)
 
   eurostat:
-    enabled: false        # → true at P4 (flag 4-year lag in dashboard)
-    countries: ["IE"]
+    enabled: true
+    countries: ["IE", "DE", "FR", "NL", "ES"]
+    isco_codes: ["2511", "2521", "2423"]
+    min_interval_hours: 720    # monthly cadence (SES rebases every 4 years)
 
 publish:
   partition_by: ["country", "year_month"]

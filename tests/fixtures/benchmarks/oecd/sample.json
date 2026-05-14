@@ -1,0 +1,67 @@
+{
+  "data": {
+    "dataSets": [
+      {
+        "action": "Information",
+        "observations": {
+          "0:0:0:0": [55000.0, 0],
+          "1:0:0:0": [48000.0, 0],
+          "0:1:0:0": [62000.0, 1],
+          "0:2:0:0": [45000.0, 0]
+        }
+      }
+    ],
+    "structures": [
+      {
+        "id": "DSD_EARNINGS_DUMMY",
+        "dimensions": {
+          "observation": [
+            {
+              "id": "ISCO08",
+              "name": "ISCO occupation",
+              "values": [
+                {"id": "2511", "name": "Systems analysts"},
+                {"id": "2521", "name": "Database designers and administrators"}
+              ]
+            },
+            {
+              "id": "REF_AREA",
+              "name": "Country",
+              "values": [
+                {"id": "IE", "name": "Ireland"},
+                {"id": "GB", "name": "United Kingdom"},
+                {"id": "ZZ", "name": "Unknown-currency country"}
+              ]
+            },
+            {
+              "id": "TIME_PERIOD",
+              "name": "Year",
+              "values": [
+                {"id": "2022", "name": "2022"}
+              ]
+            },
+            {
+              "id": "SEX",
+              "name": "Sex",
+              "values": [
+                {"id": "T", "name": "Total"}
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "observation": [
+            {
+              "id": "UNIT_MEASURE",
+              "name": "Currency",
+              "values": [
+                {"id": "EUR", "name": "Euro"},
+                {"id": "GBP", "name": "Pound sterling"}
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

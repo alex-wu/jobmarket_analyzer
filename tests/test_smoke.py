@@ -96,8 +96,10 @@ def test_source_register_rejects_non_adapter() -> None:
             pass
 
 
-def test_benchmark_registry_is_empty_at_p0() -> None:
-    assert benchmarks.names() == []
+def test_benchmark_registry_lists_known_adapters() -> None:
+    # P4 registers cso, eurostat, and (disabled-by-default) oecd.
+    for name in ("cso", "eurostat", "oecd"):
+        assert name in benchmarks.names(), f"missing {name} in benchmark registry"
 
 
 def test_benchmark_registry_get_raises_for_unknown() -> None:
