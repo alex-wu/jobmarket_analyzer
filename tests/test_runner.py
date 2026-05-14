@@ -12,14 +12,17 @@ from jobpipe import benchmarks, sources
 from jobpipe.benchmarks import BenchmarkConfig
 from jobpipe.runner import (
     EmptyRunError,
+    NoEnrichedRunError,
     NoRawRunError,
     PresetError,
     fetch_benchmarks,
     fetch_sources,
+    find_latest_enriched,
     find_latest_raw,
     load_preset,
     run_fetch,
     run_normalise,
+    run_publish,
     write_raw_parquet,
 )
 from jobpipe.sources import SourceConfig, SourceFetchError
@@ -392,6 +395,117 @@ def test_fetch_benchmarks_throttle_skips_recent_run(
 def test_fetch_benchmarks_empty_when_none_declared(tmp_path: Path) -> None:
     preset = {"preset_id": "demo"}
     assert fetch_benchmarks(preset, tmp_path / "data") == []
+
+
+# --- Publish (run_publish + find_latest_enriched) ------------------------
+
+
+def test_find_latest_enriched_returns_newest_and_handles_benchmarks(tmp_path: Path) -> None:
+    import os
+
+    enriched_root = tmp_path / "enriched"
+    older = enriched_root / "demo__20260101T000000Z-aaaaaaaa"
+    newer = enriched_root / "demo__20260601T000000Z-bbbbbbbb"
+    older.mkdir(parents=True)
+    newer.mkdir(parents=True)
+    pd.DataFrame([_valid_posting_row(0)]).to_parquet(older / "postings.parquet", index=False)
+    pd.DataFrame([_valid_posting_row(1)]).to_parquet(newer / "postings.parquet", index=False)
+    # Only the newer run has a sibling benchmarks parquet.
+    pd.DataFrame([_valid_posting_row(99)]).to_parquet(newer / "benchmarks.parquet", index=False)
+
+    older_ts = datetime(2026, 1, 1, tzinfo=UTC).timestamp()
+    newer_ts = datetime(2026, 6, 1, tzinfo=UTC).timestamp()
+    os.utime(older, (older_ts, older_ts))
+    os.utime(newer, (newer_ts, newer_ts))
+
+    postings, bench = find_latest_enriched("demo", tmp_path)
+    assert postings == newer / "postings.parquet"
+    assert bench == newer / "benchmarks.parquet"
+
+
+def test_find_latest_enriched_returns_none_for_benchmarks_when_absent(tmp_path: Path) -> None:
+    run_dir = tmp_path / "enriched" / "demo__20260101T000000Z-aaaaaaaa"
+    run_dir.mkdir(parents=True)
+    pd.DataFrame([_valid_posting_row(0)]).to_parquet(run_dir / "postings.parquet", index=False)
+
+    postings, bench = find_latest_enriched("demo", tmp_path)
+    assert postings == run_dir / "postings.parquet"
+    assert bench is None
+
+
+def test_find_latest_enriched_raises_when_missing(tmp_path: Path) -> None:
+    (tmp_path / "enriched").mkdir()
+    with pytest.raises(NoEnrichedRunError, match="demo"):
+        find_latest_enriched("demo", tmp_path)
+
+
+def test_run_publish_end_to_end(
+    fake_source_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85})
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": True, "n_rows": 3}},
+            "publish": {"partition_by": ["country", "year_month"]},
+        },
+    )
+    run_fetch(preset_path, out_root=tmp_path / "data")
+    enriched_out = run_normalise(preset_path, out_root=tmp_path / "data")
+
+    bundle = run_publish(preset_path, out_root=tmp_path / "data")
+    assert bundle.exists()
+    # `run_id` from enriched dir propagates through.
+    assert bundle.name == enriched_out.parent.name
+    assert bundle.parent.name == "publish"
+
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["preset_id"] == "demo"
+    assert manifest["run_id"] == enriched_out.parent.name
+    assert manifest["postings"]["row_count"] == 3
+
+
+def test_run_publish_raises_when_publish_block_missing(tmp_path: Path) -> None:
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": False}},
+        },
+    )
+    with pytest.raises(PresetError, match="publish"):
+        run_publish(preset_path, out_root=tmp_path / "data")
+
+
+def test_run_publish_raises_when_partition_by_empty(tmp_path: Path) -> None:
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": False}},
+            "publish": {"partition_by": []},
+        },
+    )
+    with pytest.raises(PresetError, match="partition_by"):
+        run_publish(preset_path, out_root=tmp_path / "data")
+
+
+def test_run_publish_raises_when_no_enriched_bundle(tmp_path: Path) -> None:
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": False}},
+            "publish": {"partition_by": ["country", "year_month"]},
+        },
+    )
+    with pytest.raises(NoEnrichedRunError):
+        run_publish(preset_path, out_root=tmp_path / "data")
 
 
 def test_run_normalise_writes_sibling_benchmarks_parquet(

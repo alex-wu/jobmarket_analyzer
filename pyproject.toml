@@ -50,9 +50,9 @@ dev = [
 jobpipe = "jobpipe.cli:app"
 
 [project.urls]
-Repository = "https://github.com/USER/jobmarket_analyzer"
-Documentation = "https://github.com/USER/jobmarket_analyzer#readme"
-Issues = "https://github.com/USER/jobmarket_analyzer/issues"
+Repository = "https://github.com/alex/jobmarket_analyzer"
+Documentation = "https://github.com/alex/jobmarket_analyzer#readme"
+Issues = "https://github.com/alex/jobmarket_analyzer/issues"
 
 [build-system]
 requires = ["hatchling"]

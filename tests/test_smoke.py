@@ -44,10 +44,10 @@ def test_cli_normalise_errors_on_missing_preset() -> None:
     assert "preset" in result.stderr.lower()
 
 
-def test_cli_publish_skeleton_exits_ok() -> None:
-    result = runner.invoke(app, ["publish", "--preset", "x.yaml"])
-    assert result.exit_code == 0
-    assert "publish" in result.stdout
+def test_cli_publish_errors_on_missing_preset() -> None:
+    result = runner.invoke(app, ["publish", "--preset", "definitely_missing.yaml"])
+    assert result.exit_code == 2
+    assert "preset" in result.stderr.lower()
 
 
 def test_settings_defaults_load(monkeypatch: pytest.MonkeyPatch) -> None:
