@@ -139,7 +139,7 @@ def _parse_dataset(
         logger.warning("oecd: structure missing ISCO/REF_AREA dimensions: %s", dim_ids)
         return _empty_frame()
 
-    requested_isco = {c for c in isco_codes}
+    requested_isco = set(isco_codes)
     requested_countries = {c.upper() for c in countries}
 
     rows: list[dict[str, Any]] = []
