@@ -1,0 +1,62 @@
+{
+  "class": "dataset",
+  "label": "Average Earnings, Hours Worked, Employment and Labour Costs",
+  "source": "Central Statistics Office (CSO) Ireland",
+  "updated": "2026-02-15T10:00:00Z",
+  "id": ["STATISTIC", "TLIST(Q1)", "C02665V03225", "C02397V02888"],
+  "size": [2, 2, 2, 4],
+  "dimension": {
+    "STATISTIC": {
+      "label": "Statistic",
+      "category": {
+        "index": ["EHQ03C01", "EHQ03C02"],
+        "label": {
+          "EHQ03C01": "Employment",
+          "EHQ03C02": "Average Weekly Earnings"
+        }
+      }
+    },
+    "TLIST(Q1)": {
+      "label": "Quarter",
+      "category": {
+        "index": ["20253", "20254"],
+        "label": {
+          "20253": "2025Q3",
+          "20254": "2025Q4"
+        }
+      }
+    },
+    "C02665V03225": {
+      "label": "Economic Sector NACE Rev 2",
+      "category": {
+        "index": ["-", "J"],
+        "label": {
+          "-": "All NACE economic sectors",
+          "J": "Information and communication (J)"
+        }
+      }
+    },
+    "C02397V02888": {
+      "label": "Type of Employee",
+      "category": {
+        "index": ["-", "1", "2", "3"],
+        "label": {
+          "-": "All employees",
+          "1": "Managers, professionals and associated professionals",
+          "2": "Clerical, sales and service employees",
+          "3": "Production, transport, craft and other manual workers"
+        }
+      }
+    }
+  },
+  "value": [
+    100, 200, 300, 400,
+    110, 210, 310, 410,
+    150, 250, 350, 450,
+    160, 260, 360, 460,
+    1000, 1100, 900, 800,
+    1010, 1110, 910, 810,
+    1500, 1200, 1000, 900,
+    1510, 1210, 1010, 910
+  ]
+}
