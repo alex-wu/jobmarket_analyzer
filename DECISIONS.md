@@ -12,7 +12,7 @@ When a decision changes, mark the old entry `Superseded` and add a new entry; do
 
 **Status:** Accepted, 2026-05-11.
 
-**Context:** The project targets GitHub Pages — a static-only host. Refresh cadence is daily/weekly batch. The earlier `Project_Objectives.md` spec (now archived under `docs/history/`) prescribed Dagster.
+**Context:** The project targets GitHub Pages — a static-only host. Refresh cadence is daily/weekly batch. An earlier `Project_Objectives.md` spec prescribed Dagster.
 
 **Decision:** Use a GitHub Actions cron workflow (`.github/workflows/refresh.yml`) as the orchestrator. The pipeline is a plain Python CLI (`jobpipe fetch | normalise | publish`).
 
@@ -225,5 +225,96 @@ This was discovered during the P4 pre-flight probe — the original plan assumed
 - CSO benchmark rows are usable for ballpark salary comparisons within a broad professional-grade tier, not for fine-grained ISCO-2511-vs-2521 differentiation.
 - The Eurostat SES adapter does ship 2-digit ISCO breakdowns (`OC25`) but at a 4-year-lagged annual cadence — different trade-off.
 - If CSO ever publishes a cube indexed by 4-digit ISCO (e.g. via a new National Employment Survey release), adapter the new cube's code in a new `dataset_code` config field; existing tests stay valid against the EHQ03 path.
+
+---
+
+## ADR-013 · HN Algolia + LLM client descoped from v1
+
+**Status:** Accepted, 2026-05-14.
+
+**Context:** P3 deferred Hacker News Algolia ("Who is hiring?" comment-scraping) to P4, and P4 deferred both it and the real OpenAI-compatible LLM client to a follow-up PR. v1's architectural narrative is the pluggable-adapter pattern, the deterministic ISCO path, and the free-tier deploy story — none of which require an LLM. Carrying HN + LLM into v1 adds an API-key dependency, taxonomy drift, reproducibility cost (LLM outputs vary), and a second class of CI secrets to manage. Pre-P5 cleanup pulled the trigger.
+
+**Decision:** Both are out of scope for v1.
+
+- Remove the `hn_algolia` block from `config/runs/data_analyst_ireland.yaml`; replace with a one-line comment referencing this ADR so the absence is intentional.
+- Remove `LLM_*` env vars from `.env.example`.
+- Keep `src/jobpipe/llm.py` as a documented stub: `classify_title_to_isco` + `LLMUnavailableError` are the locked contract. Nothing in the v1 pipeline imports the public function.
+
+**Consequences:**
+- Zero LLM-related env vars are required for v1 to materialise the dashboard.
+- CI stays `LLM_ENABLED=false` permanently for v1; no fake LLM endpoint needed in tests.
+- Re-introducing the feature post-v1 is a new ADR + one source adapter (`hn_algolia.py`) + the real client implementation in `llm.py`. The pluggable-adapter pattern (ADR-008) means no other code needs to change.
+- ADR-007 (LLM optional, openai-compatible) is **not superseded** — it still describes the eventual shape. ADR-013 narrows what ships in v1.
+- The dashboard story is unaffected: deterministic rapidfuzz ISCO matches are the only path users see; rows the tagger can't classify show "Unclassified" rather than waiting on an LLM fallback.
+
+---
+
+## ADR-014 · Local-only files excluded from the public repo
+
+**Status:** Accepted, 2026-05-14.
+
+**Context:** Several artefacts live in the working tree to support AI-assisted development:
+
+- `CLAUDE.md` — verbose project guide written for Claude Code sessions (priority order of docs, hard rules, open-questions list, AI-specific git workflow).
+- `.claude/` — per-IDE Claude settings, plan files, transcripts.
+- `docs/sessions/` — per-session handover logs written by an AI agent at the end of each working session.
+- `docs/history/` — superseded specs from earlier project phases (e.g. the original Dagster-centric `Project_Objectives.md`).
+
+Their value is local. Pushed to a public OSS portfolio repo they (a) add maintenance overhead (every architectural change needs synchronising in two places), (b) signal AI-tool-specific scaffolding that's not part of the project's contract with contributors, and (c) can carry session state or stale prescriptions that aren't meant to inform a new reader of the project.
+
+**Decision:** All four are gitignored and untracked.
+
+- `.gitignore` lists `CLAUDE.md`, `.claude/`, `docs/sessions/`, and `docs/history/`.
+- The load-bearing content migrates to public docs before the files are untracked: hard rules + testing discipline + git workflow → `CONTRIBUTING.md`; module layout → `docs/architecture.md`; open-questions list → `docs/open-questions.md`. The phase-by-phase narrative lives in `CHANGELOG.md`; ADRs in `DECISIONS.md` carry the *why* for every locked decision.
+- Forks pick up their own AI scaffolding rather than inheriting ours.
+
+**Consequences:**
+- `git rm --cached` removes the tracked copies; the files stay on disk for local use.
+- The branch has not been pushed to a public remote yet (verified at the time of this ADR), so no history rewrite is needed. If a public push had already happened, scrub-from-history (`git filter-repo --invert-paths --path <file>`) would be the required follow-up.
+- New contributors get a fully self-documenting repo without needing to know about Claude Code or to wade through phase-by-phase session diaries.
+- Session logs continue to be written locally — they remain useful as an AI-collaboration journal — they just don't ship.
+
+---
+
+## ADR-015 · httpx credential redaction filter on the CLI logger
+
+**Status:** Accepted, 2026-05-14.
+
+**Context:** Free-tier sources commonly pass credentials as URL query parameters. Adzuna does (`app_id` + `app_key`); future sources are likely to follow the same pattern. httpx logs full request URLs at INFO. When `jobpipe fetch --verbose` runs in a GitHub Actions workflow, the workflow log captures those URLs. Anyone with read access to the repo's Actions runs would then see the keys in plaintext.
+
+**Decision:** Install a `CredentialScrubFilter` (in `src/jobpipe/cli.py`) on the `httpx` and `httpcore` loggers at CLI entry. The filter rewrites known credential query-param values in `LogRecord.msg` and `LogRecord.args` to `REDACTED` before the record reaches any handler. Param names are matched case-insensitively from a small list (`app_id`, `app_key`, `api_key`, `api-key`) covering current and likely-future adapters.
+
+**Consequences:**
+- The fix is central and adapter-agnostic — a new source that passes secrets via query params is automatically covered as long as its param name is on the list (or added to it). No per-adapter discipline required.
+- Filter installation is idempotent and is also done before any HTTP traffic flies, so even early-init log lines are scrubbed.
+- The filter does **not** redact secrets in `Authorization` / `X-Api-Key` *headers* — httpx does not log headers at INFO, so those don't currently leak. If a future source needs header-based auth and a different log level, extend the filter to inspect formatted args containing header names.
+- This is a defence layer, not a substitute for not logging URLs at all. The CLI keeps `--verbose` opt-in (default is WARNING); CI workflows in P5 will run without `--verbose` by default.
+- Unit-tested centrally in `tests/test_log_redaction.py`. The pattern is the same one already used by the pytest-recording VCR scrubber in `tests/conftest.py` (the project abandoned VCR after P3 but the scrub list is consistent).
+
+---
+
+## ADR-016 · GitHub Pages deploy via `actions/deploy-pages` from the monorepo
+
+**Status:** Accepted, 2026-05-14.
+
+**Context:** The architecture diagram (`docs/architecture.md`) and the README badges have referenced GitHub Pages since P0, but no decision recorded *how* the static site reaches Pages. Three options were live:
+
+1. `actions/deploy-pages` from the same repo — modern, OIDC-friendly, Pages source = "GitHub Actions".
+2. Push the built site to a `gh-pages` branch — older pattern, still works.
+3. Separate repo for the dashboard, fed from this repo's Releases — cleaner separation, doubles CI overhead.
+
+**Decision:** Option 1, monorepo.
+
+- `site/` lives in this repo. A new `.github/workflows/pages.yml` (lands in P7) builds the Observable Framework project, uploads the build directory via `actions/upload-pages-artifact`, and deploys via `actions/deploy-pages`.
+- Triggers: `workflow_run` after `refresh.yml` (P5) completes successfully, plus `workflow_dispatch` for manual deploys and `push` to `main` under `site/**` for dashboard iteration.
+- Workflow permissions: `pages: write`, `id-token: write`, `contents: read`.
+- Repository setting: Settings → Pages → Source = **GitHub Actions** (not "Deploy from a branch"). Documented in `docs/github-setup.md`.
+
+**Consequences:**
+- Single CI ordering: `refresh.yml` produces data, `pages.yml` rebuilds the site against the latest release. No cross-repo trigger plumbing.
+- Public URL: `https://<owner>.github.io/jobmarket_analyzer/`. The Observable build needs to set its base path accordingly (Observable Framework's `root` config setting); handled in P6 when `site/` is scaffolded.
+- If we ever want a custom domain or more aggressive Pages caching, the OIDC deploy path is the easier baseline to extend. Switching to a `gh-pages` branch in future would supersede this ADR.
+- Data flow: `refresh.yml` uploads partitioned Parquet to GitHub Releases (per ADR-004); the Observable data loader fetches the `latest` release at build time. The dashboard does **not** read from raw repo paths, which means the Pages deploy never has to wait for a Parquet commit, and the repo doesn't bloat with binary data.
+- Manual setup beyond `.github/workflows/pages.yml`: enable Pages with "GitHub Actions" source; configure Adzuna secrets; enable secret scanning + push protection. All catalogued in `docs/github-setup.md`.
 
 ---

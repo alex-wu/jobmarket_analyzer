@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Pre-P5 cleanup (2026-05-15)
+- **Security: httpx URL credential redaction.** `CredentialScrubFilter` installed on the `httpx` / `httpcore` loggers from `src/jobpipe/cli.py` at every CLI entry point. Replaces `app_id` / `app_key` / `api_key` / `api-key` query-param values with `REDACTED` in log records before any handler sees them. Tested centrally in `tests/test_log_redaction.py`. Closes the pre-P5 must-fix; `--verbose` runs are now safe to ship to GitHub Actions logs. See [ADR-015](DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger).
+- **Scope: HN Algolia + LLM client descoped from v1.** `hn_algolia` block removed from `config/runs/data_analyst_ireland.yaml`; `LLM_*` env vars removed from `.env.example`; `src/jobpipe/llm.py` retained as a documented stub so a post-v1 PR can drop in the real client without rippling through callers. See [ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1).
+- **Privacy: local AI-collaboration scaffolding gitignored.** `CLAUDE.md`, `.claude/`, `docs/sessions/`, `docs/history/` all untracked + gitignored. Load-bearing content migrated to public docs: hard rules + testing discipline + git workflow → `CONTRIBUTING.md`; module layout → `docs/architecture.md`; open-questions list → new `docs/open-questions.md`. See [ADR-014](DECISIONS.md#adr-014--local-only-files-excluded-from-the-public-repo).
+- **Deploy: GitHub Pages strategy locked.** Monorepo with `site/`, deployed via `actions/deploy-pages` (Pages source = "GitHub Actions"). One-time manual GitHub config checklisted in new `docs/github-setup.md`. See [ADR-016](DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo).
+- **Docs: README + architecture.md updated** to point at the new ADRs, drop HN references, add a Deploy section, and link to `docs/open-questions.md` as the single source of truth for unresolved items.
+- **Test robustness:** `tests/test_smoke.py::test_settings_defaults_load` now clears `ADZUNA_*` / `LLM_*` / `GH_TOKEN` via `monkeypatch.delenv` before asserting defaults — `Settings(_env_file=None)` only disables `.env` reading, not OS env var pickup, so a developer with those vars set in their shell was getting a false failure.
+
 ### Added — P4 (2026-05-14)
 - `src/jobpipe/isco/` — rapidfuzz-based ISCO-08 tagger. `loader.py` reads the static ESCO snapshot (cached per resolved path); `tagger.py` runs `rapidfuzz.process.extractOne(title, candidates, scorer=token_set_ratio, score_cutoff=88)` to populate `isco_code` / `isco_match_method` / `isco_match_score` on postings. Pure DataFrame in / DataFrame out, no HTTP at runtime.
 - `config/esco/isco08_labels.parquet` — 2 137 labels × 436 unique 4-digit ISCO codes, built from ESCO v1.2.1 via `scripts/build_esco_snapshot.py`. The snapshot walks the ISCO concept tree from the 10 major groups (ESCO's `/api/search` and `/api/resource/concept?isInScheme=...` paginations both cap at offset=100). Provenance + EUPL-1.2 attribution in `config/esco/README.md`.
@@ -77,6 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI workflow (`.github/workflows/ci.yml`): ruff, mypy strict, pytest with coverage gate, licence audit.
 - Pre-commit hooks (ruff, mypy, end-of-file fixer, check-yaml/toml).
 - Architecture diagram in `docs/architecture.md`.
-- Original Dagster-centric spec archived under `docs/history/`.
+- Original Dagster-centric spec superseded by ADR-001.
 
 [Unreleased]: https://github.com/USER/jobmarket_analyzer/compare/HEAD...HEAD

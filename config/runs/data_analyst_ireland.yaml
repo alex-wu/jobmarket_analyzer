@@ -1,8 +1,8 @@
 # v1 preset — data-analyst roles, Ireland-focused with Eurozone context.
 #
-# All sources start with `enabled: false` at P0. Each phase flips one source on:
+# Each phase flips one source on:
 #   P1 enables adzuna; P3 enables greenhouse/lever/ashby/personio;
-#   P4 enables the benchmarks block + hn_algolia (LLM-assisted comment parsing).
+#   P4 enables the benchmarks block (cso + eurostat; oecd disabled per ADR-011).
 #
 # Adding a new role/geo = copy this file, change ids/keywords/countries.
 
@@ -62,10 +62,8 @@ sources:
     # the public-API README's attribution back-link advice does not override.
     enabled: false
 
-  hn_algolia:
-    # Deferred to P4 alongside LLM extraction — "Who is hiring?" comments are
-    # free-text and benefit substantially from LLM-assisted title/salary parsing.
-    enabled: false
+  # HN Algolia + LLM-assisted comment parsing are descoped from v1 — see ADR-013.
+  # When they return, restore an `hn_algolia` block here.
 
 benchmarks:
   cso:

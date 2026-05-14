@@ -50,7 +50,19 @@ def test_cli_publish_skeleton_exits_ok() -> None:
     assert "publish" in result.stdout
 
 
-def test_settings_defaults_load() -> None:
+def test_settings_defaults_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Strip any LLM_* / ADZUNA_* / GH_TOKEN that the local shell or a developer
+    # .env may have exported so the assertions actually exercise the defaults.
+    for var in (
+        "ADZUNA_APP_ID",
+        "ADZUNA_APP_KEY",
+        "LLM_ENABLED",
+        "LLM_BASE_URL",
+        "LLM_API_KEY",
+        "LLM_MODEL",
+        "GH_TOKEN",
+    ):
+        monkeypatch.delenv(var, raising=False)
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.llm_enabled is False
     assert s.adzuna_app_id == ""

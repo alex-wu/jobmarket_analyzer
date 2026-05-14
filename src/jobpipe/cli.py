@@ -13,6 +13,7 @@ still skeletons until P2 / P5.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import typer
@@ -25,6 +26,42 @@ from jobpipe.runner import (
     run_fetch,
     run_normalise,
 )
+
+# Query-param names treated as secret. Matched case-insensitively; both
+# underscore and hyphen forms covered. See DECISIONS.md ADR-015.
+_CREDENTIAL_PARAMS = ("app_id", "app_key", "api_key", "api-key")
+_CREDENTIAL_RE = re.compile(
+    r"(?i)\b(" + "|".join(re.escape(p) for p in _CREDENTIAL_PARAMS) + r")=[^&\s'\"]+"
+)
+
+
+class CredentialScrubFilter(logging.Filter):
+    """Replace credential query-param values in log records with ``REDACTED``.
+
+    httpx + httpcore log full request URLs at INFO. Adzuna (and likely future
+    free-tier sources) pass credentials as URL query params, so anything
+    captured to the GitHub Actions workflow log would otherwise expose them.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str) and "=" in record.msg:
+            record.msg = _CREDENTIAL_RE.sub(r"\1=REDACTED", record.msg)
+        if record.args:
+            record.args = tuple(
+                _CREDENTIAL_RE.sub(r"\1=REDACTED", a) if isinstance(a, str) else a
+                for a in record.args
+            )
+        return True
+
+
+def _install_credential_scrub() -> None:
+    """Attach the scrubber to httpx + httpcore loggers (idempotent)."""
+    scrub = CredentialScrubFilter()
+    for name in ("httpx", "httpcore"):
+        lg = logging.getLogger(name)
+        if not any(isinstance(f, CredentialScrubFilter) for f in lg.filters):
+            lg.addFilter(scrub)
+
 
 app = typer.Typer(
     name="jobpipe",
@@ -68,6 +105,7 @@ def fetch(
         level=logging.INFO if verbose else logging.WARNING,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    _install_credential_scrub()
     try:
         out = run_fetch(preset, out_root=out_root)
     except PresetError as exc:
@@ -95,6 +133,7 @@ def normalise(
         level=logging.INFO if verbose else logging.WARNING,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    _install_credential_scrub()
     try:
         out = run_normalise(preset, out_root=out_root)
     except PresetError as exc:

@@ -52,5 +52,9 @@ Thumbs.db
 *.log
 logs/
 
-# IDE-local Claude settings
-.claude/settings.local.json
+# Local AI-collaboration scaffolding (see DECISIONS.md ADR-014)
+.claude/
+.agents/
+CLAUDE.md
+docs/sessions/
+docs/history/

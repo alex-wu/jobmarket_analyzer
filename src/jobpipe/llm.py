@@ -1,18 +1,15 @@
-"""Optional LLM client interface — stub for P4, real implementation in a follow-up.
+"""Optional LLM client interface — stub for v1; do not import in production code.
 
-Per DECISIONS.md ADR-007, the pipeline must materialise end-to-end with
-``LLM_ENABLED=false`` (default). The CI cron leaves LLM off; local runs that
-opt in (and accept the API cost) get the gap-filling pass on top of the
-deterministic rapidfuzz path.
+Per DECISIONS.md ADR-013, HN Algolia + the real LLM client are descoped from
+v1. This module persists only to lock the calling contract so a future PR can
+drop in the real client without rippling through callers. ADR-007 keeps the
+pipeline materialising end-to-end with ``LLM_ENABLED=false`` as the default,
+which is also v1's permanent CI configuration.
 
-This module exists in P4 only to nail the calling contract so the follow-up
-PR drops in the real client without rippling through callers. Nothing in
-the current pipeline imports the public functions yet.
-
-Future use cases:
+Future use cases (post-v1):
 * ``classify_title_to_isco`` — fill ``isco_match_method="llm"`` rows where
   rapidfuzz scored below ADR-006's 0.88 cutoff.
-* "Who is hiring?" HN Algolia comment extraction (separate adapter).
+* "Who is hiring?" HN Algolia comment extraction (separate source adapter).
 """
 
 from __future__ import annotations
