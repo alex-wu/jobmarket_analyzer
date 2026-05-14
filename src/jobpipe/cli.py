@@ -19,12 +19,15 @@ from pathlib import Path
 import typer
 
 from jobpipe import __version__
+from jobpipe.duckdb_io import PublishError
 from jobpipe.runner import (
     EmptyRunError,
+    NoEnrichedRunError,
     NoRawRunError,
     PresetError,
     run_fetch,
     run_normalise,
+    run_publish,
 )
 
 # Query-param names treated as secret. Matched case-insensitively; both
@@ -148,7 +151,30 @@ def normalise(
 
 @app.command()
 def publish(
-    preset: Path = typer.Option(..., "--preset"),  # noqa: B008
+    preset: Path = typer.Option(..., "--preset", help="Path to a run preset YAML."),  # noqa: B008
+    out_root: Path = typer.Option(  # noqa: B008
+        Path("data"),
+        "--out-root",
+        help="Where data/enriched and data/publish live. Defaults to ./data.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable INFO logging."),
 ) -> None:
     """Export partitioned Parquet + manifest under data/publish/ for GitHub Release upload."""
-    typer.echo(f"[P0 skeleton] publish preset={preset}")
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    _install_credential_scrub()
+    try:
+        out = run_publish(preset, out_root=out_root)
+    except PresetError as exc:
+        typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except NoEnrichedRunError as exc:
+        typer.secho(f"publish failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except PublishError as exc:
+        typer.secho(f"publish failed: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(str(out))

@@ -12,6 +12,8 @@ enriched Parquet. Benchmarks and publish land in P4 / P5.
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,7 +32,7 @@ import jobpipe.sources.ashby
 import jobpipe.sources.greenhouse
 import jobpipe.sources.lever
 import jobpipe.sources.personio  # noqa: F401
-from jobpipe import benchmarks, fx, normalise, sources
+from jobpipe import benchmarks, duckdb_io, fx, normalise, sources
 from jobpipe.benchmarks._common import last_fetch_mtime, should_skip
 from jobpipe.isco import loader as isco_loader
 from jobpipe.schemas import BenchmarkSchema, PostingSchema
@@ -48,6 +50,10 @@ class PresetError(ValueError):
 
 class NoRawRunError(FileNotFoundError):
     """Raised when ``run_normalise`` cannot find any raw bundle for the preset."""
+
+
+class NoEnrichedRunError(FileNotFoundError):
+    """Raised when ``run_publish`` cannot find any enriched bundle for the preset."""
 
 
 def load_preset(path: Path) -> dict[str, Any]:
@@ -294,3 +300,80 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
             logger.info("normalise: %d benchmark rows → %s", len(bench_df), bench_out)
 
     return out
+
+
+def find_latest_enriched(preset_id: str, out_root: Path) -> tuple[Path, Path | None]:
+    """Return ``(postings_parquet, benchmarks_parquet_or_none)`` for the newest enriched run.
+
+    Raises :class:`NoEnrichedRunError` if no enriched bundle exists.
+    """
+    enriched_root = out_root / "enriched"
+    candidates = sorted(
+        (p for p in enriched_root.glob(f"{preset_id}__*") if p.is_dir()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for d in candidates:
+        postings = d / "postings.parquet"
+        if postings.exists():
+            bench = d / "benchmarks.parquet"
+            return postings, (bench if bench.exists() else None)
+    raise NoEnrichedRunError(
+        f"no enriched bundle for preset {preset_id!r} under {enriched_root}; "
+        "run `jobpipe normalise` first"
+    )
+
+
+def _resolve_git_sha() -> str | None:
+    """Best-effort git SHA: ``GITHUB_SHA`` in CI, else ``git rev-parse HEAD``."""
+    env_sha = os.environ.get("GITHUB_SHA")
+    if env_sha:
+        return env_sha
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+def run_publish(preset_path: Path, out_root: Path = Path("data")) -> Path:
+    """Top-level entry point for the ``jobpipe publish`` CLI command.
+
+    Resolves the newest enriched bundle for the preset, reads ``publish:``
+    from the preset YAML, and emits a hive-partitioned + manifest bundle
+    under ``<out_root>/publish/<same run_id>/``. The ``run_id`` propagates
+    through all three stages (raw → enriched → publish) so traceability is
+    trivial.
+    """
+    preset = load_preset(preset_path)
+    publish_cfg = preset.get("publish")
+    if not isinstance(publish_cfg, dict):
+        raise PresetError(f"preset {preset_path} is missing required mapping 'publish'")
+    partition_by_raw = publish_cfg.get("partition_by")
+    if not isinstance(partition_by_raw, list) or not partition_by_raw:
+        raise PresetError(f"preset {preset_path}: 'publish.partition_by' must be a non-empty list")
+    partition_by = [str(c) for c in partition_by_raw]
+
+    preset_id = str(preset["preset_id"])
+    postings_path, bench_path = find_latest_enriched(preset_id, out_root)
+    run_id = postings_path.parent.name  # `<preset_id>__<timestamp>-<hex>`
+
+    bundle_root = out_root / "publish" / run_id
+    git_sha = _resolve_git_sha()
+    duckdb_io.export_partitioned(
+        postings_path,
+        bench_path,
+        bundle_root,
+        partition_by=partition_by,
+        preset_id=preset_id,
+        run_id=run_id,
+        git_sha=git_sha,
+    )
+    return bundle_root

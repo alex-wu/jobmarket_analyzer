@@ -1,0 +1,96 @@
+name: refresh
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC daily (per docs/architecture.md)
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required for `gh release upload/create`
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false   # don't kill a partial upload mid-run
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Fetch
+        run: uv run jobpipe fetch --preset config/runs/data_analyst_ireland.yaml
+
+      - name: Normalise
+        run: uv run jobpipe normalise --preset config/runs/data_analyst_ireland.yaml
+
+      - name: Publish
+        id: publish
+        run: |
+          set -euo pipefail
+          BUNDLE=$(uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml)
+          echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
+          echo "date_tag=data-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Stage bundle assets
+        id: stage
+        run: |
+          set -euo pipefail
+          STAGE="$(mktemp -d)"
+          # Flatten partitioned parquet into stable filenames so `gh release upload`
+          # doesn't fight hive-style directories. Each partition becomes
+          # `postings__country=GB__year_month=2026-05__<original>.parquet`.
+          cp "${{ steps.publish.outputs.bundle }}/manifest.json" "$STAGE/"
+          if [ -f "${{ steps.publish.outputs.bundle }}/benchmarks.parquet" ]; then
+            cp "${{ steps.publish.outputs.bundle }}/benchmarks.parquet" "$STAGE/"
+          fi
+          POSTINGS_DIR="${{ steps.publish.outputs.bundle }}/postings"
+          if [ -d "$POSTINGS_DIR" ]; then
+            find "$POSTINGS_DIR" -type f -name '*.parquet' | while read -r f; do
+              rel="${f#$POSTINGS_DIR/}"
+              flat="postings__$(echo "$rel" | tr '/' '_')"
+              cp "$f" "$STAGE/$flat"
+            done
+          fi
+          echo "stage=$STAGE" >> "$GITHUB_OUTPUT"
+          ls -la "$STAGE"
+
+      - name: Upload to latest release (re-clobbered)
+        run: |
+          set -euo pipefail
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --title "latest" \
+              --notes "Re-clobbered on every refresh run. See manifest.json for run_id."
+          fi
+          # shellcheck disable=SC2046
+          gh release upload latest --clobber $(find "${{ steps.stage.outputs.stage }}" -type f)
+
+      - name: Upload to dated release (immutable, idempotent per day)
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.publish.outputs.date_tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping dated upload (idempotent)."
+            exit 0
+          fi
+          gh release create "$TAG" --title "$TAG" \
+            --notes "Daily audit snapshot. Immutable."
+          # shellcheck disable=SC2046
+          gh release upload "$TAG" $(find "${{ steps.stage.outputs.stage }}" -type f)

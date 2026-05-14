@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — P5 (2026-05-15)
+- `src/jobpipe/duckdb_io.py` — `export_partitioned()` writes the publishable bundle under `data/publish/<run_id>/`: hive-partitioned `postings/country=.../year_month=.../*.parquet` (via DuckDB `COPY ... PARTITION_BY` with `year_month` derived in the SQL projection), a sibling `benchmarks.parquet`, and a `manifest.json` carrying `schema_version`, `preset_id`, `run_id`, `pipeline_version`, `git_sha`, partition layout, and per-dataset row/source/country/ISCO-match-method counts. Raises `PublishError` on missing/empty input or unknown partition columns.
+- `src/jobpipe/runner.py` — `find_latest_enriched()` mirrors `find_latest_raw()` for the publish stage; `run_publish()` resolves the newest enriched bundle, reads `publish.partition_by` from the preset, and propagates the `run_id` from the enriched directory into the publish manifest. `_resolve_git_sha()` prefers `GITHUB_SHA` (CI) and falls back to `git rev-parse HEAD`.
+- `src/jobpipe/cli.py` — `jobpipe publish` command wired to `run_publish`, mirroring the `fetch` / `normalise` error-handling contract (red-stderr + exit 2 on `PresetError` / `NoEnrichedRunError` / `PublishError`). Replaces the P0 skeleton.
+- `.github/workflows/refresh.yml` — daily cron at 06:00 UTC plus `workflow_dispatch`. Runs `fetch → normalise → publish`, then uploads the flattened bundle to both a re-clobbered `latest` GitHub Release and a per-day immutable `data-YYYY-MM-DD` Release (idempotent if re-dispatched the same day). Threads `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` / `GITHUB_TOKEN` from Actions secrets per ADR-004 + ADR-015.
+- `tests/test_duckdb_io.py` — 8 tests covering round-trip read, hive layout assertions, manifest keys + counts, benchmarks-present / benchmarks-absent paths, and the three error branches.
+- `tests/test_cli.py` — 6 Typer `CliRunner` tests covering the success path and exit-2 routing for fetch / normalise / publish.
+- `tests/test_runner.py` — 7 new tests for `find_latest_enriched` (newest selection, no-benchmarks path, missing-bundle path) and `run_publish` (end-to-end run-id propagation, missing publish block, empty `partition_by`, no enriched bundle).
+- 252 tests, 92.67% coverage; CI floor at 80% holds, project floor of 92% preserved.
+
+### Changed
+- README, `pyproject.toml`, `docs/architecture.md`, `CHANGELOG.md` — `USER` placeholder swapped for the canonical `alex-wu` GitHub handle in badges, clone URLs, the Pages URL, the architecture diagram, and the `[Unreleased]` compare link. Repo is now ready for its first public push.
+
 ### Changed — Pre-P5 cleanup (2026-05-15)
 - **Security: httpx URL credential redaction.** `CredentialScrubFilter` installed on the `httpx` / `httpcore` loggers from `src/jobpipe/cli.py` at every CLI entry point. Replaces `app_id` / `app_key` / `api_key` / `api-key` query-param values with `REDACTED` in log records before any handler sees them. Tested centrally in `tests/test_log_redaction.py`. Closes the pre-P5 must-fix; `--verbose` runs are now safe to ship to GitHub Actions logs. See [ADR-015](DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger).
 - **Scope: HN Algolia + LLM client descoped from v1.** `hn_algolia` block removed from `config/runs/data_analyst_ireland.yaml`; `LLM_*` env vars removed from `.env.example`; `src/jobpipe/llm.py` retained as a documented stub so a post-v1 PR can drop in the real client without rippling through callers. See [ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1).
@@ -87,4 +100,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture diagram in `docs/architecture.md`.
 - Original Dagster-centric spec superseded by ADR-001.
 
-[Unreleased]: https://github.com/USER/jobmarket_analyzer/compare/HEAD...HEAD
+[Unreleased]: https://github.com/alex-wu/jobmarket_analyzer/compare/HEAD...HEAD
