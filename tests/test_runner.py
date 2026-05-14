@@ -8,11 +8,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from jobpipe import sources
+from jobpipe import benchmarks, sources
+from jobpipe.benchmarks import BenchmarkConfig
 from jobpipe.runner import (
     EmptyRunError,
     NoRawRunError,
     PresetError,
+    fetch_benchmarks,
     fetch_sources,
     find_latest_raw,
     load_preset,
@@ -269,3 +271,148 @@ def test_run_normalise_end_to_end(
     # Fake rows are country=IE → EUR rate=1, salary stays 50k/60k.
     assert len(df) == 3
     assert df["salary_min_eur"].iloc[0] == pytest.approx(50_000.0)
+
+
+# --- Benchmark fan-out ----------------------------------------------------
+
+
+def _bench_row(isco_code: str, country: str = "IE", median: float = 50000.0) -> dict[str, object]:
+    return {
+        "isco_code": isco_code,
+        "country": country,
+        "period": "2022",
+        "currency": "EUR",
+        "median_eur": median,
+        "p25_eur": None,
+        "p75_eur": None,
+        "n_observations": pd.NA,
+        "source": "fake_bench",
+        "source_url": "http://example.test/bench",
+        "retrieved_at": pd.Timestamp(datetime.now(UTC)),
+    }
+
+
+@pytest.fixture
+def fake_bench_registered() -> object:
+    class _FakeBenchConfig(BenchmarkConfig):
+        min_interval_hours: int = 0
+        emit_rows: int = 2
+
+    class _FakeBench:
+        name = "fake_bench"
+        config_model = _FakeBenchConfig
+
+        def fetch(self, config: BenchmarkConfig) -> pd.DataFrame:
+            cfg = (
+                config
+                if isinstance(config, _FakeBenchConfig)
+                else _FakeBenchConfig(**config.model_dump())
+            )
+            df = pd.DataFrame(_bench_row(f"25{i:02d}") for i in range(11, 11 + cfg.emit_rows))
+            df["n_observations"] = df["n_observations"].astype("Int64")
+            return df
+
+    instance = _FakeBench()
+    benchmarks._REGISTRY["fake_bench"] = instance
+    yield instance
+    benchmarks._REGISTRY.pop("fake_bench", None)
+
+
+@pytest.fixture
+def raising_bench_registered() -> object:
+    class _Raiser:
+        name = "raiser_bench"
+        config_model = BenchmarkConfig
+
+        def fetch(self, config: BenchmarkConfig) -> pd.DataFrame:
+            raise RuntimeError("simulated bench failure")
+
+    instance = _Raiser()
+    benchmarks._REGISTRY["raiser_bench"] = instance
+    yield instance
+    benchmarks._REGISTRY.pop("raiser_bench", None)
+
+
+def test_fetch_benchmarks_writes_per_adapter_parquet(
+    fake_bench_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0})
+    preset = {
+        "preset_id": "demo",
+        "benchmarks": {"fake_bench": {"enabled": True, "emit_rows": 3}},
+    }
+    paths = fetch_benchmarks(preset, tmp_path / "data")
+    assert len(paths) == 1
+    assert paths[0].parent.name == "fake_bench"
+    df = pd.read_parquet(paths[0])
+    assert len(df) == 3
+    assert (df["source"] == "fake_bench").all()
+
+
+def test_fetch_benchmarks_is_fail_isolated(
+    fake_bench_registered: object,
+    raising_bench_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0})
+    preset = {
+        "preset_id": "demo",
+        "benchmarks": {
+            "raiser_bench": {"enabled": True},
+            "fake_bench": {"enabled": True, "emit_rows": 2},
+        },
+    }
+    paths = fetch_benchmarks(preset, tmp_path / "data")
+    # raiser_bench crashes — fake_bench still writes.
+    assert len(paths) == 1
+    assert paths[0].parent.name == "fake_bench"
+
+
+def test_fetch_benchmarks_throttle_skips_recent_run(
+    fake_bench_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0})
+    preset = {
+        "preset_id": "demo",
+        "benchmarks": {"fake_bench": {"enabled": True, "emit_rows": 2, "min_interval_hours": 168}},
+    }
+    # First call writes.
+    first = fetch_benchmarks(preset, tmp_path / "data")
+    assert len(first) == 1
+    # Second call within the throttle window skips → no new parquet.
+    second = fetch_benchmarks(preset, tmp_path / "data")
+    assert second == []
+
+
+def test_fetch_benchmarks_empty_when_none_declared(tmp_path: Path) -> None:
+    preset = {"preset_id": "demo"}
+    assert fetch_benchmarks(preset, tmp_path / "data") == []
+
+
+def test_run_normalise_writes_sibling_benchmarks_parquet(
+    fake_source_registered: object,
+    fake_bench_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85})
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "demo",
+            "sources": {"fake": {"enabled": True, "n_rows": 2}},
+            "benchmarks": {"fake_bench": {"enabled": True, "emit_rows": 2}},
+        },
+    )
+    run_fetch(preset_path, out_root=tmp_path / "data")
+    enriched = run_normalise(preset_path, out_root=tmp_path / "data")
+    bench_path = enriched.parent / "benchmarks.parquet"
+    assert bench_path.exists()
+    df = pd.read_parquet(bench_path)
+    assert len(df) == 2
+    assert (df["source"] == "fake_bench").all()

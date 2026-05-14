@@ -134,8 +134,6 @@ def test_convert_drops_rows_with_unknown_currency() -> None:
 
 
 def test_convert_empty_frame_passthrough() -> None:
-    df = pd.DataFrame(
-        columns=["isco_code", "country", "period", "currency", "median_eur"]
-    )
+    df = pd.DataFrame(columns=["isco_code", "country", "period", "currency", "median_eur"])
     out = convert_benchmark_to_eur(df, {"EUR": 1.0})
     assert out.empty

@@ -124,11 +124,7 @@ def test_parse_missing_isco_dim_returns_empty() -> None:
         "data": {
             "dataSets": [{"observations": {"0": [1.0]}}],
             "structures": [
-                {
-                    "dimensions": {
-                        "observation": [{"id": "SOMETHING_ELSE", "values": [{"id": "x"}]}]
-                    }
-                }
+                {"dimensions": {"observation": [{"id": "SOMETHING_ELSE", "values": [{"id": "x"}]}]}}
             ],
         }
     }

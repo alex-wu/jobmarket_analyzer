@@ -189,6 +189,7 @@ def test_self_registers_under_cso_name() -> None:
 
 # Helper -----------------------------------------------------------------
 
+
 class _HttpxShim:
     """Stand-in for the ``httpx`` module that routes get() through a MockTransport."""
 

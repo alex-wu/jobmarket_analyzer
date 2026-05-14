@@ -20,15 +20,20 @@ from uuid import uuid4
 import pandas as pd
 import yaml
 
-# Side-effect imports — each module's @register decorator populates the sources registry.
+# Side-effect imports — each module's @register decorator populates the sources / benchmarks registry.
 # Ruff treats the trailing dotted import as redundant with its siblings, hence the targeted noqa.
+import jobpipe.benchmarks.cso
+import jobpipe.benchmarks.eurostat
+import jobpipe.benchmarks.oecd
 import jobpipe.sources.adzuna
 import jobpipe.sources.ashby
 import jobpipe.sources.greenhouse
 import jobpipe.sources.lever
 import jobpipe.sources.personio  # noqa: F401
-from jobpipe import fx, normalise, sources
-from jobpipe.schemas import PostingSchema
+from jobpipe import benchmarks, fx, normalise, sources
+from jobpipe.benchmarks._common import last_fetch_mtime, should_skip
+from jobpipe.isco import loader as isco_loader
+from jobpipe.schemas import BenchmarkSchema, PostingSchema
 
 logger = logging.getLogger(__name__)
 
@@ -117,11 +122,117 @@ def write_raw_parquet(df: pd.DataFrame, preset_id: str, out_root: Path) -> Path:
     return out
 
 
+def fetch_benchmarks(
+    preset: dict[str, Any],
+    out_root: Path,
+    *,
+    now: datetime | None = None,
+) -> list[Path]:
+    """Fan out to enabled benchmark adapters; return parquet paths written.
+
+    Fail-isolated per adapter (one's HTTP error logs and is swallowed).
+    Per-adapter ``min_interval_hours`` throttles re-fetch — if the most
+    recent parquet under ``data/raw/benchmarks/<name>/`` is younger than
+    the configured window, we skip and let the previous fetch stand.
+    A zero-benchmark run is not a fatal error; postings remain the
+    primary signal (CLAUDE.md hard rule).
+    """
+    declared = preset.get("benchmarks", {}) or {}
+    if not isinstance(declared, dict) or not declared:
+        return []
+
+    written: list[Path] = []
+    current = now or datetime.now(UTC)
+    rates_cache: dict[str, float] | None = None
+
+    for name, raw_cfg in declared.items():
+        if not raw_cfg.get("enabled", False):
+            logger.info("benchmark %s: disabled, skipping", name)
+            continue
+        try:
+            adapter = benchmarks.get(name)
+        except KeyError:
+            logger.warning("benchmark %s: not registered, skipping", name)
+            continue
+
+        cfg = adapter.config_model(**{k: v for k, v in raw_cfg.items() if k != "enabled"})
+
+        adapter_dir = out_root / "raw" / "benchmarks" / name
+        last_fetch = last_fetch_mtime(adapter_dir)
+        throttle_hours = int(getattr(cfg, "min_interval_hours", 0))
+        if should_skip(current, last_fetch, throttle_hours):
+            logger.info(
+                "benchmark %s: throttle skip (last_fetch=%s, window=%dh)",
+                name,
+                last_fetch,
+                throttle_hours,
+            )
+            continue
+
+        try:
+            if rates_cache is None:
+                rates_cache = fx.load_rates()
+            try:
+                df = adapter.fetch(cfg, rates=rates_cache)
+            except TypeError:
+                # Test-fixture adapters may not accept the rates kwarg.
+                df = adapter.fetch(cfg)
+        except Exception:
+            logger.exception(
+                "benchmark %s: fetch failed; continuing with other benchmarks",
+                name,
+            )
+            continue
+
+        if df.empty:
+            logger.warning("benchmark %s: returned zero rows", name)
+            continue
+
+        try:
+            BenchmarkSchema.validate(df, lazy=True)
+        except Exception:
+            logger.exception("benchmark %s: schema validation failed; skipping write", name)
+            continue
+
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        run_id = current.strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
+        out_path = adapter_dir / f"{run_id}.parquet"
+        df.to_parquet(out_path, index=False)
+        logger.info("benchmark %s: %d rows → %s", name, len(df), out_path)
+        written.append(out_path)
+
+    return written
+
+
+def _load_latest_benchmarks(out_root: Path) -> pd.DataFrame:
+    """Concat each enabled benchmark adapter's most-recent parquet."""
+    root = out_root / "raw" / "benchmarks"
+    if not root.exists():
+        return pd.DataFrame()
+    frames: list[pd.DataFrame] = []
+    for adapter_dir in sorted(root.iterdir()):
+        if not adapter_dir.is_dir():
+            continue
+        parquets = sorted(
+            adapter_dir.glob("*.parquet"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not parquets:
+            continue
+        frames.append(pd.read_parquet(parquets[0]))
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
 def run_fetch(preset_path: Path, out_root: Path = Path("data")) -> Path:
     """Top-level entry point for the ``jobpipe fetch`` CLI command."""
     preset = load_preset(preset_path)
     df = fetch_sources(preset)
-    return write_raw_parquet(df, preset["preset_id"], out_root)
+    out = write_raw_parquet(df, preset["preset_id"], out_root)
+    fetch_benchmarks(preset, out_root)
+    return out
 
 
 def find_latest_raw(preset_id: str, out_root: Path) -> Path:
@@ -158,7 +269,8 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
     logger.info("normalise: %d raw rows from %s", len(raw_df), raw_path)
 
     rates = fx.load_rates()
-    enriched = normalise.run(raw_df, rates)
+    labels = isco_loader.load_isco_labels()
+    enriched = normalise.run(raw_df, rates, labels_df=labels)
     logger.info(
         "normalise: %d rows after dedupe (%d collapsed)",
         len(enriched),
@@ -169,4 +281,16 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "postings.parquet"
     enriched.to_parquet(out, index=False)
+
+    bench_df = _load_latest_benchmarks(out_root)
+    if not bench_df.empty:
+        try:
+            BenchmarkSchema.validate(bench_df, lazy=True)
+        except Exception:
+            logger.exception("normalise: benchmark concat failed schema validation; skipping write")
+        else:
+            bench_out = out_dir / "benchmarks.parquet"
+            bench_df.to_parquet(bench_out, index=False)
+            logger.info("normalise: %d benchmark rows → %s", len(bench_df), bench_out)
+
     return out

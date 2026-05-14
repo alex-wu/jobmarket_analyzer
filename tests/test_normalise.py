@@ -124,9 +124,7 @@ def test_run_populates_isco_columns_from_labels() -> None:
         ]
     )
     out = (
-        normalise.run(df, RATES, labels_df=LABELS)
-        .sort_values("posting_id")
-        .reset_index(drop=True)
+        normalise.run(df, RATES, labels_df=LABELS).sort_values("posting_id").reset_index(drop=True)
     )
     by_title = dict(zip(out["title"], out["isco_code"], strict=False))
     assert by_title["Data Analyst"] == "2511"

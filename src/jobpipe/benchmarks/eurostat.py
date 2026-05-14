@@ -45,9 +45,7 @@ from jobpipe.benchmarks._common import convert_benchmark_to_eur
 logger = logging.getLogger(__name__)
 
 DEFAULT_DATASET = "earn_ses_annual"
-ENDPOINT_TEMPLATE = (
-    "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/{dataset}"
-)
+ENDPOINT_TEMPLATE = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/{dataset}"
 ISCO_PREFIX_RE = re.compile(r"^OC(\d{4})$")
 
 
@@ -231,9 +229,7 @@ class EurostatBenchmark:
         rates: dict[str, float] | None = None,
     ) -> pd.DataFrame:
         cfg = (
-            config
-            if isinstance(config, EurostatConfig)
-            else EurostatConfig(**config.model_dump())
+            config if isinstance(config, EurostatConfig) else EurostatConfig(**config.model_dump())
         )
         url = ENDPOINT_TEMPLATE.format(dataset=cfg.dataset)
         params: dict[str, str] = {

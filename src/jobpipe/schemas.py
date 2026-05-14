@@ -1,7 +1,7 @@
 """Pandera schemas — the contract between adapters and the rest of the pipeline.
 
-Strict mode is active from P2 onward; ``BenchmarkSchema`` is still relaxed
-until benchmark adapters land in P4.
+Strict mode is active on both schemas from P4 onward (the third benchmark
+adapter landed in P4, so the relaxation flag was retired).
 """
 
 from __future__ import annotations
@@ -65,5 +65,5 @@ class BenchmarkSchema(pa.DataFrameModel):
     retrieved_at: Series[pa.DateTime] = pa.Field(nullable=False)
 
     class Config:
-        strict = False
+        strict = True
         coerce = True

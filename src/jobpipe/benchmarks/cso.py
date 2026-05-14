@@ -252,7 +252,12 @@ class CsoBenchmark:
     name: str = "cso"
     config_model: type[BenchmarkConfig] = CsoConfig
 
-    def fetch(self, config: BenchmarkConfig) -> pd.DataFrame:
+    def fetch(
+        self,
+        config: BenchmarkConfig,
+        *,
+        rates: dict[str, float] | None = None,  # accepted but unused — CSO is EUR-native
+    ) -> pd.DataFrame:
         cfg = config if isinstance(config, CsoConfig) else CsoConfig(**config.model_dump())
         url = ENDPOINT_TEMPLATE.format(dataset=cfg.dataset_code)
         try:
