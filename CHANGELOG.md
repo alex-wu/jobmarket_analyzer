@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 252 tests, 92.67% coverage; CI floor at 80% holds, project floor of 92% preserved.
 
 ### Changed
-- README, `pyproject.toml`, `docs/architecture.md`, `CHANGELOG.md` — `USER` placeholder swapped for the canonical `alex` GitHub handle in badges, clone URLs, the Pages URL, the architecture diagram, and the `[Unreleased]` compare link. Repo is now ready for its first public push.
+- README, `pyproject.toml`, `docs/architecture.md`, `CHANGELOG.md` — `USER` placeholder swapped for the canonical `alex-wu` GitHub handle in badges, clone URLs, the Pages URL, the architecture diagram, and the `[Unreleased]` compare link. Repo is now ready for its first public push.
 
 ### Changed — Pre-P5 cleanup (2026-05-15)
 - **Security: httpx URL credential redaction.** `CredentialScrubFilter` installed on the `httpx` / `httpcore` loggers from `src/jobpipe/cli.py` at every CLI entry point. Replaces `app_id` / `app_key` / `api_key` / `api-key` query-param values with `REDACTED` in log records before any handler sees them. Tested centrally in `tests/test_log_redaction.py`. Closes the pre-P5 must-fix; `--verbose` runs are now safe to ship to GitHub Actions logs. See [ADR-015](DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger).
@@ -100,4 +100,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture diagram in `docs/architecture.md`.
 - Original Dagster-centric spec superseded by ADR-001.
 
-[Unreleased]: https://github.com/alex/jobmarket_analyzer/compare/HEAD...HEAD
+[Unreleased]: https://github.com/alex-wu/jobmarket_analyzer/compare/HEAD...HEAD

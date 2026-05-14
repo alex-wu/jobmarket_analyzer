@@ -26,7 +26,7 @@ flowchart TD
     bundle --> release["GitHub Release<br/>(latest + data-YYYY-MM-DD)"]
     release --> loader["Observable Framework<br/>data loader (build time)"]
     loader --> site["site/ static build"]
-    site --> pages["GitHub Pages<br/>https://alex.github.io/jobmarket_analyzer/"]
+    site --> pages["GitHub Pages<br/>https://alex-wu.github.io/jobmarket_analyzer/"]
     pages -.->|user clicks posting| source_url["posting_url<br/>(back to original board)"]
 
     style cron fill:#fff3b0

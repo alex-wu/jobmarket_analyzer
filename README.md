@@ -2,8 +2,8 @@
 
 > Modular, free-tier job-market intelligence pipeline. Daily ingest from public APIs, normalise into Parquet, overlay official salary benchmarks, visualise on a static GitHub Pages dashboard.
 
-![CI](https://github.com/alex/jobmarket_analyzer/actions/workflows/ci.yml/badge.svg)
-![Pages](https://github.com/alex/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
+![CI](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/ci.yml/badge.svg)
+![Pages](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **Status:** P4 complete (benchmarks + ISCO tagger) — 5 source adapters + ISCO-08 fuzzy tagger + CSO/Eurostat benchmark adapters writing a sibling `benchmarks.parquet` next to `postings.parquet`. OECD adapter is built but disabled in the preset (Cloudflare bot-protection on `sdmx.oecd.org`, see [ADR-011](DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection)). HN Algolia + the real LLM client are descoped from v1 ([ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)); P5/P6/P7 deliver Actions cron, the dashboard, and polish. See [DECISIONS.md](DECISIONS.md) for architecture rationale and [docs/architecture.md](docs/architecture.md) for the dataflow diagram.
@@ -27,7 +27,7 @@
 Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.12 (uv will install), Node 20+ (for the dashboard site).
 
 ```bash
-git clone https://github.com/alex/jobmarket_analyzer.git
+git clone https://github.com/alex-wu/jobmarket_analyzer.git
 cd jobmarket_analyzer
 uv sync
 cp .env.example .env   # then fill in ADZUNA_APP_ID / ADZUNA_APP_KEY (optional — ATS adapters work credential-free)
@@ -41,7 +41,7 @@ uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml    # P5 wi
 cd site && npm ci && npx framework dev
 ```
 
-Live demo: `https://alex.github.io/jobmarket_analyzer/` (post-P6).
+Live demo: `https://alex-wu.github.io/jobmarket_analyzer/` (post-P6).
 
 ---
 
