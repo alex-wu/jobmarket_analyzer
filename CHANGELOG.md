@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — P4 (2026-05-14)
+- `src/jobpipe/isco/` — rapidfuzz-based ISCO-08 tagger. `loader.py` reads the static ESCO snapshot (cached per resolved path); `tagger.py` runs `rapidfuzz.process.extractOne(title, candidates, scorer=token_set_ratio, score_cutoff=88)` to populate `isco_code` / `isco_match_method` / `isco_match_score` on postings. Pure DataFrame in / DataFrame out, no HTTP at runtime.
+- `config/esco/isco08_labels.parquet` — 2 137 labels × 436 unique 4-digit ISCO codes, built from ESCO v1.2.1 via `scripts/build_esco_snapshot.py`. The snapshot walks the ISCO concept tree from the 10 major groups (ESCO's `/api/search` and `/api/resource/concept?isInScheme=...` paginations both cap at offset=100). Provenance + EUPL-1.2 attribution in `config/esco/README.md`.
+- `src/jobpipe/llm.py` — stub interface. `LLMUnavailableError` + `classify_title_to_isco(title, allowed_codes)`. Raises immediately under `LLM_ENABLED=false`; the real OpenAI-compatible client lands in a follow-up. Not invoked anywhere in this phase — exists to lock the contract.
+- `src/jobpipe/benchmarks/_common.py` — `last_fetch_mtime` (newest parquet under an adapter dir), `should_skip(now, last_fetch, min_interval_hours)` (pure throttle), `convert_benchmark_to_eur` (per-row FX via the `currency` column; drops rows whose currency is missing from the ECB feed).
+- `src/jobpipe/benchmarks/cso.py` — CSO Ireland `EHQ03` PxStat JSON-stat 2.0 adapter. EUR-native (no FX). Weekly earnings annualised x52. **Caveat documented in the module docstring + `docs/adding-a-benchmark.md`:** the cube lacks a 4-digit ISCO axis; it exposes a 3-bucket "Type of Employee" classification (managers+profs / clerical+sales / manual). The adapter maps each requested ISCO code to the umbrella bucket via the leading digit.
+- `src/jobpipe/benchmarks/oecd.py` — generic OECD SDMX-JSON 2.0 adapter, configurable via `dataflow_id` + `key`. Handles `UNIT_MEASURE` per-observation currency attribute. **Disabled by default** — `sdmx.oecd.org` is Cloudflare-protected and returns 403 + HTML to unauthenticated GH-Actions workers. Adapter detects this (content-type sniff) and returns an empty frame to keep the run going.
+- `src/jobpipe/benchmarks/eurostat.py` — Eurostat `earn_ses_annual` JSON-stat 2.0 adapter. Strips the `OC` prefix on the `isco08` dimension and keeps only 4-digit leaves (aggregate buckets `OC25`, `OC1-5` etc. are dropped). Auto-selects the latest SES vintage in the response; the 4-year survey lag should be flagged in the dashboard.
+- `src/jobpipe/runner.py` — `fetch_benchmarks(preset, out_root, now=None)` mirrors `fetch_sources`: fail-isolated per adapter, throttled per `min_interval_hours` via mtime of the newest parquet under `data/raw/benchmarks/<name>/`. `run_fetch` wires it in after the postings write; `run_normalise` concats each adapter's latest parquet into a sibling `data/enriched/<run_id>/benchmarks.parquet`.
+- `BenchmarkAdapter` Protocol's `fetch` signature now declares an optional `rates: dict[str, float] | None = None` kwarg so adapters that need FX can consume rates without breaking the interface.
+- `BenchmarkSchema.Config.strict` flipped to `True` now that all three adapters land.
+- Preset `config/runs/data_analyst_ireland.yaml`: `cso` + `eurostat` flipped to `enabled: true` with per-bench `min_interval_hours`; `oecd` block kept with rationale for staying disabled.
+- `tests/test_smoke.py` benchmark-registry assertion replaces the P0 empty-registry stub.
+- `scripts/build_esco_snapshot.py` — one-shot ESCO snapshot builder, not invoked at pipeline runtime. Re-run when ESCO publishes a new classification version.
+- 59 new tests under `tests/isco/`, `tests/benchmarks/`, `tests/test_llm_stub.py` plus runner extensions; 223 tests total, 92.32% coverage.
+
+### Decided — P4 scope shifts (2026-05-14)
+- **HN Algolia deferred to a follow-up PR.** Needs the real LLM client (free-text "Who is hiring?" comments aren't usefully parseable without extraction). The `llm.py` stub locks the calling contract so the follow-up is a drop-in.
+- **OECD adapter ships disabled in the preset.** Cloudflare bot-protection on `sdmx.oecd.org` returns 403 + HTML interstitial to anonymous CI workers. The adapter is fully implemented and fixture-tested; a follow-up needs an auth header / CSV mirror / fixed-egress proxy before flipping it on.
+- **ESCO pagination is broken.** Both `/api/search?type=occupation` and `/api/resource/concept?isInScheme=...` cap at offset=100 as of v1.2.1. `scripts/build_esco_snapshot.py` walks the ISCO concept tree instead (which works) and gets full coverage of all 436 4-digit unit groups.
+- **CSO 4-digit ISCO coarseness.** The cube's "Type of Employee" axis is 3-bucket only, not 4-digit ISCO. Adapter emits one umbrella-bucket value per requested ISCO code; dashboard work (deferred) should surface the coarseness.
+
 ### Added — P3 (2026-05-11)
 - Four ATS source adapters, each mirroring the Adzuna template (fail-isolated per slug, tenacity retries, `SourceFetchError` on persistent HTTP failures):
   - `src/jobpipe/sources/greenhouse.py` — `boards-api.greenhouse.io/v1/boards/<slug>/jobs`.
