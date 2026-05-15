@@ -81,6 +81,25 @@ freshest workflow set.
 | External contributors arrive | `required_pull_request_reviews: 1` in branch protection; CODEOWNERS file |
 | Private fork sprouts | GitHub Advanced Security license (CodeQL + secret scanning are paid on private repos) |
 
+## Known upstream warnings (non-blocking)
+
+`npm install` in `site/` emits 4 deprecation warnings on a fresh checkout.
+All chain off `@observablehq/framework@1.13.4`, not our direct deps:
+
+- `inflight@1.0.6` ← `@rollup/plugin-commonjs@25.0.8` ← framework
+- `glob@8.1.0` ← `@rollup/plugin-commonjs@25.0.8` ← framework
+- `glob@10.5.0` ← `rimraf@5.0.10` + framework (deduped)
+- `whatwg-encoding@3.1.1` ← `jsdom@23.2.0` ← framework
+
+Trace: `cd site && npm ls inflight glob whatwg-encoding`.
+
+These will clear when Observable Framework upgrades its rollup-commonjs +
+jsdom pins. Dependabot will open the PR. Not something to fix locally.
+
+The P7 handover doc misdiagnosed these as puppeteer's chain; bumping
+puppeteer 23 → 24 cleared a `puppeteer-core@24.43.x` peer mismatch but
+did not affect these 4. See P9 session log for the corrected diagnosis.
+
 ## Manual setup (one-time)
 
 - **Pages source** = "GitHub Actions" — set in repo Settings → Pages.
