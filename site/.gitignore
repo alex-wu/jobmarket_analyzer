@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.observablehq/cache/
+src/.observablehq/cache/
+yarn.lock
+package-lock.json
+.DS_Store

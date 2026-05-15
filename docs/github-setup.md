@@ -89,7 +89,12 @@ gh api repos/:owner/:repo/pages | jq '.build_type, .html_url'
 # expected: "workflow", "https://<owner>.github.io/jobmarket_analyzer/"
 ```
 
-This setting is required by `pages.yml` (lands in P7) which uses `actions/upload-pages-artifact` + `actions/deploy-pages`. See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo).
+This setting is required by [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) which uses `actions/upload-pages-artifact` + `actions/deploy-pages`. See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo).
+
+Without flipping Source to *GitHub Actions* first, the workflow errors on the first run with `Error: Pages site does not exist`. After it's set:
+
+- `pages.yml` triggers on push to `main` under `site/**`, on completion of `refresh.yml` (via `workflow_run`), and on manual `workflow_dispatch`.
+- The deployment environment `github-pages` is auto-created and visible at Settings → Environments.
 
 ---
 
@@ -105,11 +110,11 @@ These are free for public repos. They catch any future accidental secret-in-comm
 
 ---
 
-## 5. Environments (not required for v1)
+## 5. Environments
 
-We do not configure a `github-pages` environment with required reviewers or branch protection in v1. The deploy workflow runs without an explicit environment.
+`pages.yml` declares `environment: github-pages`, which GitHub auto-creates on the first deploy. No manual setup needed.
 
-If you later want to harden the deploy path (e.g. require manual approval before each Pages deploy, or restrict to `main` only), create a `github-pages` environment, set its deployment branch to `main`, and reference it from `pages.yml` (`environment: github-pages`). That's a v1.1 concern.
+If you later want to harden the deploy path (e.g. require manual approval before each Pages deploy, or restrict to `main` only): Settings → Environments → `github-pages` → add a required reviewer or restrict the deployment branch to `main`. v1 leaves these defaults unset.
 
 ---
 
@@ -129,4 +134,4 @@ gh release view latest                    # should list postings/*.parquet and b
 gh release list --limit 5                 # should show "latest" plus the dated tag
 ```
 
-After P7 lands and `pages.yml` exists, the first deploy happens automatically after a successful `refresh.yml`. Visit the URL shown by `gh api repos/:owner/:repo/pages`.
+The first Pages deploy happens automatically after the next successful `refresh.yml` (via the `workflow_run` trigger in `pages.yml`), or immediately on any push to `main` under `site/**`. Visit the URL shown by `gh api repos/:owner/:repo/pages`. Day-to-day operations are documented in [`docs/operations.md`](operations.md).

@@ -1,0 +1,25 @@
+{
+  "name": "jobmarket-analyzer-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rimraf src/.observablehq/cache",
+    "build": "rimraf dist && observable build",
+    "dev": "observable preview",
+    "deploy": "observable deploy",
+    "observable": "observable",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@observablehq/framework": "^1.13.4"
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^1.5.2-r.1",
+    "puppeteer": "^23.11.1",
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}
