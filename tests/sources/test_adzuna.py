@@ -85,6 +85,34 @@ def test_fetch_required_fields(fake_creds: None) -> None:
     assert row["salary_annual_eur_p50"] == 62500.0
 
 
+def test_fetch_passes_max_days_old_when_set(fake_creds: None) -> None:
+    page = _load("search_page1.json")
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=page)
+
+    cfg = AdzunaConfig(keywords=["data analyst"], countries=["gb"], max_pages=1, max_days_old=180)
+    AdzunaAdapter().fetch(cfg, client=_mock_client(httpx.MockTransport(handler)))
+
+    assert calls[0].url.params["max_days_old"] == "180"
+
+
+def test_fetch_omits_max_days_old_when_unset(fake_creds: None) -> None:
+    page = _load("search_page1.json")
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=page)
+
+    cfg = AdzunaConfig(keywords=["data analyst"], countries=["gb"], max_pages=1)
+    AdzunaAdapter().fetch(cfg, client=_mock_client(httpx.MockTransport(handler)))
+
+    assert "max_days_old" not in calls[0].url.params
+
+
 def test_fetch_handles_missing_salary(fake_creds: None) -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=_load("search_page1.json"))

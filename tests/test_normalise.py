@@ -96,6 +96,33 @@ def test_run_empty_df_passes_through() -> None:
     assert out.empty
 
 
+def test_run_since_days_drops_old_postings() -> None:
+    now = pd.Timestamp.now(tz="UTC")
+    df = pd.DataFrame(
+        [
+            _row(0, posted_at=now - pd.Timedelta(days=10)),  # keep
+            _row(1, posted_at=now - pd.Timedelta(days=170)),  # keep (< 180)
+            _row(2, posted_at=now - pd.Timedelta(days=200)),  # drop (> 180)
+            _row(3, posted_at=now - pd.Timedelta(days=400)),  # drop
+        ]
+    )
+    out = normalise.run(df, RATES, labels_df=LABELS, since_days=180)
+    assert len(out) == 2
+    assert set(out["posting_id"]) == {"posting-0000", "posting-0001"}
+
+
+def test_run_since_days_none_keeps_everything() -> None:
+    now = pd.Timestamp.now(tz="UTC")
+    df = pd.DataFrame(
+        [
+            _row(0, posted_at=now - pd.Timedelta(days=10)),
+            _row(1, posted_at=now - pd.Timedelta(days=500)),
+        ]
+    )
+    out = normalise.run(df, RATES, labels_df=LABELS, since_days=None)
+    assert len(out) == 2
+
+
 def test_run_handles_missing_rate_by_leaving_null() -> None:
     df = pd.DataFrame([_row(0, country="ZZ")])  # unknown country
     out = normalise.run(df, RATES, labels_df=LABELS)
@@ -133,7 +160,7 @@ def test_run_populates_isco_columns_from_labels() -> None:
     assert by_title["Lead Underwater Welder"] is None
     matched = out[out["isco_code"].notna()]
     assert (matched["isco_match_method"] == "fuzzy").all()
-    assert (matched["isco_match_score"] >= 0.88).all()
+    assert (matched["isco_match_score"] >= 0.85).all()
     unmatched = out[out["isco_code"].isna()]
     assert (unmatched["isco_match_method"] == "none").all()
 

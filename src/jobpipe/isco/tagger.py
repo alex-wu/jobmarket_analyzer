@@ -9,9 +9,11 @@ Output columns written onto the input frame:
 * ``isco_match_score`` (float | None) — 0.0..1.0 (rapidfuzz score / 100)
 
 Strategy: ``rapidfuzz.process.extractOne`` with ``token_set_ratio`` and a
-score cutoff of 88 (per DECISIONS.md ADR-006). The cutoff matches the
-team-agreed precision/recall trade-off; raise it for stricter joins, lower
-for higher coverage at the cost of false positives.
+score cutoff of 85. ADR-006 set this at 88; lowered to 85 after Run 2 of
+``refresh.yml`` measured a 55.75% live match rate at n=504 (under the 60%
+ADR-013 threshold). See ``docs/open-questions.md`` for the re-measure plan.
+Raise for stricter joins, lower for higher coverage at the cost of false
+positives.
 
 The matcher trusts the strict ``PostingSchema``: ``title`` is non-null. NaN
 titles still survive matching as a no-match row to keep this safe under the
@@ -25,7 +27,7 @@ import re
 import pandas as pd
 from rapidfuzz import fuzz, process
 
-DEFAULT_SCORE_CUTOFF = 88
+DEFAULT_SCORE_CUTOFF = 85
 
 _PARENTHETICAL_RE = re.compile(r"\([^)]*\)")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9\s]+")

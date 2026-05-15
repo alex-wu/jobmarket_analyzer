@@ -15,6 +15,7 @@ Items move between sections as they're resolved. When an item closes, leave a on
 - **Local-only files (`CLAUDE.md`, `.claude/`)** — Untracked + gitignored. See [ADR-014](../DECISIONS.md#adr-014--local-only-files-excluded-from-the-public-repo).
 - **`--verbose` httpx credential leak** — Centralised scrub filter on the `httpx`/`httpcore` loggers; tested in `tests/test_log_redaction.py`. See [ADR-015](../DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger).
 - **GitHub Pages deploy strategy** — Monorepo with `site/`, `actions/deploy-pages`, Pages source = "GitHub Actions". See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo) and the manual checklist in [`docs/github-setup.md`](github-setup.md).
+- **Publish-stage partition shape** — `partition_by: []` (single flat `postings.parquet` per release) chosen over hive-on-flat-release. GitHub Releases is a flat-asset namespace; hive partitioning was stripping `country` from the parquet payload (it lives in the directory path, lost on flatten). Single flat file keeps `country` + `year_month` as real columns. ADR-004's "hive partitioning" wording deviates here at the config layer; ADR text unchanged. Decision in P5 close-out session, 2026-05-15.
 
 ---
 
@@ -42,4 +43,14 @@ These all require visual inspection of real data and are deferred until `site/` 
 
 ### ISCO live-match-rate measurement (post-first-Actions-run)
 
-Need a live `jobpipe normalise` against a full-day's worth of postings (estimated 500–1 500 rows after dedupe) to measure the rapidfuzz match rate at the 88 cutoff. A measured rate below 60% triggers a re-scope discussion on the LLM fallback (which is currently descoped via ADR-013).
+Run 2 of `refresh.yml` (2026-05-15, n=504, cutoff=88) measured a **55.75% fuzzy match rate** (281 fuzzy / 223 none) — below the 60% ADR-013 threshold by ~4 percentage points.
+
+Action taken this session: lowered `DEFAULT_SCORE_CUTOFF` in `src/jobpipe/isco/tagger.py` from 88 → 85 to capture more borderline fuzzy hits. ADR-006 was not amended (the constant is in the code, not the ADR text); the deviation is recorded here and revisited after Run 3+.
+
+A local re-run on the previous raw bundle (n=493 after recency filter) yielded fuzzy=269 / none=224 (54.56%) — the rate moved only marginally. The cutoff lowering may not be enough on its own; Run 3 (fresh data with recency floor at the source) is the next data point.
+
+If Run 3+ stays below 60%, the LLM-fallback re-scope discussion (currently descoped via ADR-013) becomes load-bearing.
+
+### Recency-filter coverage on non-Adzuna sources
+
+`normalise.run()` now applies a canonical `since_days=180` floor pre-dedupe (per preset `normalise.since_days`), and the Adzuna adapter passes `max_days_old=180` as a bandwidth optimisation. ATS sources (Greenhouse/Lever/Ashby/Personio) self-prune via company removal, so the floor is rarely binding for them — but the filter still applies uniformly. Verify on Run 3 that no ATS source ever serves a posting older than 180 days; if so, the assumption holds. Otherwise consider an adapter-level optimisation (none of these expose an "updatedSince" param on the free tier today).

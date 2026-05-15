@@ -96,20 +96,37 @@ def export_partitioned(
 
     out_root.mkdir(parents=True, exist_ok=True)
     postings_dir = out_root / "postings"
+    postings_dir.mkdir(parents=True, exist_ok=True)
 
-    partition_cols_sql = ", ".join(partition_by)
     con = duckdb.connect(":memory:")
     try:
         con.register("postings_df", postings_df)
-        con.sql(
-            f"""
-            COPY (
-                SELECT *, strftime(posted_at, '%Y-%m') AS year_month
-                FROM postings_df
-            ) TO '{postings_dir.as_posix()}'
-            (FORMAT PARQUET, PARTITION_BY ({partition_cols_sql}), OVERWRITE_OR_IGNORE);
-            """
-        )
+        if partition_by:
+            # Hive layout: partition columns end up encoded in the directory
+            # path and are stripped from the file payload by DuckDB. Re-reading
+            # with hive_partitioning=true reconstructs them.
+            partition_cols_sql = ", ".join(partition_by)
+            con.sql(
+                f"""
+                COPY (
+                    SELECT *, strftime(posted_at, '%Y-%m') AS year_month
+                    FROM postings_df
+                ) TO '{postings_dir.as_posix()}'
+                (FORMAT PARQUET, PARTITION_BY ({partition_cols_sql}), OVERWRITE_OR_IGNORE);
+                """
+            )
+        else:
+            # Single flat file — country + year_month stay as data columns
+            # so the dashboard can filter on them after a flat-release upload.
+            con.sql(
+                f"""
+                COPY (
+                    SELECT *, strftime(posted_at, '%Y-%m') AS year_month
+                    FROM postings_df
+                ) TO '{(postings_dir / "postings.parquet").as_posix()}'
+                (FORMAT PARQUET);
+                """
+            )
     finally:
         con.close()
 

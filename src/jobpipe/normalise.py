@@ -33,12 +33,19 @@ def run(
     raw: pd.DataFrame,
     rates: dict[str, float],
     labels_df: pd.DataFrame | None = None,
+    *,
+    since_days: int | None = None,
 ) -> pd.DataFrame:
     """Normalise a raw postings DataFrame.
 
     ``labels_df`` is the ESCO ISCO-08 label snapshot. If ``None``, the
     default committed parquet is loaded from disk — convenient for the
     CLI path, but tests should pass an explicit frame to keep this pure.
+
+    ``since_days`` applies a canonical recency floor: rows with ``posted_at``
+    older than ``now - since_days`` are dropped before dedupe. This is the
+    source-agnostic guarantee — adapter-level knobs (e.g. Adzuna's
+    ``max_days_old``) are bandwidth optimisations layered on top of it.
 
     Returns a frame validated against ``PostingSchema`` (strict).
     """
@@ -47,6 +54,17 @@ def run(
 
     df = fx.convert_to_eur(raw, rates)
     df = _recompute_p50(df)
+
+    if since_days is not None:
+        floor = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=since_days)
+        pre_filter = len(df)
+        df = df[df["posted_at"] >= floor].reset_index(drop=True)
+        logger.info(
+            "recency: %d → %d postings after since_days=%d filter",
+            pre_filter,
+            len(df),
+            since_days,
+        )
 
     labels = isco_loader.load_isco_labels() if labels_df is None else labels_df
     pre_match = len(df)

@@ -226,6 +226,41 @@ def test_export_partitioned_raises_when_postings_empty(tmp_path: Path) -> None:
         )
 
 
+def test_export_partitioned_empty_partition_by_writes_single_flat_file(tmp_path: Path) -> None:
+    src = _write_postings(
+        tmp_path / "enriched" / "postings.parquet",
+        [
+            _posting_row(0, country="IE", posted_at=datetime(2026, 5, 1, tzinfo=UTC)),
+            _posting_row(1, country="GB", posted_at=datetime(2026, 5, 2, tzinfo=UTC)),
+            _posting_row(2, country="GB", posted_at=datetime(2026, 6, 3, tzinfo=UTC)),
+        ],
+    )
+    export_partitioned(
+        src,
+        None,
+        tmp_path / "publish",
+        partition_by=[],
+        preset_id="demo",
+        run_id="run-1",
+    )
+
+    postings_root = tmp_path / "publish" / "postings"
+    files = list(postings_root.rglob("*.parquet"))
+    # Single flat file, no hive directories.
+    assert files == [postings_root / "postings.parquet"]
+
+    # Country + year_month survive as real columns in the data.
+    rows = duckdb.sql(
+        f"SELECT country, year_month, count(*) "
+        f"FROM '{(postings_root / 'postings.parquet').as_posix()}' "
+        f"GROUP BY country, year_month ORDER BY country, year_month"
+    ).fetchall()
+    assert rows == [("GB", "2026-05", 1), ("GB", "2026-06", 1), ("IE", "2026-05", 1)]
+
+    manifest = json.loads((tmp_path / "publish" / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["partition_by"] == []
+
+
 def test_export_partitioned_raises_on_unknown_partition_column(tmp_path: Path) -> None:
     src = _write_postings(
         tmp_path / "enriched" / "postings.parquet",

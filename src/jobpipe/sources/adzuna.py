@@ -42,6 +42,11 @@ class AdzunaConfig(SourceConfig):
     results_per_page: int = Field(default=50, ge=1, le=50)
     max_pages: int = Field(default=5, ge=1, le=20)
     timeout_seconds: float = Field(default=30.0, gt=0)
+    max_days_old: int | None = Field(
+        default=None,
+        ge=1,
+        description="When set, passed to Adzuna as ?max_days_old= to cap posting age upstream.",
+    )
     min_interval_hours: int = Field(
         default=24,
         ge=0,
@@ -137,6 +142,8 @@ class AdzunaAdapter:
             "results_per_page": cfg.results_per_page,
             "content-type": "application/json",
         }
+        if cfg.max_days_old is not None:
+            params["max_days_old"] = cfg.max_days_old
         try:
             r = http.get(url, params=params)
             r.raise_for_status()

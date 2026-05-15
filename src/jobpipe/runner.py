@@ -276,7 +276,8 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
 
     rates = fx.load_rates()
     labels = isco_loader.load_isco_labels()
-    enriched = normalise.run(raw_df, rates, labels_df=labels)
+    since_days = preset.get("normalise", {}).get("since_days")
+    enriched = normalise.run(raw_df, rates, labels_df=labels, since_days=since_days)
     logger.info(
         "normalise: %d rows after dedupe (%d collapsed)",
         len(enriched),
@@ -357,8 +358,9 @@ def run_publish(preset_path: Path, out_root: Path = Path("data")) -> Path:
     if not isinstance(publish_cfg, dict):
         raise PresetError(f"preset {preset_path} is missing required mapping 'publish'")
     partition_by_raw = publish_cfg.get("partition_by")
-    if not isinstance(partition_by_raw, list) or not partition_by_raw:
-        raise PresetError(f"preset {preset_path}: 'publish.partition_by' must be a non-empty list")
+    if not isinstance(partition_by_raw, list):
+        raise PresetError(f"preset {preset_path}: 'publish.partition_by' must be a list")
+    # Empty list is valid — produces a single flat postings.parquet (see duckdb_io).
     partition_by = [str(c) for c in partition_by_raw]
 
     preset_id = str(preset["preset_id"])

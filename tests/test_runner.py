@@ -482,13 +482,13 @@ def test_run_publish_raises_when_publish_block_missing(tmp_path: Path) -> None:
         run_publish(preset_path, out_root=tmp_path / "data")
 
 
-def test_run_publish_raises_when_partition_by_empty(tmp_path: Path) -> None:
+def test_run_publish_raises_when_partition_by_not_a_list(tmp_path: Path) -> None:
     preset_path = _write_preset(
         tmp_path,
         {
             "preset_id": "demo",
             "sources": {"fake": {"enabled": False}},
-            "publish": {"partition_by": []},
+            "publish": {"partition_by": "country"},  # string, not list
         },
     )
     with pytest.raises(PresetError, match="partition_by"):

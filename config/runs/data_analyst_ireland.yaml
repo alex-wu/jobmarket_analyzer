@@ -29,6 +29,7 @@ sources:
     max_results: 500
     results_per_page: 50
     max_pages: 5
+    max_days_old: 180         # bandwidth saver — matches normalise.since_days floor
     min_interval_hours: 24    # refresh.yml honours this; raise if free tier bites
 
   greenhouse:
@@ -89,6 +90,14 @@ benchmarks:
     isco_codes: ["2511", "2521", "2423"]
     min_interval_hours: 720    # monthly cadence (SES rebases every 4 years)
 
+normalise:
+  # Source-agnostic recency floor applied before dedupe. Adzuna's max_days_old
+  # is the bandwidth optimisation; this filter is the dataset-level guarantee.
+  since_days: 180
+
 publish:
-  partition_by: ["country", "year_month"]
+  # Empty list = single flat postings.parquet (no hive directory tree). Keeps
+  # country + year_month as real columns survive GitHub Release's flat-asset
+  # namespace — see docs/sessions/2026-05-15-p5-cron-publish-first-push.md.
+  partition_by: []
   retention_days: 365

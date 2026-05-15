@@ -48,7 +48,7 @@ def test_match_above_cutoff_keeps_match(labels: pd.DataFrame) -> None:
     df = tag(_frame(["Senior Data Analyst (Dublin)"]), labels)
     assert df.loc[0, "isco_code"] == "2511"
     assert df.loc[0, "isco_match_method"] == "fuzzy"
-    assert df.loc[0, "isco_match_score"] >= 0.88
+    assert df.loc[0, "isco_match_score"] >= 0.85
 
 
 def test_match_below_cutoff_returns_none(labels: pd.DataFrame) -> None:
@@ -92,7 +92,7 @@ def test_empty_postings_frame_passthrough(labels: pd.DataFrame) -> None:
 
 
 def test_score_cutoff_param_overrides_default(labels: pd.DataFrame) -> None:
-    # "analyt" is too short to clear default 88, but lowering cutoff lets a sloppy match through.
+    # "analyt" is too short to clear default 85, but lowering cutoff lets a sloppy match through.
     strict = tag(_frame(["analyt"]), labels, score_cutoff=95)
     assert strict.loc[0, "isco_code"] is None
     loose = tag(_frame(["analyt"]), labels, score_cutoff=50)
