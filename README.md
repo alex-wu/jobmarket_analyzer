@@ -4,6 +4,8 @@
 
 ![CI](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/ci.yml/badge.svg)
 ![Pages](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
+![CodeQL](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/codeql.yml/badge.svg)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alex-wu/jobmarket_analyzer/badge)](https://scorecard.dev/viewer/?uri=github.com/alex-wu/jobmarket_analyzer)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **Status:** P6 single-page BI dashboard live at <https://alex-wu.github.io/jobmarket_analyzer/>; P7 `pages.yml` deploy + automation green. `refresh.yml` runs daily @ 06:00 UTC, fetches from all 5 source adapters (Adzuna + 4 ATS), normalises with a 180-day recency floor, and publishes a single flat `postings.parquet` + `manifest.json` to a re-clobbered `latest` GitHub Release and an immutable `data-YYYY-MM-DD` release per UTC day. `pages.yml` then rebuilds the dashboard against that fresh dataset via `workflow_run`. Verified end-to-end on `alex-wu/jobmarket_analyzer`. OECD adapter is built but disabled (Cloudflare bot-protection on `sdmx.oecd.org`, see [ADR-011](DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection)). HN Algolia + LLM client descoped from v1 ([ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)); ISCO live match rate sits at ~56 % (Run 5, n=504) — LLM-fallback re-scope tracked in [docs/open-questions.md](docs/open-questions.md). Day-to-day operations: [docs/operations.md](docs/operations.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
@@ -24,7 +26,7 @@
 
 ## Quick start
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.12 (uv will install), Node 20+ (for the dashboard site).
+Prerequisites: [uv](https://docs.astral.sh/uv/), Python 3.12 (uv will install), Node 24+ (for the dashboard site).
 
 ```bash
 git clone https://github.com/alex-wu/jobmarket_analyzer.git
