@@ -64,7 +64,7 @@ jobs:
           POSTINGS_DIR="${{ steps.publish.outputs.bundle }}/postings"
           if [ -d "$POSTINGS_DIR" ]; then
             find "$POSTINGS_DIR" -type f -name '*.parquet' | while read -r f; do
-              rel="${f#$POSTINGS_DIR/}"
+              rel="${f#"$POSTINGS_DIR"/}"
               flat="postings__$(echo "$rel" | tr '/' '_')"
               cp "$f" "$STAGE/$flat"
             done
