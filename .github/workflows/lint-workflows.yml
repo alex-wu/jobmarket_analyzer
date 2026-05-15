@@ -1,0 +1,30 @@
+name: lint-workflows
+
+# Runs actionlint against .github/workflows/*.yml on any change touching them.
+# Catches YAML syntax + embedded shell errors before they hit a real run.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-workflows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: raven-actions/actionlint@v2
+        with:
+          fail-on-error: true
