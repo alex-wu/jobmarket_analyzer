@@ -8,6 +8,7 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 ## Resolved
 
+- **P6 dashboard rebuild + P7 GitHub Pages deploy** — Single-page BI canvas live at <https://alex-wu.github.io/jobmarket_analyzer/>. Three feature commits on `main` (`dc4c46f`, `7ea1f6e`, `40fb37a`). Operations runbook at [`docs/operations.md`](operations.md). Comprehensive context for the next agent: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md).
 - **Adzuna free tier capacity** — `max_pages=5 × results_per_page=50 = 250` per fetch, with `min_interval_hours=24` as the safety knob. Lived at 499 rows across two keywords in P1's live run without tripping the limit (P1 acceptance).
 - **Remotive ToS** — Excluded entirely. ToS §8 prohibits redistribution + commercial database-building; attribution back-links don't override. See [ADR-009](../DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources).
 - **ESCO live API pagination** — `/api/search` and `/api/resource/concept?isInScheme=...` both cap at offset=100 as of v1.2.1. Workaround: walk the ISCO concept tree to build a static snapshot. See [ADR-010](../DECISIONS.md#adr-010--esco-label-snapshot-built-by-walking-the-isco-concept-tree).
@@ -20,6 +21,39 @@ Items move between sections as they're resolved. When an item closes, leave a on
 ---
 
 ## Still open — owned by a future phase
+
+### Dashboard cold-load performance (owned by P8)
+
+DuckDB-WASM ships as **7.2 MB compressed (~36 MB uncompressed)** in `dist/_npm/@duckdb/`. The dataset it queries is **23 KB compressed (~55 KB uncompressed)** — the WASM module is ~310× the data. Every cold visit downloads it; `Cache-Control: max-age=600` only covers repeats within 10 minutes. Cold-load is dominated by WASM init (1-2 s) + nine sequential SQL cells against the in-browser engine.
+
+Strategy doc [`docs/dashboard_strategy.md`](dashboard_strategy.md) §2 principle 8 ("SQL is the single source of truth for filter logic") was correct intent at the wrong scale. For ≤1000 rows and fixed aggregations, JS `d3.rollup` does the same work in <1 ms with zero WASM dependency.
+
+Recommended path (full scoping in [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §3):
+
+- **Path C — Hybrid pre-bake + client-side filter.** Static aggregates as JSON loaders; raw 504-row JSON for filter-dependent cells; `d3.rollup` does the math in JS. Cold load <500 ms; filter response <50 ms. ~1 day rework. **Ships ADR-017** formally superseding the strategy doc principle.
+
+Other paths rejected: (A) service worker cache the 7 MB WASM — half-measure; (B) full data-loader rewrite without raw-rows JSON — loses filter interactivity.
+
+### CI/CD modernisation backlog (owned by P9)
+
+Surfaced from `pages.yml` / `refresh.yml` / `ci.yml` run annotations on 2026-05-15:
+
+- **Node.js 20 actions deprecated.** GitHub forces Node 24 from 2026-06-02 (hard deadline). Bump `actions/checkout`, `actions/setup-node`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, `astral-sh/setup-uv` to their Node-24 versions.
+- **`puppeteer@23.11.1` unsupported** (< 24.15.0). Bumping clears 4 transitive deprecation warnings (`inflight`, `glob@8`, `glob@10`, `whatwg-encoding`).
+- **No `.github/dependabot.yml`.** Add 3-ecosystem config (npm in `site/`, pip via `uv.lock`, github-actions at root).
+- **No branch protection on `main`.** Anyone with write access pushes direct. Add: required PR + 1 review + green CI/pages checks.
+- **No CodeQL.** Free on public repos; add `.github/workflows/codeql.yml`.
+
+### Pipeline coverage regressions (owned by P10)
+
+Run `25913215989` (2026-05-15 10:32 UTC) logged zero-row returns from:
+
+- ATS adapters: Lever, Ashby, Personio
+- Benchmark adapters: CSO PxStat, Eurostat SES
+
+If this has been silent on every cron since P5, the benchmark overlay claim on the dashboard ("salary vs official wage statistics") is currently unbacked. Investigation: replay the most recent `refresh.yml` log; spot-check each company's careers endpoint + each statistics-agency SDMX/PxStat path manually. Each adapter either gets fixed or marked disabled with an ADR (parallel to ADR-011 for OECD).
+
+Also: `src/jobpipe/runner.py:116` emits a `pandas` FutureWarning about empty-frame concatenation that will become an error in a future pandas release. Pre-filter empty frames before `pd.concat`.
 
 ### OECD SDMX unblock (no current owner)
 

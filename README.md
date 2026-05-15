@@ -97,6 +97,16 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 - [x] **P6** — Observable Framework single-page BI dashboard (`site/`) reads `data/gh_databuild_samples/postings__postings.parquet` in-browser via DuckDB-WASM. Stock Plot marks only, Framework `grid` / `card` primitives, dashboard theme — no custom CSS. Spec: [docs/dashboard_strategy.md](docs/dashboard_strategy.md). Three originally-requested facets (`experience_level`, `work_arrangement`, `skills`) remain deliberately deferred — see [docs/dashboard_data_gaps.md](docs/dashboard_data_gaps.md) for the extraction roadmap.
 - [x] **P7** — `pages.yml` deploys `site/` via `actions/deploy-pages`; triggered by push to `main` under `site/**`, by `workflow_run` after `refresh.yml`, or by manual `workflow_dispatch`. CI smoke-tests the static build before publishing. Live at <https://alex-wu.github.io/jobmarket_analyzer/>. Operations runbook: [docs/operations.md](docs/operations.md).
 
+### Queued
+
+Detailed scoping in [docs/sessions/2026-05-15-p7-shipped-handover.md](docs/sessions/2026-05-15-p7-shipped-handover.md).
+
+- [ ] **P8** — Site performance. DuckDB-WASM (7.2 MB compressed) is ~310× the dataset size; cold load dominated by WASM init. Move to build-time data loaders + client-side `d3.rollup` for filter-dependent aggregations (path C in the handover doc). Ships ADR-017 superseding `dashboard_strategy.md` §2 principle 8.
+- [ ] **P9** — CI/CD modernisation. Node-20 actions deprecation (forced Node 24 from 2026-06-02), puppeteer ≥ 24.15.0, `dependabot.yml`, branch protection on `main`, CodeQL workflow.
+- [ ] **P10** — Pipeline observability + coverage. Investigate the zero-row Lever/Ashby/Personio/CSO/Eurostat results in the most recent `refresh.yml` runs; fix `pandas` FutureWarning at `src/jobpipe/runner.py:116`; add coverage alarms.
+- [ ] **P11** — Portfolio polish + first tagged release. Second preset (UK or Eurozone-wide); README hero screenshot; CHANGELOG seed; `v0.1.0` tag.
+- [ ] **P12** — Schema expansion. `experience_level`, `work_arrangement`, `skills` extraction per [docs/dashboard_data_gaps.md](docs/dashboard_data_gaps.md); dashboard sections wiring the new fields (depends on P8 architecture).
+
 ---
 
 ## License
