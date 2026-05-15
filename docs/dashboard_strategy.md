@@ -3,6 +3,8 @@
 > Spec for the P6 dashboard rebuild. The implementer in the next session executes against this doc.
 > Companion: [`docs/dashboard_data_gaps.md`](dashboard_data_gaps.md) — the upstream-pipeline extraction roadmap.
 
+> **⚠ Principle 8 superseded by P8.** §2 principle 8 (SQL composition centralised in-browser via DuckDB-WASM) is correct at scale ≥ 10 MB parquet but wrong at our scale (23 KB compressed). DuckDB-WASM ships at 7.2 MB compressed (~310× the data) and dominates cold-load time. P8 replaces in-browser SQL with build-time data loaders + client-side `d3.rollup`. ADR-017 will formalise; rewrite of §3.3 + §3.4 pending. Full context: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §3. The rest of this doc (layout, components, filter contract, styling discipline) remains valid.
+
 ---
 
 ## 1. Why this rebuild
@@ -349,5 +351,5 @@ For the eventual rebuild (referenced from this doc):
 - **Three deferred fields** — `experience_level`, `work_arrangement`, `skills`. Extraction roadmap lives in [`docs/dashboard_data_gaps.md`](dashboard_data_gaps.md). This rebuild reserves no layout slots; when the fields land, a new strategy revision adds the visual sections.
 - **LLM ISCO fallback** — descoped from v1 per [ADR-013](../DECISIONS.md). Live match rate at ~56 % (Run 5, n=504); the dashboard surfaces the coverage but does not work around it.
 - **Cross-day delta on KPI cards** — would let a tile show "504 (↑12 since yesterday)". Blocked on a history table (`data/postings_history.parquet` partitioned by snapshot date). Out of this rebuild's scope.
-- **Second preset** — P7 ships a second `config/runs/*.yaml` (likely UK or Eurozone-wide). The dashboard already reads whatever the manifest's `preset_id` says, so the only change is the title chip. No layout consequence.
+- **Second preset** — moved to P11.1. The dashboard already reads whatever the manifest's `preset_id` says, so the only change is the title chip. No layout consequence.
 - **Scaffolder warning** — do NOT run `npm create @observablehq` for any new file; the scaffolder is interactive-only and rejects `--yes`. Hand-author every component. (Memory: `pitfall-observable-scaffolder-interactive`.)

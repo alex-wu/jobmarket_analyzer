@@ -113,7 +113,7 @@ Suggested phasing once any of these get prioritised:
 2. **`work_arrangement` second** — per-source adapter work but no new taxonomies.
 3. **`skills` last** — gated behind ESCO skill snapshot + an ADR-013-style decision on whether the LLM fallback ever ships.
 
-None of these block the v0.1.0 tag; they're follow-ups slotted into the next milestone after P7 (Pages deploy + screenshots + second preset).
+None of these block the `v0.1.0` tag (P11). They're slotted into **P12** (schema expansion), which depends on P8 landing first so the new chart cells use the build-time aggregator architecture rather than in-browser SQL. See [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §4 for the full phase plan.
 
 ## 5. Surfacing extraction quality
 
