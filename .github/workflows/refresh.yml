@@ -79,6 +79,14 @@ jobs:
             gh release create latest --title "latest" \
               --notes "Re-clobbered on every refresh run. See manifest.json for run_id."
           fi
+          # Wipe stale assets first — `gh release upload --clobber` only replaces
+          # same-named assets, so a layout change (e.g. partition_by going from
+          # ["country","year_month"] to []) would leave the previous run's
+          # assets as zombies on the release.
+          gh release view latest --json assets --jq '.assets[].name' \
+            | while read -r name; do
+                [ -n "$name" ] && gh release delete-asset latest "$name" --yes
+              done
           # shellcheck disable=SC2046
           gh release upload latest --clobber $(find "${{ steps.stage.outputs.stage }}" -type f)
 
