@@ -73,6 +73,27 @@ flowchart TD
 - **Per-benchmark override:** same `min_interval_hours` knob, enforced by `runner.fetch_benchmarks` via the mtime of the newest parquet under `data/raw/benchmarks/<name>/`. Defaults: CSO 168h (weekly recheck of quarterly cube), Eurostat/OECD 720h (monthly recheck of annual-or-rarer series).
 - **Manual:** `workflow_dispatch` on the same workflow for ad-hoc refreshes.
 
+## Source API delta semantics
+
+**None of the five source adapters consume an incremental / "updated-since" API**, because none of the upstreams expose one for free-tier access. Every refresh fetches the **full current set** of postings:
+
+| Source | Endpoint pattern | Delta support upstream | What we do |
+|---|---|---|---|
+| Adzuna | `GET /v1/api/jobs/{country}/search/{page}` | Has `max_days_old` / `sort_by=date` knobs but no cursor — every call returns the current top N for the (country, keyword) query. | Full re-fetch each run. `posting_id = sha1("adzuna:{upstream_id}")` is stable, so the same posting reappears with the same id day-over-day. |
+| Greenhouse | `GET /v1/boards/{slug}/jobs?content=true` | No delta — returns every open job on the board. | Full re-fetch per company slug. `posting_id = sha1("greenhouse:{slug}:{job_id}")`, stable. |
+| Lever | `GET /v0/postings/{slug}?mode=json` | No delta. | Full re-fetch per slug. `posting_id = sha1("lever:{slug}:{posting_id}")`, stable. |
+| Ashby | `GET /posting-api/job-board/{slug}` | No delta on the public job-board endpoint. (The paid API has `updatedSince`.) | Full re-fetch per slug. `posting_id = sha1("ashby:{slug}:{job_id}")`, stable. |
+| Personio | `GET /xml?language=en` per company | No delta. | Full re-fetch per slug. `posting_id = sha1("personio:{slug}:{position_id}")`, stable. |
+
+**What that means for our data:**
+
+- **Within a run**, every adapter de-duplicates by `posting_id` before returning (each `_normalise_row` produces a stable hash, and adapters call `drop_duplicates(subset="posting_id")` before yielding). The `PostingSchema.posting_id` uniqueness check would loud-fail otherwise.
+- **Across runs**, the same posting reappears every day until the upstream removes it. `posting_id` is the same. `posted_at` (the upstream-reported create/update timestamp) is the same. `ingested_at` advances each run.
+- **Each daily publish bundle is a complete snapshot**, not a delta — the `data-YYYY-MM-DD` releases each contain the full day's set. There is no cross-run join at publish time.
+- **Closed/removed postings simply stop appearing** in new fetches. There is no signal in the data that a posting was closed; it just drops out of subsequent bundles.
+
+This shapes downstream choices the project hasn't made yet (decisions parked for P6 in `docs/open-questions.md`): whether the dashboard surfaces "freshness" against the latest snapshot, computes `first_seen_at` by joining historical bundles, or treats each daily release as standalone.
+
 ## Deploy
 
 - **Refresh (P5):** `.github/workflows/refresh.yml` runs the pipeline daily, uploads partitioned Parquet to a `latest` GitHub Release (re-clobbered each run) and a dated `data-YYYY-MM-DD` Release for audit history. See [ADR-004](../DECISIONS.md#adr-004--storage--delivery-parquet-via-github-releases-as-cdn).

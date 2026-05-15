@@ -6,6 +6,40 @@ The workflows (`refresh.yml` for P5, `pages.yml` for P7) cannot do these steps o
 
 ---
 
+## 0. Email privacy (before the first `git push`)
+
+GitHub blocks pushes with `GH007: Your push would publish a private email address` if (a) **Settings → Emails → "Keep my email addresses private"** is on AND (b) your commits' author email is your real address rather than the noreply alias. Both are the default for accounts created in recent years, so this trips most forkers on their first push.
+
+Two clean fixes:
+
+1. **Use the noreply alias** (recommended — keeps your real email out of the public commit history forever):
+
+   ```bash
+   # 1. Find your noreply alias: <user-id>+<login>@users.noreply.github.com
+   gh api /user --jq '"\(.id)+\(.login)@users.noreply.github.com"'
+
+   # 2. Lock new commits in *this* repo to that alias (local config, not global):
+   git config user.email "<id>+<login>@users.noreply.github.com"
+
+   # 3. Rewrite existing commits' author + committer email (one-shot, before push):
+   git filter-branch -f --env-filter '
+     if [ "$GIT_AUTHOR_EMAIL" = "your.real@email.com" ]; then
+       export GIT_AUTHOR_EMAIL="<id>+<login>@users.noreply.github.com"
+     fi
+     if [ "$GIT_COMMITTER_EMAIL" = "your.real@email.com" ]; then
+       export GIT_COMMITTER_EMAIL="<id>+<login>@users.noreply.github.com"
+     fi
+   ' -- --all
+   ```
+
+   `filter-branch` rewrites every reachable commit in seconds — safe pre-push since nothing is on the remote yet. After the rewrite, `git push -u origin main` succeeds. The `refs/original/refs/heads/*` backup refs left by `filter-branch` can be deleted once the push lands.
+
+2. **Toggle the protection off** at `https://github.com/settings/emails` (uncheck "Block command line pushes that expose my email"). Faster, but your real email lands in the public commit history of every prior commit, permanently.
+
+Forks that originate from an already-public repo don't need this step — the upstream history is already noreply-aliased.
+
+---
+
 ## 1. Repository secrets
 
 **Settings → Secrets and variables → Actions → New repository secret**

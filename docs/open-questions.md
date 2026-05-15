@@ -38,6 +38,7 @@ These all require visual inspection of real data and are deferred until `site/` 
 - **`salary_min_eur == 0` rows.** Adzuna emits a small non-zero count of zero-floored salaries. Decide: surface or hide.
 - **CSO 4-digit ISCO coarseness.** [ADR-012](../DECISIONS.md#adr-012--cso-pxstat-4-digit-isco-coarseness) documents that CSO's `EHQ03` cube maps to a 3-bucket umbrella. The dashboard must not present CSO bucket-1 numbers as if they were ISCO-2511-specific. UI decision: label, tooltip, or row-level disclaimer.
 - **Cross-source dedupe efficacy on the live mix.** Same job often appears on the company's Greenhouse and on Adzuna. Measure overlap once we have a full daily run.
+- **Cross-day delta surfacing.** None of the source upstreams expose an incremental API, so every refresh fetches the full current set (see [`docs/architecture.md`](architecture.md#source-api-delta-semantics) for per-source detail). `posting_id` is stable, so the same posting reappears every day until it's removed upstream; `posted_at` is the upstream-reported create/update timestamp; `ingested_at` advances. P6 decision: present each daily release standalone (simplest, matches the publish model), compute `first_seen_at` by joining historical releases at build time (better UX, more loader logic), or flag "new today" by diffing against the previous `data-YYYY-MM-DD` release (cheaper, only needs the prior day).
 
 ### ISCO live-match-rate measurement (post-first-Actions-run)
 
