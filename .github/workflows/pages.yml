@@ -1,0 +1,87 @@
+name: pages
+
+# Deploys the Observable Framework dashboard (site/) to GitHub Pages.
+# Per ADR-016 — monorepo deploy via actions/deploy-pages. Pages source must be
+# set to "GitHub Actions" in repo settings (see docs/github-setup.md §3).
+#
+# Data flow: refresh.yml uploads postings__postings.parquet + manifest.json to
+# the `latest` release. This workflow downloads them into the same path the
+# local data loader reads from (data/gh_databuild_samples/), so local dev and
+# CI builds run identical bytes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: [refresh]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip if a workflow_run trigger fires from a failed refresh.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+        # No npm cache: site/.gitignore excludes package-lock.json by design.
+        # If lockfile policy changes, re-add `cache: npm` + cache-dependency-path.
+
+      - name: Download latest dataset from release
+        # Same flags as the README's local-dev snippet. Single source of truth.
+        run: |
+          mkdir -p data/gh_databuild_samples
+          gh release download latest \
+            -p "postings__postings.parquet" \
+            -p "manifest.json" \
+            -D data/gh_databuild_samples/ \
+            --clobber
+
+      - name: Install site deps
+        working-directory: site
+        # `npm install` (not `npm ci`) — repo deliberately omits package-lock.json.
+        run: npm install --no-audit --no-fund
+
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Smoke test the build
+        # Headless Chromium walk of the static dist/. Catches runtime errors
+        # that `npm run build` misses (it doesn't execute cell JS).
+        working-directory: site
+        env:
+          SMOKE_PHASE: dist
+        run: npm run smoke
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
