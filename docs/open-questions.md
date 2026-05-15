@@ -39,7 +39,7 @@ Other paths rejected: (A) service worker cache the 7 MB WASM — half-measure; (
 
 P9 shipped the modernisation; these are residual items deliberately not closed:
 
-- **Branch protection `strict: true` → `false`** (recommended; not yet applied). User approved Option A in P9 session but the change was classifier-blocked as scope-escalation. Re-confirm + apply via one `gh api PUT` to eliminate Dependabot rebase-race deadlock. Staged payload in [P9 handover §6](sessions/2026-05-15-p9-shipped-handover.md).
+- ~~Branch protection `strict: true` → `false`~~ **applied end of P9 session.** Dependabot waves no longer bottleneck on sequential rebase. Payload archived in P9 handover §6.
 - **4 transitive npm warnings still present.** Diagnosed in P9 as Observable Framework's deps (`@rollup/plugin-commonjs@25.0.8` + `jsdom@23.2.0`), not puppeteer or rimraf. Not actionable until Observable Framework upgrades its pins. Dependabot will surface the PR.
 - **`puppeteer` 25.x not yet on npm** despite Dependabot proposing 25.0.2 (closed as PR #6). Re-watch when 25.x publishes — the current `~24.42.0` pin is a workaround for the `puppeteer-core@24.43.x` peer-publish lag.
 - **Scorecard score audit.** First weekly run completed clean post-P9. When Scorecard surfaces lower-scoring checks, decide whether to SHA-pin all actions (Dependabot can still track via `# vX.Y.Z` trailing comments) or accept the score for a portfolio repo.
