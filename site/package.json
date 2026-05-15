@@ -16,10 +16,10 @@
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.2-r.1",
-    "puppeteer": "^23.11.1",
+    "puppeteer": "~24.42.0",
     "rimraf": "^5.0.5"
   },
   "engines": {
-    "node": ">=20.6"
+    "node": ">=24"
   }
 }
