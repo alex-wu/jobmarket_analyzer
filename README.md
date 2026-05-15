@@ -6,7 +6,7 @@
 ![Pages](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Status:** P4 complete (benchmarks + ISCO tagger) — 5 source adapters + ISCO-08 fuzzy tagger + CSO/Eurostat benchmark adapters writing a sibling `benchmarks.parquet` next to `postings.parquet`. OECD adapter is built but disabled in the preset (Cloudflare bot-protection on `sdmx.oecd.org`, see [ADR-011](DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection)). HN Algolia + the real LLM client are descoped from v1 ([ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)); P5/P6/P7 deliver Actions cron, the dashboard, and polish. See [DECISIONS.md](DECISIONS.md) for architecture rationale and [docs/architecture.md](docs/architecture.md) for the dataflow diagram.
+**Status:** P5 complete (cron + publish + first public push). `refresh.yml` runs daily @ 06:00 UTC, fetches from all 5 source adapters (Adzuna + 4 ATS), normalises with a 180-day recency floor, and publishes a single flat `postings.parquet` + `manifest.json` to a re-clobbered `latest` GitHub Release and an immutable `data-YYYY-MM-DD` release per UTC day. Verified end-to-end on `alex-wu/jobmarket_analyzer`. OECD adapter is built but disabled (Cloudflare bot-protection on `sdmx.oecd.org`, see [ADR-011](DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection)). HN Algolia + LLM client descoped from v1 ([ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)); ISCO live match rate sits at ~56 % (Run 5, n=504) — LLM-fallback re-scope is now a P6-blocking decision. P6 builds the Observable Framework dashboard locally against `data/gh_databuild_samples/` then wires `pages.yml` in P7. See [DECISIONS.md](DECISIONS.md) for architecture rationale and [docs/architecture.md](docs/architecture.md) for the dataflow diagram.
 
 **v1 preset:** data-analyst roles, Ireland-focused with Eurozone context. The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography is a YAML file, not a code change.
 
@@ -35,13 +35,17 @@ cp .env.example .env   # then fill in ADZUNA_APP_ID / ADZUNA_APP_KEY (optional �
 # Run the v1 preset end-to-end against the live APIs (Adzuna is skipped if creds are absent)
 uv run jobpipe fetch --preset config/runs/data_analyst_ireland.yaml --verbose
 uv run jobpipe normalise --preset config/runs/data_analyst_ireland.yaml
-uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml    # P5 wires Release upload
+uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml
 
-# Build the dashboard against the local Parquet bundle (P6)
+# Or skip live fetching and download the production sample from the latest release:
+gh release download latest -p "postings__postings.parquet" -p "manifest.json" \
+  -R alex-wu/jobmarket_analyzer -D data/gh_databuild_samples/ --clobber
+
+# Build the dashboard against the local Parquet sample (P6 — in progress)
 cd site && npm ci && npx framework dev
 ```
 
-Live demo: `https://alex-wu.github.io/jobmarket_analyzer/` (post-P6).
+Live demo: `https://alex-wu.github.io/jobmarket_analyzer/` (post-P7).
 
 ---
 
@@ -87,9 +91,9 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 - [x] **P2** — normalisation + dedupe + strict schema
 - [x] **P3** — ATS source adapters (Greenhouse, Lever, Ashby, Personio). Remotive excluded ([ADR-009](DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources)).
 - [x] **P4** — benchmark adapters (CSO PxStat, OECD SDMX, Eurostat SES) + ESCO/ISCO tagging via rapidfuzz. OECD ships disabled ([ADR-011](DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection)); HN Algolia + LLM ISCO fallback descoped from v1 ([ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)).
-- [ ] **P5** — GH Actions refresh + Release upload
-- [ ] **P6** — Observable Framework site + GH Pages
-- [ ] **P7** — polish, second preset, screenshots
+- [x] **P5** — GH Actions refresh + Release upload. Daily 06:00 UTC cron + workflow dispatch. `publish.partition_by: []` writes a single flat `postings.parquet` (hive layout strips columns on flatten — see session log). Recency floor at 180 days (Adzuna `max_days_old` + `normalise.since_days`). Verified Run 5 on 2026-05-15.
+- [ ] **P6** — Observable Framework site + GH Pages. Builds locally against `data/gh_databuild_samples/postings__postings.parquet`.
+- [ ] **P7** — polish, second preset, screenshots, `pages.yml`
 
 ---
 
