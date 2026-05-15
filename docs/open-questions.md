@@ -8,6 +8,7 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 ## Resolved
 
+- **P9 CI/CD modernisation** — Shipped 2026-05-15 across 8 PRs (`#2` umbrella, `#3-#5/#7` first Dependabot wave, `#6` closed as ghost version, `#8` doc fix, `#9` Scorecard tag pin). Active automation: CodeQL (Python + JS matrix), Dependabot weekly grouped (npm + pip + actions), OpenSSF Scorecard + README badges, actionlint, Dependabot auto-merge for patch+minor. Light branch protection on `main` (required checks = `test` + `analyze (python|javascript)`; no PR-review wall; `delete_branch_on_merge: true`). Comprehensive handover: [`docs/sessions/2026-05-15-p9-shipped-handover.md`](sessions/2026-05-15-p9-shipped-handover.md). Reference: [`docs/ci-cd-practices.md`](ci-cd-practices.md). Deferred design (no code): [`docs/data-history-design.md`](data-history-design.md) for weekly cron + 6-month accumulation.
 - **P6 dashboard rebuild + P7 GitHub Pages deploy** — Single-page BI canvas live at <https://alex-wu.github.io/jobmarket_analyzer/>. Three feature commits on `main` (`dc4c46f`, `7ea1f6e`, `40fb37a`). Operations runbook at [`docs/operations.md`](operations.md). Comprehensive context for the next agent: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md).
 - **Adzuna free tier capacity** — `max_pages=5 × results_per_page=50 = 250` per fetch, with `min_interval_hours=24` as the safety knob. Lived at 499 rows across two keywords in P1's live run without tripping the limit (P1 acceptance).
 - **Remotive ToS** — Excluded entirely. ToS §8 prohibits redistribution + commercial database-building; attribution back-links don't override. See [ADR-009](../DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources).
@@ -34,15 +35,16 @@ Recommended path (full scoping in [`docs/sessions/2026-05-15-p7-shipped-handover
 
 Other paths rejected: (A) service worker cache the 7 MB WASM — half-measure; (B) full data-loader rewrite without raw-rows JSON — loses filter interactivity.
 
-### CI/CD modernisation backlog (owned by P9)
+### CI/CD follow-ups (residual from P9)
 
-Surfaced from `pages.yml` / `refresh.yml` / `ci.yml` run annotations on 2026-05-15:
+P9 shipped the modernisation; these are residual items deliberately not closed:
 
-- **Node.js 20 actions deprecated.** GitHub forces Node 24 from 2026-06-02 (hard deadline). Bump `actions/checkout`, `actions/setup-node`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, `astral-sh/setup-uv` to their Node-24 versions.
-- **`puppeteer@23.11.1` unsupported** (< 24.15.0). Bumping clears 4 transitive deprecation warnings (`inflight`, `glob@8`, `glob@10`, `whatwg-encoding`).
-- **No `.github/dependabot.yml`.** Add 3-ecosystem config (npm in `site/`, pip via `uv.lock`, github-actions at root).
-- **No branch protection on `main`.** Anyone with write access pushes direct. Add: required PR + 1 review + green CI/pages checks.
-- **No CodeQL.** Free on public repos; add `.github/workflows/codeql.yml`.
+- **Branch protection `strict: true` → `false`** (recommended; not yet applied). User approved Option A in P9 session but the change was classifier-blocked as scope-escalation. Re-confirm + apply via one `gh api PUT` to eliminate Dependabot rebase-race deadlock. Staged payload in [P9 handover §6](sessions/2026-05-15-p9-shipped-handover.md).
+- **4 transitive npm warnings still present.** Diagnosed in P9 as Observable Framework's deps (`@rollup/plugin-commonjs@25.0.8` + `jsdom@23.2.0`), not puppeteer or rimraf. Not actionable until Observable Framework upgrades its pins. Dependabot will surface the PR.
+- **`puppeteer` 25.x not yet on npm** despite Dependabot proposing 25.0.2 (closed as PR #6). Re-watch when 25.x publishes — the current `~24.42.0` pin is a workaround for the `puppeteer-core@24.43.x` peer-publish lag.
+- **Scorecard score audit.** First weekly run completed clean post-P9. When Scorecard surfaces lower-scoring checks, decide whether to SHA-pin all actions (Dependabot can still track via `# vX.Y.Z` trailing comments) or accept the score for a portfolio repo.
+- **PR-gate smoke?** `pages.yml` smoke only fires on push-to-main, not on PR. A path-filtered `smoke.yml` running puppeteer on PRs touching `site/**` would catch dashboard regressions pre-merge. ~2-3 min cost per `site/` PR. Open question for next agent.
+- **Tighten Dependabot auto-merge for workflow-bumps?** Workflow file changes can subtly change CI semantics; current auto-merge blesses any patch/minor including `.github/workflows/**` bumps. Consider an exclusion filter in `dependabot-automerge.yml`.
 
 ### Pipeline coverage regressions (owned by P10)
 
