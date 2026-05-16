@@ -111,3 +111,8 @@ gate:
   # Disabled adapters (oecd) are already skipped — list is for adapters we
   # *expect* to be flaky upstream but don't want to disable outright.
   allow_zero_sources: []
+  # Warn-only during P10 stabilisation: issues print to the workflow log but
+  # Stage + Upload still run, so Adzuna + Greenhouse data ships while the
+  # zero-row ATS adapters (lever/ashby/personio) get investigated. Flip back
+  # to true once the per-source coverage is stable.
+  fail_on_issues: false

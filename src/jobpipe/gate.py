@@ -16,10 +16,17 @@ then asserts:
 * same for benchmarks *when* the manifest carries a ``benchmarks``
   block — a zero-benchmark run is not fatal per ``runner.py`` invariant.
 
-Wired into ``refresh.yml`` as the step after publish; any issue raises
-:class:`GateError` and fails the workflow. The fix-loop is "investigate
-the source that flat-lined, then either patch the adapter or move it
-into ``allow_zero_sources`` with a comment."
+Wired into ``refresh.yml`` as the step after publish. Behaviour is
+controlled by ``preset.gate.fail_on_issues``:
+
+* ``true`` (default in code, strict): any issue raises :class:`GateError`
+  and fails the workflow — Stage + Upload are skipped, so no degraded
+  data ships. Fix-loop: investigate the offending source, patch the
+  adapter or move it into ``allow_zero_sources``.
+* ``false`` (warn-only, used during P10 stabilisation): issues are
+  printed to stderr but run_gate returns normally; Stage + Upload still
+  run, so partial data ships. Flip back to ``true`` once per-source
+  coverage stabilises.
 """
 
 from __future__ import annotations
@@ -31,10 +38,11 @@ from typing import Any
 from jobpipe.runner import load_preset
 
 DEFAULT_MIN_TOTAL_ROWS = 20
+DEFAULT_FAIL_ON_ISSUES = True
 
 
 class GateError(RuntimeError):
-    """Raised when the manifest fails one or more gate assertions."""
+    """Raised when the manifest fails one or more gate assertions (strict mode)."""
 
 
 def _enabled_names(block: dict[str, Any] | None) -> list[str]:
@@ -107,7 +115,7 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _gate_config(preset: dict[str, Any]) -> tuple[int, set[str]]:
+def _gate_config(preset: dict[str, Any]) -> tuple[int, set[str], bool]:
     block = preset.get("gate") or {}
     if not isinstance(block, dict):
         raise GateError("preset 'gate' block must be a mapping")
@@ -119,19 +127,30 @@ def _gate_config(preset: dict[str, Any]) -> tuple[int, set[str]]:
     allow_raw = block.get("allow_zero_sources", []) or []
     if not isinstance(allow_raw, list):
         raise GateError("preset 'gate.allow_zero_sources' must be a list")
-    return min_total, {str(n) for n in allow_raw}
+    fail_on_issues = block.get("fail_on_issues", DEFAULT_FAIL_ON_ISSUES)
+    if not isinstance(fail_on_issues, bool):
+        raise GateError(f"preset 'gate.fail_on_issues' must be a bool, got {fail_on_issues!r}")
+    return min_total, {str(n) for n in allow_raw}, fail_on_issues
 
 
-def run_gate(manifest_path: Path, preset_path: Path) -> None:
-    """CLI entry point. Raises :class:`GateError` on any failure."""
+def run_gate(manifest_path: Path, preset_path: Path) -> list[str]:
+    """CLI entry point. Returns the list of issues (empty = pass).
+
+    In strict mode (``gate.fail_on_issues=true``, the default), raises
+    :class:`GateError` when issues exist. In warn-only mode (``false``),
+    always returns the issues without raising — callers decide whether to
+    treat them as warnings or failures. Used during stabilisation when we
+    want partial data to ship while the noisy adapters get fixed.
+    """
     manifest = _read_manifest(manifest_path)
     preset = load_preset(preset_path)
-    min_total, allow_zero = _gate_config(preset)
+    min_total, allow_zero, fail_on_issues = _gate_config(preset)
     issues = check_manifest(
         manifest,
         preset,
         min_total_rows=min_total,
         allow_zero_sources=allow_zero,
     )
-    if issues:
+    if issues and fail_on_issues:
         raise GateError("manifest gate failed:\n  - " + "\n  - ".join(issues))
+    return issues

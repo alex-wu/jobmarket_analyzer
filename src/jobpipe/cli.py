@@ -218,7 +218,7 @@ def gate(
     )
     _install_credential_scrub()
     try:
-        run_gate(manifest, preset)
+        issues = run_gate(manifest, preset)
     except PresetError as exc:
         typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2) from exc
@@ -226,4 +226,11 @@ def gate(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2) from exc
 
-    typer.echo("gate ok")
+    if issues:
+        # Warn-only mode (gate.fail_on_issues=false). Issues printed loud so
+        # they're visible in the workflow log; exit 0 so Stage + Upload run.
+        for msg in issues:
+            typer.secho(f"warning: {msg}", fg=typer.colors.YELLOW, err=True)
+        typer.echo(f"gate ok (warn-only: {len(issues)} issue(s))")
+    else:
+        typer.echo("gate ok")

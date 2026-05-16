@@ -228,6 +228,77 @@ def test_run_gate_invalid_gate_block(tmp_path: Path) -> None:
     assert "non-negative integer" in str(ei.value)
 
 
+def test_run_gate_warn_mode_returns_issues_without_raising(tmp_path: Path) -> None:
+    """gate.fail_on_issues=false → run_gate returns issues, never raises."""
+    manifest_path = tmp_path / "manifest.json"
+    preset_path = tmp_path / "preset.yaml"
+    manifest_path.write_text(
+        json.dumps(_manifest(total=5, source_counts={"adzuna": 5})),
+        encoding="utf-8",
+    )
+    preset_path.write_text(
+        yaml.safe_dump(
+            _preset(
+                sources={"adzuna": {"enabled": True}, "lever": {"enabled": True}},
+                gate_block={"fail_on_issues": False},
+            )
+        ),
+        encoding="utf-8",
+    )
+    issues = run_gate(manifest_path, preset_path)
+    assert any("below threshold" in m for m in issues)
+    assert any("source lever" in m for m in issues)
+
+
+def test_run_gate_warn_mode_returns_empty_on_clean_run(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    preset_path = tmp_path / "preset.yaml"
+    manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
+    preset_path.write_text(
+        yaml.safe_dump(_preset(gate_block={"fail_on_issues": False})),
+        encoding="utf-8",
+    )
+    assert run_gate(manifest_path, preset_path) == []
+
+
+def test_run_gate_rejects_non_bool_fail_on_issues(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    preset_path = tmp_path / "preset.yaml"
+    manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
+    preset_path.write_text(
+        yaml.safe_dump(_preset(gate_block={"fail_on_issues": "yes"})),
+        encoding="utf-8",
+    )
+    with pytest.raises(GateError) as ei:
+        run_gate(manifest_path, preset_path)
+    assert "must be a bool" in str(ei.value)
+
+
+def test_cli_gate_warn_mode_exits_0_with_warnings(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    preset_path = tmp_path / "preset.yaml"
+    manifest_path.write_text(
+        json.dumps(_manifest(total=5, source_counts={"adzuna": 5})),
+        encoding="utf-8",
+    )
+    preset_path.write_text(
+        yaml.safe_dump(
+            _preset(
+                sources={"adzuna": {"enabled": True}, "lever": {"enabled": True}},
+                gate_block={"fail_on_issues": False},
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        ["gate", "--manifest", str(manifest_path), "--preset", str(preset_path)],
+    )
+    assert result.exit_code == 0
+    assert "warn-only" in result.stdout
+    assert "source lever" in result.stderr
+
+
 def test_cli_gate_exits_2_on_failure(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     preset_path = tmp_path / "preset.yaml"
