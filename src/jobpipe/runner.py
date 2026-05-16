@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -182,11 +183,19 @@ def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
             "no postings returned from any enabled source — check credentials and connectivity"
         )
 
-    # Coerce dtypes per-frame so concat doesn't have to infer across mixed
-    # all-NA / real-valued columns (silences pandas 2.x FutureWarning).
-    # PostingSchema has coerce=True; this is the canonical dtype map.
-    frames = [PostingSchema.validate(f, lazy=True) for f in frames]
-    combined = pd.concat(frames, ignore_index=True)
+    # pandas 2.x emits a FutureWarning when concat sees mixed all-NA vs real
+    # columns (e.g. one ATS returns no salary data; Adzuna returns floats).
+    # The downstream PostingSchema.validate enforces dtype, so suppress
+    # exactly this message at the call site. Schema-level coerce-per-frame
+    # was tried and rejected: pa.DateTime strips tz from posted_at, breaking
+    # the tz-aware since_days filter in normalise.run.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated",
+            category=FutureWarning,
+        )
+        combined = pd.concat(frames, ignore_index=True)
     PostingSchema.validate(combined, lazy=True)
     return combined
 
