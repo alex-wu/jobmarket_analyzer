@@ -113,6 +113,10 @@ def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
             "no postings returned from any enabled source — check credentials and connectivity"
         )
 
+    # Coerce dtypes per-frame so concat doesn't have to infer across mixed
+    # all-NA / real-valued columns (silences pandas 2.x FutureWarning).
+    # PostingSchema has coerce=True; this is the canonical dtype map.
+    frames = [PostingSchema.validate(f, lazy=True) for f in frames]
     combined = pd.concat(frames, ignore_index=True)
     PostingSchema.validate(combined, lazy=True)
     return combined

@@ -191,6 +191,64 @@ def test_fetch_sources_raises_empty_when_zero_rows(raising_source_registered: ob
         fetch_sources(preset)
 
 
+def test_fetch_sources_concat_no_future_warning() -> None:
+    """Regression: pandas 2.x FutureWarning fires on concat when one frame
+    has an all-NA column and another has real values. Production refresh
+    logs show this at runner.py:116 when an ATS adapter returns rows with
+    no salary data alongside Adzuna rows that do. The fix must keep the
+    behaviour (NaN fill) while silencing the dtype-inference warning.
+
+    Pyproject filterwarnings=["error"] promotes any FutureWarning to a
+    test failure — no explicit pytest.warns needed.
+    """
+
+    def _row_with_salary(idx: int) -> dict[str, object]:
+        row = _valid_posting_row(idx)
+        return row
+
+    def _row_no_salary(idx: int) -> dict[str, object]:
+        row = _valid_posting_row(1000 + idx)
+        row["salary_min_eur"] = None
+        row["salary_max_eur"] = None
+        row["salary_annual_eur_p50"] = None
+        row["salary_period"] = None
+        row["salary_imputed"] = None
+        return row
+
+    class _SalaryHaver:
+        name = "salaried"
+        config_model = SourceConfig
+
+        def fetch(self, config: SourceConfig) -> pd.DataFrame:
+            return pd.DataFrame(_row_with_salary(i) for i in range(3))
+
+    class _SalaryNone:
+        name = "unsalaried"
+        config_model = SourceConfig
+
+        def fetch(self, config: SourceConfig) -> pd.DataFrame:
+            return pd.DataFrame(_row_no_salary(i) for i in range(3))
+
+    sources._REGISTRY["salaried"] = _SalaryHaver()
+    sources._REGISTRY["unsalaried"] = _SalaryNone()
+    try:
+        df = fetch_sources(
+            {
+                "preset_id": "demo",
+                "sources": {
+                    "salaried": {"enabled": True},
+                    "unsalaried": {"enabled": True},
+                },
+            }
+        )
+    finally:
+        sources._REGISTRY.pop("salaried", None)
+        sources._REGISTRY.pop("unsalaried", None)
+    assert len(df) == 6
+    assert df["salary_min_eur"].notna().sum() == 3
+    assert df["salary_min_eur"].isna().sum() == 3
+
+
 def test_write_raw_parquet_creates_partition(tmp_path: Path) -> None:
     df = pd.DataFrame([_valid_posting_row(0), _valid_posting_row(1)])
     out = write_raw_parquet(df, "demo", tmp_path)
