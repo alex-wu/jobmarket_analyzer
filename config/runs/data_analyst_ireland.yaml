@@ -101,3 +101,13 @@ publish:
   # namespace — see docs/sessions/2026-05-15-p5-cron-publish-first-push.md.
   partition_by: []
   retention_days: 365
+
+gate:
+  # Post-publish manifest check (jobpipe gate). Healthy runs produce hundreds of
+  # rows; 20 catches catastrophic failure without flapping on slow news days.
+  # Tighten once 30+ days of historical row counts ground a percentile floor.
+  min_total_rows: 20
+  # Enabled adapters allowed to report zero rows without failing the gate.
+  # Disabled adapters (oecd) are already skipped — list is for adapters we
+  # *expect* to be flaky upstream but don't want to disable outright.
+  allow_zero_sources: []

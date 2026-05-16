@@ -49,6 +49,12 @@ jobs:
           echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
           echo "date_tag=data-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
+      - name: Gate (manifest row + coverage check)
+        run: |
+          uv run jobpipe gate \
+            --manifest "${{ steps.publish.outputs.bundle }}/manifest.json" \
+            --preset config/runs/data_analyst_ireland.yaml
+
       - name: Stage bundle assets
         id: stage
         run: |

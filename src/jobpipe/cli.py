@@ -20,6 +20,7 @@ import typer
 
 from jobpipe import __version__
 from jobpipe.duckdb_io import PublishError
+from jobpipe.gate import GateError, run_gate
 from jobpipe.runner import (
     EmptyRunError,
     NoEnrichedRunError,
@@ -178,3 +179,27 @@ def publish(
         raise typer.Exit(code=2) from exc
 
     typer.echo(str(out))
+
+
+@app.command()
+def gate(
+    manifest: Path = typer.Option(..., "--manifest", help="Path to manifest.json."),  # noqa: B008
+    preset: Path = typer.Option(..., "--preset", help="Path to the same preset YAML."),  # noqa: B008
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable INFO logging."),
+) -> None:
+    """Assert the published manifest meets per-preset row + coverage thresholds."""
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    _install_credential_scrub()
+    try:
+        run_gate(manifest, preset)
+    except PresetError as exc:
+        typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+    except GateError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo("gate ok")
