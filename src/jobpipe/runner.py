@@ -75,6 +75,75 @@ def load_preset(path: Path) -> dict[str, Any]:
     return raw
 
 
+def validate_preset(path: Path) -> list[str]:
+    """Run a non-destructive sanity check on a preset YAML.
+
+    Returns a list of human-readable issues. An empty list means the preset
+    is valid. Used by the ``jobpipe validate`` subcommand so fork users can
+    catch typos before paying for a real ``fetch`` round-trip.
+
+    Does NOT alter the warn-and-skip semantics of ``fetch_sources`` — that
+    path keeps tolerating unknown adapter names so existing forks aren't
+    broken. This function is the opt-in stricter check.
+    """
+    try:
+        preset = load_preset(path)
+    except PresetError as exc:
+        return [str(exc)]
+
+    issues: list[str] = []
+
+    src_block = preset.get("sources")
+    if isinstance(src_block, dict):
+        for name, raw_cfg in src_block.items():
+            if not isinstance(raw_cfg, dict):
+                issues.append(f"source {name!r}: config block must be a mapping")
+                continue
+            if not raw_cfg.get("enabled", False):
+                continue
+            try:
+                adapter = sources.get(name)
+            except KeyError:
+                issues.append(f"source {name!r}: not a registered adapter")
+                continue
+            try:
+                adapter.config_model(**{k: v for k, v in raw_cfg.items() if k != "enabled"})
+            except Exception as exc:
+                issues.append(f"source {name!r}: invalid config — {exc}")
+
+    bench_block = preset.get("benchmarks")
+    if bench_block is not None:
+        if not isinstance(bench_block, dict):
+            issues.append("'benchmarks' block must be a mapping when present")
+        else:
+            for name, raw_cfg in bench_block.items():
+                if not isinstance(raw_cfg, dict):
+                    issues.append(f"benchmark {name!r}: config block must be a mapping")
+                    continue
+                if not raw_cfg.get("enabled", False):
+                    continue
+                try:
+                    adapter_b = benchmarks.get(name)
+                except KeyError:
+                    issues.append(f"benchmark {name!r}: not a registered adapter")
+                    continue
+                try:
+                    adapter_b.config_model(**{k: v for k, v in raw_cfg.items() if k != "enabled"})
+                except Exception as exc:
+                    issues.append(f"benchmark {name!r}: invalid config — {exc}")
+
+    publish_block = preset.get("publish")
+    if publish_block is not None:
+        if not isinstance(publish_block, dict):
+            issues.append("'publish' block must be a mapping when present")
+        else:
+            partition_by = publish_block.get("partition_by")
+            if partition_by is not None and not isinstance(partition_by, list):
+                issues.append("'publish.partition_by' must be a list")
+
+    return issues
+
+
 def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
     """Fan out to enabled source adapters; return the concatenated DataFrame.
 

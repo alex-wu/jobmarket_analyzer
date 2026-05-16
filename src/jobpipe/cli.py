@@ -29,6 +29,7 @@ from jobpipe.runner import (
     run_fetch,
     run_normalise,
     run_publish,
+    validate_preset,
 )
 
 # Query-param names treated as secret. Matched case-insensitively; both
@@ -179,6 +180,29 @@ def publish(
         raise typer.Exit(code=2) from exc
 
     typer.echo(str(out))
+
+
+@app.command()
+def validate(
+    preset: Path = typer.Option(..., "--preset", help="Path to a run preset YAML."),  # noqa: B008
+) -> None:
+    """Sanity-check a preset YAML without performing any HTTP fetch.
+
+    Fork-friendly entry point — useful before a first ``jobpipe fetch`` on a
+    new role/geo preset. Exits 0 with 'preset ok' on success; exits 2 and
+    prints each issue on its own line on failure.
+    """
+    try:
+        issues = validate_preset(preset)
+    except PresetError as exc:
+        typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    if issues:
+        for msg in issues:
+            typer.secho(msg, fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2)
+    typer.echo("preset ok")
 
 
 @app.command()

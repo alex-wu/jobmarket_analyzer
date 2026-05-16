@@ -34,10 +34,14 @@ cd jobmarket_analyzer
 uv sync
 cp .env.example .env   # then fill in ADZUNA_APP_ID / ADZUNA_APP_KEY (optional — ATS adapters work credential-free)
 
+# Sanity-check the preset before any HTTP calls (recommended for forks)
+uv run jobpipe validate --preset config/runs/data_analyst_ireland.yaml
+
 # Run the v1 preset end-to-end against the live APIs (Adzuna is skipped if creds are absent)
 uv run jobpipe fetch --preset config/runs/data_analyst_ireland.yaml --verbose
 uv run jobpipe normalise --preset config/runs/data_analyst_ireland.yaml
 uv run jobpipe publish --preset config/runs/data_analyst_ireland.yaml
+uv run jobpipe gate --manifest data/publish/<run_id>/manifest.json --preset config/runs/data_analyst_ireland.yaml
 
 # Or skip live fetching and download the production sample from the latest release:
 gh release download latest -p "postings__postings.parquet" -p "manifest.json" \
