@@ -159,6 +159,16 @@ def publish(
         "--out-root",
         help="Where data/enriched and data/publish live. Defaults to ./data.",
     ),
+    accumulate_window_days: int | None = typer.Option(
+        None,
+        "--accumulate-window-days",
+        help=(
+            "ADR-020 accumulation window override. Reads data/archive/data-"
+            "{preset_id}-*/ and rewrites the latest parquet as the deduped "
+            "union of archive + fresh fetch. When omitted, the value comes "
+            "from publish.accumulate_window_days in the preset YAML."
+        ),
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable INFO logging."),
 ) -> None:
     """Export partitioned Parquet + manifest under data/publish/ for GitHub Release upload."""
@@ -168,7 +178,11 @@ def publish(
     )
     _install_credential_scrub()
     try:
-        out = run_publish(preset, out_root=out_root)
+        out = run_publish(
+            preset,
+            out_root=out_root,
+            accumulate_window_days=accumulate_window_days,
+        )
     except PresetError as exc:
         typer.secho(f"preset error: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2) from exc
