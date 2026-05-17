@@ -6,6 +6,8 @@ P6 ships the Observable Framework dashboard against `PostingSchema` as-is. The o
 
 This doc is the spec for the upstream pipeline pass that closes those gaps. It assumes the reader has read the rest of [`README.md`](../README.md) + the relevant ADRs in [`DECISIONS.md`](../DECISIONS.md).
 
+> **Post-2026-05-17 scope-pivot note:** multi-preset support ([ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)) does not change this extraction roadmap. The three P12 fields (`experience_level`, `work_arrangement`, `skills`) plus `remote` derivation land per-preset — each `latest-{preset_id}.parquet` carries them once the extractor lands in `normalise.run()`. Per-source extraction paths in §2 are partially shelved (ATS adapters disabled per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)) — Adzuna-only sourcing means the description-regex / title-keyword path is the active path until ATS adapters reactivate.
+
 ## Scope
 
 Three intentionally omitted fields, in order of likely extraction difficulty:
