@@ -33,6 +33,10 @@ class PostingSchema(pa.DataFrameModel):
 
     posted_at: Series[pa.DateTime] = pa.Field(nullable=False)
     ingested_at: Series[pa.DateTime] = pa.Field(nullable=False)
+    # ADR-020 accumulation cols. Per-source / per-run frames leave both NaT;
+    # duckdb_io.export_accumulated() is the sole producer of non-null values.
+    first_seen_at: Series[pa.DateTime] = pa.Field(nullable=True)
+    last_seen_at: Series[pa.DateTime] = pa.Field(nullable=True)
     posting_url: Series[str] = pa.Field(nullable=False, str_startswith="http")
 
     isco_code: Series[str] = pa.Field(nullable=True, str_matches=r"^\d{4}$")
