@@ -152,7 +152,7 @@ The rebuilt page is one markdown file (`site/src/index.md`) with the sections be
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Job Market Analyzer · EU data-analyst preset · daily snapshot       │  H1 + subtitle
+│  Job Market Analyzer · EU data-analyst preset · weekly accumulated   │  H1 + subtitle
 │  As of 2026-05-15 · 504 postings · 2 countries · pipeline v0.5.0     │  manifest chip
 ├──────────────────────────────────────────────────────────────────────┤
 │  [Country ▾] [ISCO major ▾] [Salary range ─────] [Posted after ─]    │  filter strip

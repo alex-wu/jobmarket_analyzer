@@ -95,7 +95,7 @@ The Adzuna adapter does not consume an incremental / "updated-since" API; the fr
 
 - **Within a run**, the adapter de-duplicates by `posting_id` before returning (same posting matching multiple keywords collapses to one row).
 - **Across runs**, the same posting reappears every Monday until upstream closes it. `posting_id` is the same. `posted_at` (upstream-reported create timestamp) is the same. `ingested_at` advances each run.
-- **Each daily dated release is a complete snapshot** of that week's pull. The accumulated `latest-{preset_id}.parquet` is the only artifact that does cross-run joins (via `export_accumulated()`).
+- **Each weekly dated release is a complete snapshot** of that run's multi-country pull. The accumulated `latest-{preset_id}.parquet` is the only artifact that does cross-run joins (via `export_accumulated()`).
 - **Closed/removed postings simply stop appearing** in new fetches. `last_seen_at < generated_at - 7d` signals upstream closure.
 
 ## Accumulation model
