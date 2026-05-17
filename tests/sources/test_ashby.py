@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 import pytest
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceFetchError
 from jobpipe.sources.ashby import (
     ANNUALISE_FACTOR,
@@ -53,7 +53,7 @@ def test_fetch_returns_normalised_dataframe(tmp_path: Path) -> None:
     # 4 fixture jobs: Dublin Analyst EUR (kept), NY FDE (dropped country+kw), Remote-EU Analytics EUR (kept),
     # Dublin Risk Analyst USD (kept — country matches, USD comp dropped but row kept).
     assert len(df) == 3
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
 
 
 def test_fetch_extracts_eur_compensation(tmp_path: Path) -> None:

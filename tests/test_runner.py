@@ -553,6 +553,108 @@ def test_run_publish_raises_when_partition_by_not_a_list(tmp_path: Path) -> None
         run_publish(preset_path, out_root=tmp_path / "data")
 
 
+def test_run_publish_flat_uses_latest_preset_filename(
+    fake_source_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-019: empty partition_by emits `latest-{preset_id}.parquet`, not postings.parquet."""
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85})
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "data_analyst_eu",
+            "sources": {"fake": {"enabled": True, "n_rows": 3}},
+            "publish": {"partition_by": []},  # flat layout
+        },
+    )
+    run_fetch(preset_path, out_root=tmp_path / "data")
+    run_normalise(preset_path, out_root=tmp_path / "data")
+    bundle = run_publish(preset_path, out_root=tmp_path / "data")
+
+    expected = bundle / "postings" / "latest-data_analyst_eu.parquet"
+    assert expected.exists(), f"expected {expected} to exist after flat publish"
+    # Legacy generic name must NOT be emitted in the flat case anymore.
+    assert not (bundle / "postings" / "postings.parquet").exists()
+
+
+def test_run_publish_accumulate_window_uses_archive(
+    fake_source_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-020: when accumulate_window_days set + archive present, the
+    flat latest is rewritten as the union of archive + fresh fetch."""
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85})
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "data_analyst_eu",
+            "sources": {"fake": {"enabled": True, "n_rows": 2}},
+            "publish": {"partition_by": [], "accumulate_window_days": 30},
+        },
+    )
+
+    # Stage a fake archived snapshot containing a different posting_id ("legacy-1")
+    # so the post-accumulation file has the union of fresh + archived.
+    today_iso = datetime.now(UTC).strftime("%Y-%m-%d")
+    archive_tag_dir = tmp_path / "data" / "archive" / f"data-data_analyst_eu-{today_iso}"
+    archive_tag_dir.mkdir(parents=True)
+
+    archive_row = _valid_posting_row(7777)
+    archive_row["posting_id"] = "legacy-1"
+    archive_row["first_seen_at"] = pd.NaT
+    archive_row["last_seen_at"] = pd.NaT
+    archive_row["year_month"] = pd.Timestamp(archive_row["posted_at"]).strftime("%Y-%m")
+    archive_df = pd.DataFrame([archive_row])
+    for col in ("first_seen_at", "last_seen_at"):
+        archive_df[col] = pd.to_datetime(archive_df[col], utc=True)
+    archive_df.to_parquet(
+        archive_tag_dir / "latest-data_analyst_eu.parquet", index=False
+    )
+
+    run_fetch(preset_path, out_root=tmp_path / "data")
+    run_normalise(preset_path, out_root=tmp_path / "data")
+    bundle = run_publish(preset_path, out_root=tmp_path / "data")
+
+    out = bundle / "postings" / "latest-data_analyst_eu.parquet"
+    assert out.exists()
+    accumulated = pd.read_parquet(out)
+    # Fresh fetch: 2 rows (posting-0000, posting-0001). Archive: 1 (legacy-1).
+    # Union by posting_id → 3 unique rows.
+    assert len(accumulated) == 3
+    assert set(accumulated["posting_id"]) == {"posting-0000", "posting-0001", "legacy-1"}
+
+
+def test_run_publish_accumulate_window_no_archive_is_first_run(
+    fake_source_registered: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """First-run case: no archive dir → log + ship fresh fetch as latest."""
+    monkeypatch.setattr("jobpipe.runner.fx.load_rates", lambda: {"EUR": 1.0, "GBP": 0.85})
+    preset_path = _write_preset(
+        tmp_path,
+        {
+            "preset_id": "data_analyst_eu",
+            "sources": {"fake": {"enabled": True, "n_rows": 2}},
+            "publish": {"partition_by": [], "accumulate_window_days": 180},
+        },
+    )
+
+    run_fetch(preset_path, out_root=tmp_path / "data")
+    run_normalise(preset_path, out_root=tmp_path / "data")
+    with caplog.at_level("INFO", logger="jobpipe.runner"):
+        bundle = run_publish(preset_path, out_root=tmp_path / "data")
+
+    out = bundle / "postings" / "latest-data_analyst_eu.parquet"
+    assert out.exists()
+    fresh = pd.read_parquet(out)
+    assert len(fresh) == 2  # exactly the fresh fetch, no accumulation
+    assert any("first-run" in rec.message for rec in caplog.records)
+
+
 def test_run_publish_raises_when_no_enriched_bundle(tmp_path: Path) -> None:
     preset_path = _write_preset(
         tmp_path,

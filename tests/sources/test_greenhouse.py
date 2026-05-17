@@ -10,7 +10,7 @@ import httpx
 import pandas as pd
 import pytest
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceFetchError
 from jobpipe.sources.greenhouse import BASE_URL, GreenhouseAdapter, GreenhouseConfig
 
@@ -48,7 +48,7 @@ def test_fetch_returns_normalised_dataframe(tmp_path: Path) -> None:
     assert isinstance(df, pd.DataFrame)
     # Fixture has 4 jobs: 1 Dublin analyst (kept), 1 SF EM (dropped: country + keyword), 1 Remote-EU analytics (kept), 1 Dublin CX (dropped: keyword).
     assert len(df) == 2
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
     assert set(df["title"]) == {"Senior Data Analyst", "Analytics Engineer"}
 
 

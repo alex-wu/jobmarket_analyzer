@@ -70,8 +70,14 @@ def export_partitioned(
     preset_id: str,
     run_id: str,
     git_sha: str | None = None,
+    output_filename: str = "postings.parquet",
 ) -> Path:
     """Write the hive-partitioned bundle + ``manifest.json`` under ``out_root``.
+
+    ``output_filename`` only applies to the flat (``partition_by=[]``) case —
+    multi-preset releases pass ``latest-{preset_id}.parquet`` so the asset
+    name in the GitHub release is preset-scoped (ADR-019). Hive layout
+    ignores it; per-partition files are named by DuckDB.
 
     Returns ``out_root``. Raises :class:`PublishError` if the postings
     parquet is missing or empty, or if the partition columns aren't all
@@ -123,7 +129,7 @@ def export_partitioned(
                 COPY (
                     SELECT *, strftime(posted_at, '%Y-%m') AS year_month
                     FROM postings_df
-                ) TO '{(postings_dir / "postings.parquet").as_posix()}'
+                ) TO '{(postings_dir / output_filename).as_posix()}'
                 (FORMAT PARQUET);
                 """
             )
@@ -158,3 +164,102 @@ def export_partitioned(
         partition_by,
     )
     return out_root
+
+
+# Columns aggregated via ANY_VALUE in export_accumulated. Stable-per-posting
+# attributes — duplicates across weekly snapshots agree, so any value works.
+_ACCUMULATE_ANY_VALUE_COLS = (
+    "source",
+    "title",
+    "company",
+    "location_raw",
+    "country",
+    "region",
+    "remote",
+    "salary_min_eur",
+    "salary_max_eur",
+    "salary_period",
+    "salary_annual_eur_p50",
+    "salary_imputed",
+    "posted_at",
+    "posting_url",
+    "isco_code",
+    "isco_match_method",
+    "isco_match_score",
+    "raw_payload",
+    "year_month",
+)
+
+
+def export_accumulated(
+    dated_paths: list[Path],
+    out: Path,
+    preset_id: str,
+) -> int:
+    """Recompute the moving ``latest-{preset_id}.parquet`` from dated snapshots.
+
+    ADR-020 pure-function accumulation: given the immutable per-week parquets
+    that fall inside the accumulation window, GROUP BY ``posting_id`` and
+    derive ``first_seen_at`` / ``last_seen_at`` from MIN/MAX of historical
+    ``ingested_at`` (or the prior accumulation's first/last when re-running).
+
+    Returns the row count of the accumulated frame. Raises :class:`PublishError`
+    if the input list is empty (caller decides whether that is fatal).
+    """
+    if not dated_paths:
+        raise PublishError(
+            f"export_accumulated[{preset_id}]: no dated parquets supplied; "
+            "caller should fall back to the fresh fetch."
+        )
+
+    paths_sql = ", ".join(f"'{p.as_posix()}'" for p in dated_paths)
+    any_value_sql = ",\n            ".join(
+        f"ANY_VALUE({col}) AS {col}" for col in _ACCUMULATE_ANY_VALUE_COLS
+    )
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect(":memory:")
+    try:
+        # union_by_name=true tolerates schema drift across older snapshots
+        # (e.g. pre-ADR-020 archives missing first_seen_at / last_seen_at).
+        # COALESCE folds the legacy NaT case into the same MIN/MAX expression.
+        # Explicit casts inside COALESCE: per-source frames inject NaT (no tz,
+        # writes as TIMESTAMP_NS) while ingested_at is tz-aware (TIMESTAMP WITH
+        # TIME ZONE). DuckDB refuses mixed-tz COALESCE without an explicit cast.
+        con.sql(
+            f"""
+            COPY (
+                WITH archive AS (
+                    SELECT * FROM read_parquet([{paths_sql}], union_by_name=true)
+                )
+                SELECT
+                    posting_id,
+                    MIN(COALESCE(
+                        CAST(first_seen_at AS TIMESTAMP WITH TIME ZONE),
+                        ingested_at
+                    )) AS first_seen_at,
+                    MAX(COALESCE(
+                        CAST(last_seen_at AS TIMESTAMP WITH TIME ZONE),
+                        ingested_at
+                    )) AS last_seen_at,
+                    MAX(ingested_at) AS ingested_at,
+                    {any_value_sql}
+                FROM archive
+                GROUP BY posting_id
+            ) TO '{out.as_posix()}' (FORMAT PARQUET);
+            """
+        )
+        row_count_row = con.sql(
+            f"SELECT count(*) FROM read_parquet('{out.as_posix()}')"
+        ).fetchone()
+    finally:
+        con.close()
+
+    row_count = int(row_count_row[0]) if row_count_row else 0
+    logger.info(
+        "publish: accumulated %d unique postings from %d dated parquets → %s",
+        row_count,
+        len(dated_paths),
+        out,
+    )
+    return row_count
