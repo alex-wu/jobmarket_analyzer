@@ -1,0 +1,72 @@
+# v1.1 preset — Adzuna-only, multi-country EU. Replaces archived
+# data_analyst_ireland.yaml per ADR-017 scope pivot (2026-05-17).
+#
+# Smoke-test scope: [gb, es] only — gb stands in for IE (Adzuna does not serve
+# `ie` per source docstring; old preset used the same proxy) and es exercises
+# a non-English-speaking country to surface the translation question.
+# Full 7-country expansion (gb, de, fr, nl, es, it, pl) is a one-line edit
+# once the first multi-country run is verified.
+#
+# Adding a new role/geo = copy this file, change preset_id + keywords +
+# countries. Then add preset_id to .github/workflows/refresh.yml's
+# strategy.matrix.preset.
+
+preset_id: data_analyst_eu
+title: "Data Analyst — EU"
+description: >
+  Job postings for data-analyst-flavoured roles across EU countries via
+  Adzuna. Weekly Monday accumulation into a rolling 180-day corpus.
+  Smoke-test scope at v1.1: gb (IE proxy) + es.
+
+# ISCO-08 4-digit codes the dashboard surfaces front-and-centre.
+isco_focus:
+  - "2521"  # Database designers and administrators
+  - "2511"  # Systems analysts
+  - "2423"  # Personnel and careers professionals (analytics adjacent)
+
+sources:
+  adzuna:
+    enabled: true
+    countries: ["gb", "es"]       # smoke-test pair; widen post-Run-1
+    keywords: ["data analyst", "analytics engineer", "bi analyst"]
+    max_results: 1500             # 2 countries × 3 keywords; raise on expansion
+    results_per_page: 50
+    max_pages: 5
+    max_days_old: 180             # matches normalise.since_days
+    # min_interval_hours dropped — weekly cron is authoritative (ADR-018).
+
+  # All non-Adzuna sources shelved per ADR-017. Code remains in tree.
+  greenhouse:
+    enabled: false
+  lever:
+    enabled: false
+  ashby:
+    enabled: false
+  personio:
+    enabled: false
+  remotive:
+    enabled: false                # also ADR-009 (ToS exclusion)
+
+benchmarks:
+  # All benchmark adapters shelved per ADR-017. Reactivate via new ADR.
+  cso:
+    enabled: false
+  oecd:
+    enabled: false                # also ADR-011 (Cloudflare bot-gating)
+  eurostat:
+    enabled: false
+
+normalise:
+  since_days: 180
+
+publish:
+  partition_by: []                # single flat latest-{preset_id}.parquet
+  accumulate_window_days: 180     # NEW: ADR-020 pure-function accumulation
+  retention_days: 365             # legacy field; archive actually kept forever
+
+gate:
+  # 80 = 2-country baseline guess; recalibrate after first 1–2 runs (plan §6e).
+  # Raise to actual × 0.8 once row counts stabilise.
+  min_total_rows: 80
+  allow_zero_sources: []
+  fail_on_issues: true            # re-enabled — Adzuna-only kills warn-mode justification
