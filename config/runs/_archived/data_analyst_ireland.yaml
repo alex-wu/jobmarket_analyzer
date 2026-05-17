@@ -1,3 +1,6 @@
+# ARCHIVED 2026-05-17 per ADR-017 scope pivot (Adzuna-only, multi-country).
+# Replaced by config/runs/data_analyst_eu.yaml. Kept for historical reference.
+#
 # v1 preset — data-analyst roles, Ireland-focused with Eurozone context.
 #
 # Each phase flips one source on:
