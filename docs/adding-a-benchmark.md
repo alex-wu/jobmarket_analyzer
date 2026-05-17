@@ -37,7 +37,7 @@ implementation reads the mtime of the newest parquet under
 `data/raw/benchmarks/<name>/` and skips the fetch when the gap is under
 the configured window. Choose your defaults to match the upstream cadence —
 CSO is quarterly so `168h` (weekly recheck) is plenty; OECD/Eurostat are
-annual so `720h` (monthly) avoids hammering them on the daily cron.
+annual so `720h` (monthly) avoids hammering them on the weekly cron.
 
 ## Fail-isolation
 
