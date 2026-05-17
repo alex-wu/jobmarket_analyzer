@@ -43,7 +43,7 @@ When a decision changes, mark the old entry `Superseded` and add a new entry; do
 
 ## ADR-003 · Ingestion: API-first, no JobSpy
 
-**Status:** Accepted, 2026-05-11.
+**Status:** Accepted, 2026-05-11. **Amended by ADR-017 (2026-05-17)** — active source set narrowed to Adzuna only for v1.
 
 **Context:** Original spec leaned on JobSpy (Indeed, LinkedIn, Glassdoor, etc.) for breadth. We run on GitHub Actions datacenter IPs.
 
@@ -59,7 +59,7 @@ When a decision changes, mark the old entry `Superseded` and add a new entry; do
 
 ## ADR-004 · Storage + delivery: Parquet via GitHub Releases as CDN
 
-**Status:** Accepted, 2026-05-11.
+**Status:** Accepted, 2026-05-11. **Amended by ADR-019 (2026-05-17)** — single `latest` tag replaced by per-preset `latest-{preset_id}`; dated tag becomes `data-{preset_id}-YYYY-MM-DD`. **Amended by ADR-020 (2026-05-17)** — `latest-{preset_id}.parquet` is now a pure function over the dated archive, not a per-run snapshot.
 
 **Context:** The dashboard needs the latest dataset on every visit. Options: commit Parquet to repo (bloats history), Cloudflare R2 / S3 (paid account), GitHub Releases (free, public, unlimited bandwidth).
 
@@ -120,7 +120,7 @@ When a decision changes, mark the old entry `Superseded` and add a new entry; do
 
 ## ADR-008 · Pluggable adapter pattern (sources + benchmarks)
 
-**Status:** Accepted, 2026-05-11.
+**Status:** Accepted, 2026-05-11. **Amended by ADR-017 (2026-05-17)** — pattern survives; only Adzuna has `enabled: true` in v1. ATS + benchmark adapter code remains in tree, shelved via preset config.
 
 **Context:** v1 focuses on data-analyst roles in Ireland, but the codebase must generalise to other roles, geographies, and data sources without rework.
 
@@ -316,5 +316,103 @@ Their value is local. Pushed to a public OSS portfolio repo they (a) add mainten
 - If we ever want a custom domain or more aggressive Pages caching, the OIDC deploy path is the easier baseline to extend. Switching to a `gh-pages` branch in future would supersede this ADR.
 - Data flow: `refresh.yml` uploads partitioned Parquet to GitHub Releases (per ADR-004); the Observable data loader fetches the `latest` release at build time. The dashboard does **not** read from raw repo paths, which means the Pages deploy never has to wait for a Parquet commit, and the repo doesn't bloat with binary data.
 - Manual setup beyond `.github/workflows/pages.yml`: enable Pages with "GitHub Actions" source; configure Adzuna secrets; enable secret scanning + push protection. All catalogued in `docs/github-setup.md`.
+
+---
+
+## ADR-017 · Scope cut to Adzuna-only post-v1 stabilisation
+
+**Status:** Accepted, 2026-05-17.
+
+**Context:** v1 shipped with 5 source adapters (Adzuna + Greenhouse / Lever / Ashby / Personio) and 3 benchmark adapters (CSO / OECD / Eurostat). Post-P9 reality: ATS adapters returned zero rows in production runs (P10 outstanding investigation), OECD shipped disabled (ADR-011), CSO is bucket-coarse for ISCO (ADR-012), and accumulated trend analysis was not yet wired. The multi-adapter fan-out widened coverage but starved iteration: each adapter is a fragile upstream coupling, the schema must absorb every adapter's quirks, and the dashboard cannot honestly present cross-source aggregates while some sources silently zero out.
+
+A 2026-05-17 scope conversation grounded the trade: Adzuna alone covers 19 countries (no `ie`) at 250 free-tier calls/day, ~105 calls/day at 7 EU countries × 3 keywords × 5 pages — 42 % of quota. That headroom is enough to support per-country accumulation across a multi-month window, which produces a tighter, more honest portfolio story than wide-and-shallow multi-source.
+
+**Decision:** v1 ships with **Adzuna as the only `enabled: true` source**. ATS adapters (greenhouse / lever / ashby / personio), benchmark adapters (cso / oecd / eurostat), HN Algolia, and the LLM stub all remain in the codebase, shelved by preset configuration. No adapter code is deleted. The old single-source preset `config/runs/data_analyst_ireland.yaml` is archived to `config/runs/_archived/`; the new multi-country preset is `config/runs/data_analyst_eu.yaml`.
+
+**Consequences:**
+- Loss accepted: no Ireland-resident postings (Adzuna's `ie` is unserved). Dashboard becomes a GB-anchored EU view.
+- Schema unchanged. Benchmark joins become inert until reactivation.
+- The pluggable-adapter pattern (ADR-008) survives — `enabled: false` is the shelf mechanism.
+- Amends ADR-003 (active source set) and ADR-008 (only Adzuna enabled in v1).
+- Reactivation criteria for multi-source: **multi-country unified merge across the Adzuna-only shape must first prove stable end-to-end** (one full accumulation cycle, dashboard preset switcher live, gate at `fail_on_issues: true` without flapping). Then ATS / benchmark adapters return via a new ADR that supersedes this one.
+- P10's zero-row ATS investigation is **closed by descope**, preserved in `docs/open-questions.md` as historical context.
+
+---
+
+## ADR-018 · Weekly cadence + multi-country single-run
+
+**Status:** Accepted, 2026-05-17.
+
+**Context:** ADR-017 reduced the pipeline to a single source. The next axis is cadence × country fan-out. Two viable shapes were considered: (A) daily rotation — one country per day of week, deep paging per country; (B) all countries every run, shallower paging. A third option — daily all-countries — was ruled out by the trend-resolution analysis (see `docs/data-history-design.md` and the 2026-05-17 session log).
+
+Option B (all countries per run, weekly cadence) gives uniform per-country sampling, simpler cron-skip recovery (next week, not next rotation cycle), and aligns with the portfolio-analytics value: weekly trend granularity is sufficient and the dataset is cheap enough that 7-day refresh costs nothing extra.
+
+**Decision:** Weekly Monday 06:00 UTC cron (`0 6 * * 1`) plus `workflow_dispatch` for on-demand runs. The single-preset multi-country fan-out happens inside one workflow run: `sources.adzuna.countries: [gb, de, fr, nl, es, it, pl]` — the existing `for country in cfg.countries` loop in `src/jobpipe/sources/adzuna.py:85-91` handles it without code change.
+
+**Consequences:**
+- Per-run cost ≈ 7 countries × 3 keywords × 5 pages = **105 calls** (42 % of Adzuna's 250/day free-tier quota).
+- 52 cron firings/year vs 365 — cron-drift / skip blast radius is one week (down from one day, but acceptable for trend analytics).
+- Closure detection lag = 7 days (a posting that disappears from upstream takes one cron to register as `last_seen_at < generated_at`).
+- `min_interval_hours` preset knob deprecated for Adzuna (cron schedule is now authoritative).
+- Future-proofing: if a per-country call cost rises sharply (Adzuna adds aggressive paging caps, or we widen `keywords`), drop to two-day rotation (~3.5 countries/run) — preserves the all-in-one-run simplicity.
+
+---
+
+## ADR-019 · Multi-preset `latest-{preset_id}` release naming
+
+**Status:** Accepted, 2026-05-17.
+
+**Context:** A single `latest` release tag (per ADR-004) couples the pipeline to one preset at a time. The project now anticipates multiple parallel presets (`data_analyst_eu`, future `software_developer_eu`, etc.) running on independent crons or shared matrix runs. Without preset-scoped naming, two parallel runs would race on the same `latest` tag, the same `data-YYYY-MM-DD` tag, and the same asset filenames — `gh release upload --clobber` matches by name and would lose one preset's data.
+
+**Decision:** Release tags and asset filenames are scoped by `preset_id`:
+
+- Moving tag: `latest-{preset_id}` (e.g. `latest-data_analyst_eu`)
+- Dated tag: `data-{preset_id}-YYYY-MM-DD`
+- Asset filename: `latest-{preset_id}.parquet` (single flat parquet, partition_by unchanged)
+- Workflow concurrency group: `refresh-${{ matrix.preset }}` (allows cross-preset parallelism, serialises same-preset)
+- GitHub Actions strategy: `strategy.matrix.preset: [...]` in `refresh.yml`, hardcoded preset references replaced with `config/runs/${{ matrix.preset }}.yaml`
+
+**Consequences:**
+- Multiple presets run in parallel without artifact collision.
+- Dashboard data loader must enumerate `latest-*` release tags (and/or read a presets manifest) instead of hardcoding `latest`. See ADR-020 for the dashboard switcher pattern.
+- `gh release list` paging applies — at any plausible preset count (< 30) this is fine; revisit if presets explode.
+- `manifest.json` already carries `preset_id` (see `src/jobpipe/duckdb_io.py`) — gate command lookup unbroken.
+- Amends ADR-004 (single `latest` assumption). ADR-004's storage cost and "free CDN" rationale unchanged.
+
+---
+
+## ADR-020 · Accumulated dataset via pure-function recompute
+
+**Status:** Accepted, 2026-05-17. Promotes `docs/data-history-design.md` (P9 design) from design-only to accepted.
+
+**Context:** v1 pre-pivot semantics: each run is a snapshot, `latest` is overwritten with that run's data, prior dated releases accumulate as a side effect that no consumer reads. This forecloses trend analysis: `posted_at` (upstream-stable) plus `ingested_at` (advances per run) carry all the information needed for `first_seen_at` / `last_seen_at` derivation, but only if multiple runs are unioned.
+
+Two unification models were considered: (B) stateful append-merge — each run downloads prior `latest`, appends today's data, dedupes, republishes; (D) pure-function recompute — each run unions the last N dated releases from the immutable archive, GROUP BY `posting_id`, MIN/MAX `ingested_at` → emits a freshly computed `latest`. (B) is fragile under corruption (errors propagate forward); (D) is recoverable from archive at any point.
+
+**Decision:** `latest-{preset_id}.parquet` is computed every run as a **pure function** of `(archive_window, window_days)`:
+
+```sql
+WITH archive AS (
+  SELECT * FROM read_parquet('data-{preset_id}-*/postings.parquet')
+  WHERE ingested_at >= now() - INTERVAL window_days DAYS
+)
+SELECT
+  posting_id,
+  MIN(ingested_at) AS first_seen_at,
+  MAX(ingested_at) AS last_seen_at,
+  ANY_VALUE(title), ANY_VALUE(company), ...
+FROM archive
+GROUP BY posting_id;
+```
+
+Implementation: `src/jobpipe/duckdb_io.py:export_accumulated(dated_paths, out, preset_id)`. Wired through `runner.run_publish()` via preset YAML `publish.accumulate_window_days` (default: 180 days, matches existing `normalise.since_days` floor). Adds two nullable columns to `PostingSchema`: `first_seen_at: datetime`, `last_seen_at: datetime` (populated only by accumulated artifact, not per-source adapters).
+
+**Consequences:**
+- `latest-{preset_id}.parquet` is **always recomputable** from the dated archive. Bug in publish step → re-run, get correct result. No state drift.
+- Window is a config value, not a destructive operation. Change `accumulate_window_days: 90` → `365` → next publish rebuilds. No data migration.
+- Archive retention: **forever** (no `cleanup.yml`). GH Releases on public repos have no published storage cap; ~1.3 GB/yr per preset is acceptable. Revisit only if it becomes a measured problem.
+- Closure detection: `last_seen_at < generated_at - one_cron_interval` signals upstream closure.
+- Dashboard `latest` artifact grows from ~23 KB (single snapshot) to ~150-250 MB (180-day accumulation). This **forces P8 forward** — DuckDB-WASM cold-loading 200 MB is unacceptable. P8's planned fix (build-time data loaders + pre-aggregated per-chart parquets) must ship in lockstep with accumulation, or before. P8 is folded into the next implementation phase per `docs/open-questions.md`.
+- Backfill: first run after pivot derives `first_seen_at` from any existing dated releases within the window (legacy `data-YYYY-MM-DD` plus new `data-{preset_id}-YYYY-MM-DD`). Pre-pivot releases lack the new fields → safe to ignore for any field they don't carry; safe to include for `posting_id` / `ingested_at` derivation.
 
 ---
