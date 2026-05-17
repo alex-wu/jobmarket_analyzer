@@ -5,7 +5,14 @@ import {tmpdir} from "node:os";
 import {DuckDBInstance} from "@duckdb/node-api";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SOURCE = resolve(__dirname, "../../../data/gh_databuild_samples/postings__postings.parquet");
+// Adapter to the post-ADR-019 release asset name. Multi-preset enumeration
+// (and the preset switcher) is queued — see reference_phase_status. Until
+// then, this loader hardcodes the v1 preset. Run-time: change the constant.
+const PRESET_ID = "data_analyst_eu";
+const SOURCE = resolve(
+  __dirname,
+  `../../../data/gh_databuild_samples/latest-${PRESET_ID}.parquet`,
+);
 const sqlSrc = SOURCE.replaceAll("\\", "/");
 
 const tmp = mkdtempSync(join(tmpdir(), "postings-loader-"));

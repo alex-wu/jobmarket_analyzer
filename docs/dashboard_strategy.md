@@ -315,7 +315,7 @@ For the eventual rebuild (referenced from this doc):
 - Visual width sweep: every chart re-flows at 1440 / 1024 / 768 / 360 px (`resize()` working).
 - Filter strip: changing any one of the four inputs updates every chart AND the coverage banner. Toggling everything back to `ALL` / full range restores `where === ""`.
 - Theme toggle: switch to dark via the Framework sidebar control; no hard-coded colour bleeds through.
-- Sample data path: opens the page with `data/gh_databuild_samples/postings__postings.parquet` and renders all sections without empty / error states.
+- Sample data path: opens the page with `data/gh_databuild_samples/latest-{preset_id}.parquet` (e.g. `latest-data_analyst_eu.parquet`) and renders all sections without empty / error states.
 
 ---
 

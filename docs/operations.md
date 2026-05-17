@@ -75,10 +75,9 @@ The weekly Monday 06:00 UTC cron runs `refresh.yml` automatically for every pres
 # Refresh every preset in the matrix:
 gh workflow run refresh.yml -R alex-wu/jobmarket_analyzer
 gh run watch -R alex-wu/jobmarket_analyzer    # wait until green
-
-# Refresh a single preset (requires workflow_dispatch input wired in P13):
-gh workflow run refresh.yml -R alex-wu/jobmarket_analyzer -f preset=data_analyst_eu
 ```
+
+`refresh.yml` triggers every preset in `strategy.matrix.preset` in parallel jobs. To limit to a single preset on a one-off basis, temporarily edit the matrix list on a branch and `--ref` to that branch (single-preset workflow_dispatch input is deferred until presets > 1).
 
 For each preset in the matrix, `refresh.yml` fetches Adzuna across the preset's `countries`, normalises, ISCO-tags, then:
 
@@ -92,14 +91,19 @@ To pull the new data locally after a refresh, re-run the `gh release download` s
 
 ### Backfill / one-off accumulation
 
-If `latest-{preset_id}` is corrupted or accidentally deleted, it can be recomputed from the dated archive without re-fetching upstream:
+If `latest-{preset_id}` is corrupted or accidentally deleted, it can be recomputed from the dated archive. The full path requires a normal `fetch → normalise → publish` cycle plus the accumulation window override:
 
 ```powershell
-# Re-run accumulation only against the existing archive (P13 surface):
-uv run jobpipe publish --preset config/runs/data_analyst_eu.yaml --accumulate-only
+$preset = "data_analyst_eu"
+uv run jobpipe fetch     --preset config/runs/$preset.yaml
+uv run jobpipe normalise --preset config/runs/$preset.yaml
+# Download the archive window into data/archive/data-$preset-*/ first
+# (see refresh.yml "Download accumulation window" step for the gh CLI pattern),
+# then accumulate-on-publish:
+uv run jobpipe publish   --preset config/runs/$preset.yaml --accumulate-window-days 180
 ```
 
-Dated releases are immutable; the archive is the source of truth.
+A `--accumulate-only` flag that skips the fresh fetch is queued (see [[reference-phase-status]]) — useful when only the accumulation step needs re-running. Dated releases are immutable; the archive is the source of truth.
 
 ---
 

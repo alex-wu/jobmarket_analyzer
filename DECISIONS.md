@@ -337,6 +337,8 @@ A 2026-05-17 scope conversation grounded the trade: Adzuna alone covers 19 count
 - Reactivation criteria for multi-source: **multi-country unified merge across the Adzuna-only shape must first prove stable end-to-end** (one full accumulation cycle, dashboard preset switcher live, gate at `fail_on_issues: true` without flapping). Then ATS / benchmark adapters return via a new ADR that supersedes this one.
 - P10's zero-row ATS investigation is **closed by descope**, preserved in `docs/open-questions.md` as historical context.
 
+**Amended 2026-05-18 (first-run validation):** P13 backend shipped on branch `scope/adzuna-only-multi-preset` and first matrix run (gh run 26004866509, 51 s) completed green with `gate.fail_on_issues: true` strict mode. The first preset (`data_analyst_eu`) ships with `[gb, es]` as a deliberate smoke-test scope rather than the originally-planned 7-country list — adding the remaining 5 countries is a one-line YAML edit once the dashboard side absorbs the data shape. Adzuna's "no `ie`" caveat held: GB stands in as labour-market proxy.
+
 ---
 
 ## ADR-018 · Weekly cadence + multi-country single-run
@@ -379,6 +381,8 @@ Option B (all countries per run, weekly cadence) gives uniform per-country sampl
 - `manifest.json` already carries `preset_id` (see `src/jobpipe/duckdb_io.py`) — gate command lookup unbroken.
 - Amends ADR-004 (single `latest` assumption). ADR-004's storage cost and "free CDN" rationale unchanged.
 
+**Amended 2026-05-18 (first-run validation):** Naming shipped as designed. First release pair created cleanly: `latest-data_analyst_eu` (moving) + `data-data_analyst_eu-2026-05-17` (immutable). Wipe-then-upload on the moving tag preserved per [[pitfall-release-clobber-zombies]]; the renamed asset (`latest-data_analyst_eu.parquet` replacing the legacy `postings__postings.parquet`) did not leave zombies because the new tag started empty.
+
 ---
 
 ## ADR-020 · Accumulated dataset via pure-function recompute
@@ -414,5 +418,27 @@ Implementation: `src/jobpipe/duckdb_io.py:export_accumulated(dated_paths, out, p
 - Closure detection: `last_seen_at < generated_at - one_cron_interval` signals upstream closure.
 - Dashboard `latest` artifact grows from ~23 KB (single snapshot) to ~150-250 MB (180-day accumulation). This **forces P8 forward** — DuckDB-WASM cold-loading 200 MB is unacceptable. P8's planned fix (build-time data loaders + pre-aggregated per-chart parquets) must ship in lockstep with accumulation, or before. P8 is folded into the next implementation phase per `docs/open-questions.md`.
 - Backfill: first run after pivot derives `first_seen_at` from any existing dated releases within the window (legacy `data-YYYY-MM-DD` plus new `data-{preset_id}-YYYY-MM-DD`). Pre-pivot releases lack the new fields → safe to ignore for any field they don't carry; safe to include for `posting_id` / `ingested_at` derivation.
+
+**Amended 2026-05-18 (first-run validation):** Implementation shipped with two non-obvious adjustments not captured in the original design:
+
+1. **Tz-aware NaT injection is mandatory.** Per-source frames must inject `first_seen_at` / `last_seen_at` as `pd.Series(pd.NaT, dtype="datetime64[ns, UTC]")` — a bare `pd.NaT` writes to parquet as `TIMESTAMP_NS` (no tz) while `ingested_at` writes as `TIMESTAMP WITH TIME ZONE`. DuckDB's `COALESCE` inside the MIN/MAX aggregation refuses mixed-tz inputs without an explicit cast, so the accumulation SQL also wraps the inputs in `CAST(... AS TIMESTAMP WITH TIME ZONE)`. Helper `jobpipe.schemas.inject_accumulation_cols(df)` does the injection at every validate site (fetch_sources, normalise.run, adapter smoke tests).
+2. **Greenfield-Option-A confirmed.** First run for a new preset finds no `data-{preset_id}-*` archive entries. `_accumulate_into_latest` logs "first-run, no archive — using fresh fetch only" and ships the per-source frame unmodified (all `first_seen_at` / `last_seen_at` columns NaT). Week-2 onward: `MIN(COALESCE(first_seen_at, ingested_at))` correctly derives the historical floor from the legacy snapshot's `ingested_at`. No backfill of pre-pivot single-source releases attempted — preset-provenance stays clean.
+
+Recorded as pitfalls: [[pitfall-pandas-naT-not-tz-aware-parquet]] (new), [[pitfall-duckdb-coalesce-mixed-tz]] (new).
+
+---
+
+## ADR-021 · No per-country keyword translation table in v1
+
+**Status:** Accepted, 2026-05-18.
+
+**Context:** Going into the first multi-country run, the open hypothesis was: "non-English Adzuna markets (ES, DE, FR, IT, NL, PL) will return locally-titled postings (e.g. `Analista de datos`) that fuzzy-match poorly against the English-only ESCO label set, requiring a per-country keyword translation map (`keywords_by_country: {de: [Datenanalyst, ...], es: [analista de datos, ...]}`) and a multilingual ESCO snapshot before widening the country scope."
+
+**Decision:** No translation table for v1. The first run (2026-05-17, gh run 26004866509, gb+es smoke scope, 992 rows) measured **ES at 70.6 % ISCO match rate vs GB at 53.5 %** — ES match rate is *higher*, not lower. Sampling 15 random ES titles surfaced only one with Spanish content ("Prácticas de Data Analyst", and even that is half-English). Adzuna's Spanish corpus, when queried with `what=data analyst`, returns mostly English-titled tech postings — the Spanish tech-sector job market labels these roles in English. The actual lever for raising the GB rate is **ISCO label coverage** ("Analytics Engineer", "Power BI Developer", "BI Developer" don't appear in the current ESCO snapshot — adding them lifts GB ~10 pp).
+
+**Consequences:**
+- Adzuna preset stays single-keyword-list across all countries. `sources.adzuna.keywords: ["data analyst", "analytics engineer", "bi analyst"]` is the v1 shape.
+- Re-open this decision under any of: (a) widening to DE / FR / IT / PL surfaces materially lower match rates than ES (suggests Spanish tech market is the exception, not the norm); (b) the role family expands beyond data-analyst-flavoured roles, where market-localisation is more common (e.g. construction, healthcare, retail); (c) Adzuna's matching behaviour changes upstream.
+- Cheap pre-v1.1 win: extend `config/esco/isco08_labels.parquet` with the three missing English titles. Single PR, no schema work, no translation infrastructure.
 
 ---
