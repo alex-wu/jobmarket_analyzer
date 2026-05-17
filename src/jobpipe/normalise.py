@@ -24,7 +24,7 @@ import pandas as pd
 from jobpipe import dedupe, fx
 from jobpipe.isco import loader as isco_loader
 from jobpipe.isco import tagger as isco_tagger
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +78,7 @@ def run(
     )
 
     df = dedupe.cross_source(df)
-    for col in ("first_seen_at", "last_seen_at"):
-        if col not in df.columns:
-            df[col] = pd.NaT
+    df = inject_accumulation_cols(df)
     PostingSchema.validate(df, lazy=True)
     return df
 

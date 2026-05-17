@@ -6,8 +6,36 @@ adapter landed in P4, so the relaxation flag was retired).
 
 from __future__ import annotations
 
+import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
+
+
+_ACCUMULATION_COLS = ("first_seen_at", "last_seen_at")
+
+
+def inject_accumulation_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Inject ADR-020 accumulation cols (first/last_seen_at) as null when missing.
+
+    Per-source adapters MUST NOT populate these — fetch_sources / normalise.run
+    inject them as tz-aware NaT before strict validation; export_accumulated()
+    is the sole producer of non-null values. This helper is exported so adapter
+    smoke tests that call PostingSchema.validate() directly can mirror the
+    production injection point.
+
+    Columns are tz-aware (datetime64[ns, UTC]) so the resulting parquet's
+    column type matches ingested_at — DuckDB's COALESCE in export_accumulated
+    refuses mixed-tz inputs without an explicit cast.
+    """
+    if df.empty:
+        return df
+    out = df
+    for col in _ACCUMULATION_COLS:
+        if col not in out.columns:
+            out = out.assign(
+                **{col: pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")}
+            )
+    return out
 
 
 class PostingSchema(pa.DataFrameModel):

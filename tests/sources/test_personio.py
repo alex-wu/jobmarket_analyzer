@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceFetchError
 from jobpipe.sources.personio import PersonioAdapter, PersonioConfig
 
@@ -44,7 +44,7 @@ def test_fetch_returns_normalised_dataframe(tmp_path: Path) -> None:
     # 5 fixture positions: 2 Dublin analyst rows kept; Munich engineer dropped (country),
     # empty-id and empty-name positions dropped (defensive guards).
     assert len(df) == 2
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
     assert set(df["title"]) == {"Senior Data Analyst", "Analytics Engineer (Remote-friendly)"}
 
 
@@ -84,7 +84,7 @@ def test_fetch_falls_back_to_ingested_at_for_missing_create_date(tmp_path: Path)
     df = PersonioAdapter().fetch(cfg, client=_mock(httpx.MockTransport(handler)))
     assert len(df) == 1
     # Just confirm posted_at is a valid timestamp; we don't pin the exact value.
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
 
 
 def test_fetch_skips_slug_on_404_and_continues(tmp_path: Path) -> None:

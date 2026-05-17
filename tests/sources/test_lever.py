@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 import pytest
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceFetchError
 from jobpipe.sources.lever import BASE_URL, LeverAdapter, LeverConfig
 
@@ -46,7 +46,7 @@ def test_fetch_returns_normalised_dataframe(tmp_path: Path) -> None:
     # 4 fixture postings: Dublin analyst (kept), NY FDE (dropped country+kw), Remote-EU analytics
     # (kept), Dublin marketing (dropped keyword).
     assert len(df) == 2
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
     assert set(df["title"]) == {"Senior Data Analyst", "Analytics Engineer"}
 
 

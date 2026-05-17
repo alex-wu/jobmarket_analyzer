@@ -36,7 +36,7 @@ import jobpipe.sources.personio  # noqa: F401
 from jobpipe import benchmarks, duckdb_io, fx, normalise, sources
 from jobpipe.benchmarks._common import last_fetch_mtime, should_skip
 from jobpipe.isco import loader as isco_loader
-from jobpipe.schemas import BenchmarkSchema, PostingSchema
+from jobpipe.schemas import BenchmarkSchema, PostingSchema, inject_accumulation_cols
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +196,7 @@ def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
             category=FutureWarning,
         )
         combined = pd.concat(frames, ignore_index=True)
-    for col in ("first_seen_at", "last_seen_at"):
-        if col not in combined.columns:
-            combined[col] = pd.NaT
+    combined = inject_accumulation_cols(combined)
     PostingSchema.validate(combined, lazy=True)
     return combined
 
@@ -429,14 +427,25 @@ def _resolve_git_sha() -> str | None:
     return sha or None
 
 
-def run_publish(preset_path: Path, out_root: Path = Path("data")) -> Path:
+def run_publish(
+    preset_path: Path,
+    out_root: Path = Path("data"),
+    *,
+    accumulate_window_days: int | None = None,
+) -> Path:
     """Top-level entry point for the ``jobpipe publish`` CLI command.
 
     Resolves the newest enriched bundle for the preset, reads ``publish:``
-    from the preset YAML, and emits a hive-partitioned + manifest bundle
-    under ``<out_root>/publish/<same run_id>/``. The ``run_id`` propagates
-    through all three stages (raw → enriched → publish) so traceability is
-    trivial.
+    from the preset YAML, and emits a per-preset flat or hive-partitioned
+    bundle under ``<out_root>/publish/<same run_id>/``. The ``run_id``
+    propagates through all three stages (raw → enriched → publish) so
+    traceability is trivial.
+
+    ``accumulate_window_days`` (ADR-020) overrides ``publish.accumulate_window_days``
+    in the preset. When set (and ``partition_by`` is empty), after the fresh
+    flat write the function globs ``<out_root>/archive/data-{preset_id}-*/`` for
+    dated parquets and rewrites the flat file as a deduped UNION over the
+    archive + fresh fetch. First-run case (empty archive) logs and skips.
     """
     preset = load_preset(preset_path)
     publish_cfg = preset.get("publish")
@@ -452,6 +461,10 @@ def run_publish(preset_path: Path, out_root: Path = Path("data")) -> Path:
     postings_path, bench_path = find_latest_enriched(preset_id, out_root)
     run_id = postings_path.parent.name  # `<preset_id>__<timestamp>-<hex>`
 
+    output_filename = (
+        f"latest-{preset_id}.parquet" if not partition_by else "postings.parquet"
+    )
+
     bundle_root = out_root / "publish" / run_id
     git_sha = _resolve_git_sha()
     duckdb_io.export_partitioned(
@@ -462,5 +475,76 @@ def run_publish(preset_path: Path, out_root: Path = Path("data")) -> Path:
         preset_id=preset_id,
         run_id=run_id,
         git_sha=git_sha,
+        output_filename=output_filename,
     )
+
+    if accumulate_window_days is None:
+        accumulate_window_days = publish_cfg.get("accumulate_window_days")
+    if accumulate_window_days is not None and not partition_by:
+        _accumulate_into_latest(
+            bundle_root / "postings" / output_filename,
+            out_root,
+            preset_id,
+            int(accumulate_window_days),
+        )
+
     return bundle_root
+
+
+def _accumulate_into_latest(
+    fresh_latest: Path,
+    out_root: Path,
+    preset_id: str,
+    window_days: int,
+) -> None:
+    """Glob the dated archive within ``window_days``, accumulate into ``fresh_latest``.
+
+    The workflow downloads ``data-{preset_id}-YYYY-MM-DD/latest-{preset_id}.parquet``
+    snapshots under ``out_root/archive/`` before calling publish; this function
+    inspects that directory tree. Empty-archive case (first run) logs and
+    leaves the fresh fetch untouched — see ADR-020 + handover §5 Option A.
+    """
+    archive_dir = out_root / "archive"
+    if not archive_dir.exists():
+        logger.info(
+            "publish: first-run for %s — no archive directory at %s; "
+            "shipping fresh fetch as the new latest",
+            preset_id,
+            archive_dir,
+        )
+        return
+
+    cutoff = datetime.now(UTC).date() - pd.Timedelta(days=window_days)
+    archived: list[Path] = []
+    for tag_dir in sorted(archive_dir.glob(f"data-{preset_id}-*")):
+        if not tag_dir.is_dir():
+            continue
+        # Tag suffix is ISO date (data-{preset_id}-YYYY-MM-DD). Filter by window.
+        date_str = tag_dir.name.removeprefix(f"data-{preset_id}-")
+        try:
+            tag_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            logger.warning("publish: skipping non-date tag dir %s", tag_dir)
+            continue
+        if tag_date < cutoff:
+            continue
+        candidate = tag_dir / f"latest-{preset_id}.parquet"
+        if candidate.exists():
+            archived.append(candidate)
+
+    if not archived:
+        logger.info(
+            "publish: archive for %s within %d days is empty; shipping fresh fetch",
+            preset_id,
+            window_days,
+        )
+        return
+
+    tmp_out = fresh_latest.with_suffix(".parquet.tmp")
+    duckdb_io.export_accumulated([*archived, fresh_latest], tmp_out, preset_id)
+    tmp_out.replace(fresh_latest)
+    logger.info(
+        "publish: rewrote %s with %d archived snapshots + fresh fetch",
+        fresh_latest,
+        len(archived),
+    )

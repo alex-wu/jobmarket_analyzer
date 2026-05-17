@@ -15,7 +15,7 @@ import httpx
 import pandas as pd
 import pytest
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceFetchError
 from jobpipe.sources.adzuna import BASE_URL, AdzunaAdapter, AdzunaConfig
 
@@ -54,7 +54,7 @@ def test_fetch_returns_normalised_dataframe(fake_creds: None) -> None:
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 3
     # P1 uses partial validation (strict=False); P2 will flip to strict=True.
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
 
     # First call hits the documented endpoint shape and includes credentials + keyword.
     first = calls[0]
@@ -192,7 +192,7 @@ def test_fetch_dedupes_overlapping_keywords(fake_creds: None) -> None:
     # Fixture has 3 postings; same handler returns them for both keywords → 6 raw, 3 unique.
     assert df["posting_id"].is_unique
     assert len(df) == 3
-    PostingSchema.validate(df, lazy=True)
+    PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
 
 
 def test_max_results_caps_output(fake_creds: None) -> None:

@@ -31,7 +31,7 @@ def test_shipped_preset_validates_clean() -> None:
 
     Catches the worst kind of merge mistake: breaking the production preset.
     """
-    issues = validate_preset(Path("config/runs/data_analyst_ireland.yaml"))
+    issues = validate_preset(Path("config/runs/data_analyst_eu.yaml"))
     assert issues == [], f"shipped preset has validation issues: {issues}"
 
 
@@ -130,7 +130,7 @@ def test_unknown_benchmark_name(tmp_path: Path) -> None:
 def test_cli_validate_exits_0_on_pass() -> None:
     result = runner.invoke(
         app,
-        ["validate", "--preset", "config/runs/data_analyst_ireland.yaml"],
+        ["validate", "--preset", "config/runs/data_analyst_eu.yaml"],
     )
     assert result.exit_code == 0
     assert "preset ok" in result.stdout
