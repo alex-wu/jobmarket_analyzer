@@ -87,8 +87,9 @@ One PR per phase. Each PR: code + tests + README/CHANGELOG delta where relevant.
 
 ## Adding things
 
-- **New source** (e.g. another ATS provider, a new job board API): create `src/jobpipe/sources/<name>.py` implementing the `SourceAdapter` Protocol and decorated with `@register("<name>")`. Output a DataFrame conforming to `PostingSchema`. Walkthrough: [docs/adding-a-source.md](docs/adding-a-source.md).
-- **New benchmark** (e.g. another national statistics agency): same pattern under `src/jobpipe/benchmarks/`. Walkthrough: [docs/adding-a-benchmark.md](docs/adding-a-benchmark.md).
+- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`. No code change. The pages workflow auto-discovers new presets at build time.
+- **New source adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable pattern survives; walkthrough at [docs/adding-a-source.md](docs/adding-a-source.md) is the reactivation path.
+- **New benchmark adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Walkthrough: [docs/adding-a-benchmark.md](docs/adding-a-benchmark.md).
 - **New role / geography**: add a YAML under `config/runs/`. No code change.
 
 ## Reporting an issue
