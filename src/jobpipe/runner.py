@@ -196,6 +196,9 @@ def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
             category=FutureWarning,
         )
         combined = pd.concat(frames, ignore_index=True)
+    for col in ("first_seen_at", "last_seen_at"):
+        if col not in combined.columns:
+            combined[col] = pd.NaT
     PostingSchema.validate(combined, lazy=True)
     return combined
 

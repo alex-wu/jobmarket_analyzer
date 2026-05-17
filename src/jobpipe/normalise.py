@@ -78,6 +78,9 @@ def run(
     )
 
     df = dedupe.cross_source(df)
+    for col in ("first_seen_at", "last_seen_at"):
+        if col not in df.columns:
+            df[col] = pd.NaT
     PostingSchema.validate(df, lazy=True)
     return df
 
