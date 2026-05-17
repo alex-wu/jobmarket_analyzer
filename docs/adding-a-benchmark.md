@@ -1,5 +1,7 @@
 # Adding a new benchmark adapter
 
+> **Post-v1 only.** Benchmark adapters (CSO / OECD / Eurostat) shelved per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable pattern ([ADR-008](../DECISIONS.md#adr-008--pluggable-adapter-pattern-sources--benchmarks)) survives — this walkthrough is the canonical reactivation path. Benchmark adapters return once multi-country unified merge across Adzuna proves stable (see [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation) reactivation criteria).
+
 A benchmark adapter pulls official wage statistics from a statistics agency and emits a DataFrame conforming to [`BenchmarkSchema`](../src/jobpipe/schemas.py). It is the dashboard's reference line — postings vs. official median.
 
 ## Checklist

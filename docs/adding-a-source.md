@@ -1,5 +1,7 @@
 # Adding a new source adapter
 
+> **Post-v1 only.** v1 ships Adzuna-only per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). New source adapters are out of scope until the multi-country unified-merge shape proves stable end-to-end. The pluggable-adapter pattern ([ADR-008](../DECISIONS.md#adr-008--pluggable-adapter-pattern-sources--benchmarks)) survives — this walkthrough is the canonical path for reactivation. Reactivation criteria in [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation).
+
 A source adapter ingests job postings from one external API and emits a DataFrame conforming to [`PostingSchema`](../src/jobpipe/schemas.py). The rest of the pipeline does not need to change.
 
 ## Checklist
