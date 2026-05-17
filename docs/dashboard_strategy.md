@@ -3,7 +3,9 @@
 > Spec for the P6 dashboard rebuild. The implementer in the next session executes against this doc.
 > Companion: [`docs/dashboard_data_gaps.md`](dashboard_data_gaps.md) — the upstream-pipeline extraction roadmap.
 
-> **⚠ Principle 8 superseded by P8.** §2 principle 8 (SQL composition centralised in-browser via DuckDB-WASM) is correct at scale ≥ 10 MB parquet but wrong at our scale (23 KB compressed). DuckDB-WASM ships at 7.2 MB compressed (~310× the data) and dominates cold-load time. P8 replaces in-browser SQL with build-time data loaders + client-side `d3.rollup`. ADR-017 will formalise; rewrite of §3.3 + §3.4 pending. Full context: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §3. The rest of this doc (layout, components, filter contract, styling discipline) remains valid.
+> **⚠ Principle 8 superseded by P8 / ADR-020 forcing function.** §2 principle 8 (SQL composition centralised in-browser via DuckDB-WASM) is correct at scale ≥ 10 MB parquet but wrong at our scale. Post-pivot accumulation pushes the `latest-{preset_id}.parquet` to 150-250 MB — DuckDB-WASM cold-load becomes untenable. [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute) is the formalising ADR (folded into P13). The rebuild replaces in-browser SQL with build-time data loaders + client-side `d3.rollup`. Rewrite of §3.3 + §3.4 pending P13. Full context: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §3. The rest of this doc (layout, components, filter contract, styling discipline) remains valid.
+
+> **⚠ Single-preset assumption.** This doc was written when one preset = one dataset. Post-pivot ([ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)), each preset publishes its own `latest-{preset_id}.parquet`. The dashboard adds a **preset switcher** at the top of the page (above the filter strip) — see [§13](#13-multi-preset-switcher). Switcher state drives which dataset the data loader pulls. URL `?preset={preset_id}` for shareable links.
 
 ---
 
@@ -351,5 +353,60 @@ For the eventual rebuild (referenced from this doc):
 - **Three deferred fields** — `experience_level`, `work_arrangement`, `skills`. Extraction roadmap lives in [`docs/dashboard_data_gaps.md`](dashboard_data_gaps.md). This rebuild reserves no layout slots; when the fields land, a new strategy revision adds the visual sections.
 - **LLM ISCO fallback** — descoped from v1 per [ADR-013](../DECISIONS.md). Live match rate at ~56 % (Run 5, n=504); the dashboard surfaces the coverage but does not work around it.
 - **Cross-day delta on KPI cards** — would let a tile show "504 (↑12 since yesterday)". Blocked on a history table (`data/postings_history.parquet` partitioned by snapshot date). Out of this rebuild's scope.
-- **Second preset** — moved to P11.1. The dashboard already reads whatever the manifest's `preset_id` says, so the only change is the title chip. No layout consequence.
+- **Second preset** — superseded by §13 multi-preset switcher (P13).
 - **Scaffolder warning** — do NOT run `npm create @observablehq` for any new file; the scaffolder is interactive-only and rejects `--yes`. Hand-author every component. (Memory: `pitfall-observable-scaffolder-interactive`.)
+
+---
+
+## 13. Multi-preset switcher
+
+Added 2026-05-17 per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming). The dashboard supports N presets via a single switcher above the filter strip.
+
+### UI
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Job Market Analyzer · [Preset: data_analyst_eu ▾]                  │  H1 + preset switcher
+│  ▾ data_analyst_eu      (default)                                   │  dropdown options
+│  ▾ software_developer_eu                                            │
+│  As of 2026-05-17 · 4,820 postings · 7 countries · pipeline v0.6.0  │  manifest chip
+├──────────────────────────────────────────────────────────────────────┤
+│  [Country ▾] [ISCO major ▾] [Salary range ─────] [Posted after ─]    │  filter strip (unchanged)
+```
+
+### Data source
+
+- `site/src/data/presets.json` — generated at build time by `pages.yml` from `config/runs/*.yaml` (excluding `_archived/`). Shape: `[{preset_id, label, default, description}, …]`.
+- For each preset, the data loader fetches `data/gh_databuild_samples/latest-{preset_id}.parquet`. CI's `pages.yml` step enumerates all `latest-*` releases and downloads each preset's parquet.
+
+### Reactive wiring
+
+```js
+const presets = await FileAttachment("data/presets.json").json();
+const initial = new URLSearchParams(window.location.search).get("preset") ?? presets.find(p => p.default).preset_id;
+const preset = view(Inputs.select(presets.map(p => p.preset_id), {label: "Preset", value: initial, format: id => presets.find(p => p.preset_id === id).label}));
+
+// Switcher state drives loader. The page reactively re-runs every SQL cell.
+const datasetUrl = `data/gh_databuild_samples/latest-${preset}.parquet`;
+const db = await DuckDBClient.of({postings: FileAttachment(datasetUrl)});
+```
+
+**FileAttachment caveat** (§2 principle 7): paths must be static literals. Workaround: declare a `FileAttachment(...)` for every preset at module top-level (build-time discoverable), select by `preset` at runtime:
+
+```js
+const datasets = Object.fromEntries(presets.map(p => [p.preset_id, FileAttachment(`data/gh_databuild_samples/latest-${p.preset_id}.parquet`)]));
+const db = await DuckDBClient.of({postings: datasets[preset]});
+```
+
+### URL persistence
+
+`?preset={preset_id}` reflects current selection. On switcher change, update the URL via `history.replaceState`. On load, hydrate from URL if present; else use the `default: true` preset from `presets.json`.
+
+### Adding a new preset
+
+1. Write `config/runs/{new_preset_id}.yaml`.
+2. Add `{new_preset_id}` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`.
+3. Push. Next weekly cron (or `workflow_dispatch`) produces `latest-{new_preset_id}.parquet`.
+4. `pages.yml` regenerates `presets.json` automatically — switcher gets the new option without code change.
+
+To mark a preset as the default on first visit, add `default: true` to its entry in the presets-manifest generator (or first-in-config is implicit default).

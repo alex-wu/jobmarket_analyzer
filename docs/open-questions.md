@@ -8,7 +8,16 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 ## Resolved
 
-- **P9 CI/CD modernisation** — Shipped 2026-05-15 across 8 PRs (`#2` umbrella, `#3-#5/#7` first Dependabot wave, `#6` closed as ghost version, `#8` doc fix, `#9` Scorecard tag pin). Active automation: CodeQL (Python + JS matrix), Dependabot weekly grouped (npm + pip + actions), OpenSSF Scorecard + README badges, actionlint, Dependabot auto-merge for patch+minor. Light branch protection on `main` (required checks = `test` + `analyze (python|javascript)`; no PR-review wall; `delete_branch_on_merge: true`). Comprehensive handover: [`docs/sessions/2026-05-15-p9-shipped-handover.md`](sessions/2026-05-15-p9-shipped-handover.md). Reference: [`docs/ci-cd-practices.md`](ci-cd-practices.md). Deferred design (no code): [`docs/data-history-design.md`](data-history-design.md) for weekly cron + 6-month accumulation.
+- **Scope pivot 2026-05-17 — Adzuna-only + multi-preset accumulation.** ADR-017 (scope cut), ADR-018 (weekly cadence), ADR-019 (multi-preset `latest-{preset_id}` naming), ADR-020 (pure-function accumulation). Closes several previously-open items below:
+  - "Dashboard cold-load performance (P8)" — folded into P13 as a forcing function of ADR-020 (accumulated parquet at 150-250 MB forces build-time loaders).
+  - "Pipeline coverage regressions (P10)" — zero-row ATS adapters closed by descope. Code remains in tree, shelved by preset config.
+  - "OECD SDMX unblock" — closed by descope. Benchmark adapters shelved.
+  - "Adzuna posting recency" (P6 dashboard decision) — `max_days_old: 180` + `since_days: 180` carried over; accumulation window matches.
+  - "CSO 4-digit ISCO coarseness" — moot; CSO shelved.
+  - "Cross-source dedupe efficacy on live mix" — moot; only Adzuna sources postings.
+  - "Cross-day delta surfacing" — resolved by accumulation: `first_seen_at` / `last_seen_at` derived per posting (ADR-020).
+  Implementation = P13. Comprehensive handover: see `docs/sessions/2026-05-17-adzuna-only-scope-pivot-handover.md` (local only per ADR-014).
+- **P9 CI/CD modernisation** — Shipped 2026-05-15 across 8 PRs (`#2` umbrella, `#3-#5/#7` first Dependabot wave, `#6` closed as ghost version, `#8` doc fix, `#9` Scorecard tag pin). Active automation: CodeQL (Python + JS matrix), Dependabot weekly grouped (npm + pip + actions), OpenSSF Scorecard + README badges, actionlint, Dependabot auto-merge for patch+minor. Light branch protection on `main` (required checks = `test` + `analyze (python|javascript)`; no PR-review wall; `delete_branch_on_merge: true`). Comprehensive handover: [`docs/sessions/2026-05-15-p9-shipped-handover.md`](sessions/2026-05-15-p9-shipped-handover.md). Reference: [`docs/ci-cd-practices.md`](ci-cd-practices.md). Deferred design (now ADR-020): [`docs/data-history-design.md`](data-history-design.md) for weekly cron + 6-month accumulation.
 - **P6 dashboard rebuild + P7 GitHub Pages deploy** — Single-page BI canvas live at <https://alex-wu.github.io/jobmarket_analyzer/>. Three feature commits on `main` (`dc4c46f`, `7ea1f6e`, `40fb37a`). Operations runbook at [`docs/operations.md`](operations.md). Comprehensive context for the next agent: [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md).
 - **Adzuna free tier capacity** — `max_pages=5 × results_per_page=50 = 250` per fetch, with `min_interval_hours=24` as the safety knob. Lived at 499 rows across two keywords in P1's live run without tripping the limit (P1 acceptance).
 - **Remotive ToS** — Excluded entirely. ToS §8 prohibits redistribution + commercial database-building; attribution back-links don't override. See [ADR-009](../DECISIONS.md#adr-009--remotive-excluded-from-ingest-sources).
@@ -23,17 +32,20 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 ## Still open — owned by a future phase
 
-### Dashboard cold-load performance (owned by P8)
+### Scope-pivot follow-ups (P13)
 
-DuckDB-WASM ships as **7.2 MB compressed (~36 MB uncompressed)** in `dist/_npm/@duckdb/`. The dataset it queries is **23 KB compressed (~55 KB uncompressed)** — the WASM module is ~310× the data. Every cold visit downloads it; `Cache-Control: max-age=600` only covers repeats within 10 minutes. Cold-load is dominated by WASM init (1-2 s) + nine sequential SQL cells against the in-browser engine.
+New open questions surfaced by ADR-017..020. To resolve during P13 implementation:
 
-Strategy doc [`docs/dashboard_strategy.md`](dashboard_strategy.md) §2 principle 8 ("SQL is the single source of truth for filter logic") was correct intent at the wrong scale. For ≤1000 rows and fixed aggregations, JS `d3.rollup` does the same work in <1 ms with zero WASM dependency.
+- **Preset switcher state persistence.** URL query param (`?preset=…`) vs `localStorage` vs both? URL is shareable, localStorage is sticky; both can be used together (URL hydrate on load, localStorage as fallback). Decide before wiring the switcher.
+- **First-run backfill window.** Pre-pivot dated releases (`data-2026-05-XX`) exist for the legacy `data_analyst_ireland` preset (different country mix, GB-only). Include them in the first `data_analyst_eu` accumulation? Pre-pivot rows lack the new `country` mix but `posting_id` / `ingested_at` are sound — including them backfills GB history at the cost of mixed-preset provenance.
+- **Gate `min_total_rows` after pivot.** Set to `200` in the handover spec as a guess. Revise after first 1-2 real runs ground a baseline. May want per-country sub-thresholds (`min_rows_per_country: 20`) if a single-country failure should fail the gate.
+- **Per-preset Pages deploy ordering.** `pages.yml` fires once per `refresh.yml` matrix job completion. If two presets finish 30 seconds apart, Pages may rebuild twice in quick succession. Acceptable today; revisit if it becomes annoying. Possible fix: debounce in `pages.yml` via `concurrency: pages` no-cancel.
+- **ADR-017 reactivation criteria measurability.** "Multi-country unified merge proven stable end-to-end" — define stability concretely (one full 180-day accumulation cycle without manual intervention? Gate green for N consecutive runs? Some other measure?).
+- **Closure-detection lag under weekly cadence.** `last_seen_at < generated_at - 7d` is the right predicate, but the dashboard needs to communicate that "closed yesterday" cannot be detected until next Monday. UX wording question.
 
-Recommended path (full scoping in [`docs/sessions/2026-05-15-p7-shipped-handover.md`](sessions/2026-05-15-p7-shipped-handover.md) §3):
+### Dashboard cold-load performance — CLOSED, folded into P13
 
-- **Path C — Hybrid pre-bake + client-side filter.** Static aggregates as JSON loaders; raw 504-row JSON for filter-dependent cells; `d3.rollup` does the math in JS. Cold load <500 ms; filter response <50 ms. ~1 day rework. **Ships ADR-017** formally superseding the strategy doc principle.
-
-Other paths rejected: (A) service worker cache the 7 MB WASM — half-measure; (B) full data-loader rewrite without raw-rows JSON — loses filter interactivity.
+The DuckDB-WASM 7.2 MB / 23 KB dataset mismatch is **strictly worse** post-pivot (accumulated parquet → 150-250 MB). ADR-020 makes build-time data loaders + client-side `d3.rollup` mandatory, not optional. Path C from the previous handover is the implementation route. Full scoping was in `docs/sessions/2026-05-15-p7-shipped-handover.md` §3 — preserved for reference, executed in P13.
 
 ### CI/CD follow-ups (residual from P9)
 
@@ -46,36 +58,21 @@ P9 shipped the modernisation; these are residual items deliberately not closed:
 - **PR-gate smoke?** `pages.yml` smoke only fires on push-to-main, not on PR. A path-filtered `smoke.yml` running puppeteer on PRs touching `site/**` would catch dashboard regressions pre-merge. ~2-3 min cost per `site/` PR. Open question for next agent.
 - **Tighten Dependabot auto-merge for workflow-bumps?** Workflow file changes can subtly change CI semantics; current auto-merge blesses any patch/minor including `.github/workflows/**` bumps. Consider an exclusion filter in `dependabot-automerge.yml`.
 
-### Pipeline coverage regressions (owned by P10)
+### Pipeline coverage regressions (P10) — CLOSED by descope
 
-Run `25913215989` (2026-05-15 10:32 UTC) logged zero-row returns from:
+Pre-pivot, P10 was scoped to investigate zero-row Lever / Ashby / Personio / CSO / Eurostat returns. **All five adapters shelved by ADR-017.** Their code stays in tree, `enabled: false`. Pandas FutureWarning at `src/jobpipe/runner.py:116` already fixed in commit `48bf28e` (2026-05-15). When/if these adapters reactivate (per ADR-017 reactivation criteria), zero-row investigation reopens as part of that reactivation ADR.
 
-- ATS adapters: Lever, Ashby, Personio
-- Benchmark adapters: CSO PxStat, Eurostat SES
+### OECD SDMX unblock — CLOSED by descope
 
-If this has been silent on every cron since P5, the benchmark overlay claim on the dashboard ("salary vs official wage statistics") is currently unbacked. Investigation: replay the most recent `refresh.yml` log; spot-check each company's careers endpoint + each statistics-agency SDMX/PxStat path manually. Each adapter either gets fixed or marked disabled with an ADR (parallel to ADR-011 for OECD).
+Benchmark adapters (including OECD) shelved per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Unblock paths preserved as historical context: (1) OECD-issued API key, (2) CSV mirror, (3) fixed-egress proxy. When reactivated, [ADR-011](../DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection) remains authoritative on the Cloudflare situation.
 
-Also: `src/jobpipe/runner.py:116` emits a `pandas` FutureWarning about empty-frame concatenation that will become an error in a future pandas release. Pre-filter empty frames before `pd.concat`.
+### P6 dashboard decisions — most CLOSED by descope; one open
 
-### OECD SDMX unblock (no current owner)
-
-`sdmx.oecd.org` returns 403 + a Cloudflare "Just a moment..." interstitial to anonymous httpx requests. The adapter ships disabled per [ADR-011](../DECISIONS.md#adr-011--oecd-sdmx-adapter-ships-disabled-cloudflare-bot-protection). Unblock paths in priority order:
-
-1. OECD-issued API key header (registered developer programme — unverified whether the free option bypasses Cloudflare).
-2. Switch the adapter to a CSV mirror via `data.oecd.org` / `data-explorer.oecd.org` if one publishes the same wage series.
-3. Route through a fixed-egress proxy (Cloudflare Worker etc.). Adds infrastructure cost — would violate the free-tier goal.
-
-Until one of those lands, benchmark coverage is CSO (Ireland) + Eurostat (Eurozone, 4-year-lagged SES).
-
-### P6 dashboard decisions
-
-These all require visual inspection of real data and are deferred until `site/` exists.
-
-- **Adzuna posting recency.** Live P1 returned `posted_at` up to a year old. Decide: filter at ingest, surface an age column on the dashboard, or show a freshness badge per posting.
-- **`salary_min_eur == 0` rows.** Adzuna emits a small non-zero count of zero-floored salaries. Decide: surface or hide.
-- **CSO 4-digit ISCO coarseness.** [ADR-012](../DECISIONS.md#adr-012--cso-pxstat-4-digit-isco-coarseness) documents that CSO's `EHQ03` cube maps to a 3-bucket umbrella. The dashboard must not present CSO bucket-1 numbers as if they were ISCO-2511-specific. UI decision: label, tooltip, or row-level disclaimer.
-- **Cross-source dedupe efficacy on the live mix.** Same job often appears on the company's Greenhouse and on Adzuna. Measure overlap once we have a full daily run.
-- **Cross-day delta surfacing.** None of the source upstreams expose an incremental API, so every refresh fetches the full current set (see [`docs/architecture.md`](architecture.md#source-api-delta-semantics) for per-source detail). `posting_id` is stable, so the same posting reappears every day until it's removed upstream; `posted_at` is the upstream-reported create/update timestamp; `ingested_at` advances. P6 decision: present each daily release standalone (simplest, matches the publish model), compute `first_seen_at` by joining historical releases at build time (better UX, more loader logic), or flag "new today" by diffing against the previous `data-YYYY-MM-DD` release (cheaper, only needs the prior day).
+- ~~**Adzuna posting recency.**~~ Resolved by `max_days_old: 180` + `since_days: 180` carry-over post-pivot, plus accumulation window also at 180 days.
+- **`salary_min_eur == 0` rows.** Still open — Adzuna emits a small non-zero count of zero-floored salaries. P13 dashboard work decides: surface or hide.
+- ~~**CSO 4-digit ISCO coarseness.**~~ Moot — CSO shelved (ADR-017).
+- ~~**Cross-source dedupe efficacy on the live mix.**~~ Moot — only Adzuna sources postings.
+- ~~**Cross-day delta surfacing.**~~ Resolved by ADR-020 accumulation: `first_seen_at` / `last_seen_at` derived at publish step.
 
 ### ISCO live-match-rate measurement (post-first-Actions-run)
 

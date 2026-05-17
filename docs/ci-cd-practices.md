@@ -9,7 +9,7 @@ Reference for how this repo's pipelines are wired. Distilled from P9 cleanup
 |---|---|---|
 | Lint + type + test (Python) | `.github/workflows/ci.yml` | `gh run list -w ci.yml --limit 1` |
 | Pages build + smoke + deploy | `.github/workflows/pages.yml` | `gh run list -w pages.yml --limit 1` |
-| Daily data refresh + release | `.github/workflows/refresh.yml` | `gh run list -w refresh.yml --limit 1` |
+| Weekly data refresh + release (matrix per preset) | `.github/workflows/refresh.yml` | `gh run list -w refresh.yml --limit 1` |
 | Workflow YAML lint | `.github/workflows/lint-workflows.yml` | path-filtered; runs on `.github/workflows/**` changes |
 | CodeQL (Python + JS) | `.github/workflows/codeql.yml` | `gh api repos/alex-wu/jobmarket_analyzer/code-scanning/alerts` |
 | OpenSSF Scorecard | `.github/workflows/scorecard.yml` | <https://scorecard.dev/viewer/?uri=github.com/alex-wu/jobmarket_analyzer> |
@@ -42,7 +42,7 @@ Reference for how this repo's pipelines are wired. Distilled from P9 cleanup
 |---|---|---|---|
 | `ci` | push to `main`, PR to `main` | `ci-${{ github.ref }}` cancel-in-progress | Required check |
 | `pages` | push to `main` under `site/**`, `workflow_run` after `refresh`, `workflow_dispatch` | `pages` no-cancel | Required check |
-| `refresh` | cron `0 6 * * *`, `workflow_dispatch` | `refresh` no-cancel | Data ingest |
+| `refresh` | cron `0 6 * * 1` (weekly Mon 06:00 UTC), `workflow_dispatch` | `refresh-${{ matrix.preset }}` no-cancel | Data ingest, matrix over `config/runs/*.yaml` |
 | `codeql` | push to `main`, PR to `main`, cron `0 8 * * 1` | matrix per language | Findings → Security tab |
 | `scorecard` | branch_protection_rule, push to `main`, cron `0 9 * * 1` | `scorecard` no-cancel | Score → scorecard.dev |
 | `lint-workflows` | PR or push touching `.github/workflows/**` | `lint-workflows-${{ github.ref }}` cancel-in-progress | actionlint |
@@ -50,7 +50,36 @@ Reference for how this repo's pipelines are wired. Distilled from P9 cleanup
 
 Cron timing is staggered Monday 06/08/09 UTC so Dependabot fires first,
 CodeQL runs against any post-Dependabot state, then Scorecard sees the
-freshest workflow set.
+freshest workflow set. `refresh` shares the 06:00 Monday slot since the
+pivot ([ADR-018](../DECISIONS.md#adr-018--weekly-cadence--multi-country-single-run))
+— different workflow file, same hour — so weekly data freshness aligns
+with the dependency-update cycle.
+
+## Multi-preset parallelism (post-2026-05-17 pivot)
+
+Per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming),
+`refresh.yml` matrixes over presets in `config/runs/*.yaml`:
+
+```yaml
+strategy:
+  matrix:
+    preset: [data_analyst_eu]   # extend as new presets land
+  fail-fast: false              # one preset's failure must not block others
+
+concurrency:
+  group: refresh-${{ matrix.preset }}
+  cancel-in-progress: false
+```
+
+Per-preset concurrency group prevents same-preset races (two `data_analyst_eu`
+runs cannot collide on `latest-data_analyst_eu`), while allowing cross-preset
+parallelism. Release tag scheme: `latest-{preset_id}` (moving),
+`data-{preset_id}-YYYY-MM-DD` (immutable archive).
+
+Adding a preset: append `preset_id` to `strategy.matrix.preset`, push. Next
+weekly cron (or `workflow_dispatch`) runs it. No other workflow change needed —
+`pages.yml` discovers new presets by enumerating `latest-*` releases and
+`config/runs/*.yaml` at build time.
 
 ## Checklist for adding a new workflow
 

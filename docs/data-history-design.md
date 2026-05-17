@@ -1,7 +1,12 @@
 # Data history design — accumulating 6-month corpus
 
-**Status:** design only. Not implemented. Written during P9 cleanup
-(2026-05-15) to document current behaviour and lay out the path forward.
+**Status:** **Accepted as ADR-020 (2026-05-17)**. Implementation queued as **P13**.
+Originally written 2026-05-15 during P9 cleanup as design-only; promoted following
+the 2026-05-17 scope-pivot conversation. The doc text below is preserved with
+two amendments inline:
+
+1. **Cadence shipped weekly** (per [ADR-018](../DECISIONS.md#adr-018--weekly-cadence--multi-country-single-run)) — the daily→weekly diff in §"Weekly cadence" is the decision, not a hypothetical.
+2. **`export_accumulated()` is preset-parameterised** (per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)) — every reference below to a single canonical `latest`/`postings.parquet` reads as `latest-{preset_id}.parquet`. The accumulation operates against `data-{preset_id}-*` dated releases for the active preset.
 
 ## Current behaviour (snapshot-only)
 
@@ -111,10 +116,12 @@ weekly and have the dashboard read `latest` only. Loses trend analysis
 entirely — back to single-snapshot. The accumulation step is the entire
 value here.
 
-## Why deferred
+## Why deferred (historical context)
 
 P9's scope is CI/CD modernisation, not pipeline rework. Accumulation
 touches `runner.py` + `duckdb_io.py` + the publish step + the YAML preset
 schema + dashboard data-loader semantics. It's its own phase. Tentatively
-queue as **P10.5** or **P13** after P10 ships pipeline observability +
+queued as **P10.5** or **P13** after P10 ships pipeline observability +
 adapter coverage fixes.
+
+**Resolution 2026-05-17:** the scope-pivot conversation (ADR-017..020) accelerated this. P10's adapter-coverage work is closed by descope (ATS adapters shelved). Accumulation becomes load-bearing for trend analysis under the new Adzuna-only multi-country shape. Folded into **P13** along with P8 (build-time data loaders — required because accumulated parquet is 150-250 MB).
