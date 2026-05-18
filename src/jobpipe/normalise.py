@@ -25,6 +25,7 @@ from jobpipe import dedupe, fx
 from jobpipe.isco import loader as isco_loader
 from jobpipe.isco import tagger as isco_tagger
 from jobpipe.schemas import PostingSchema, inject_accumulation_cols
+from jobpipe.skills import tagger as skills_tagger
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ def run(
     rates: dict[str, float],
     labels_df: pd.DataFrame | None = None,
     *,
+    skills_df: pd.DataFrame | None = None,
+    focus_isco: list[str] | None = None,
     since_days: int | None = None,
 ) -> pd.DataFrame:
     """Normalise a raw postings DataFrame.
@@ -76,6 +79,9 @@ def run(
         pre_match,
         100.0 * matched / pre_match if pre_match else 0.0,
     )
+
+    if skills_df is not None:
+        df = skills_tagger.tag(df, skills_df, focus_isco=focus_isco)
 
     df = dedupe.cross_source(df)
     df = inject_accumulation_cols(df)
