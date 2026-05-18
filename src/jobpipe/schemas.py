@@ -26,7 +26,7 @@ def _is_list_of_str_or_null(v: object) -> bool:
     if isinstance(v, (list, np.ndarray)):
         return all(isinstance(x, str) for x in v)
     try:
-        if pd.isna(v):
+        if pd.isna(v):  # type: ignore[call-overload]
             return True
     except (TypeError, ValueError):
         pass
