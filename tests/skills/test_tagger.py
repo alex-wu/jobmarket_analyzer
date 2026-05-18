@@ -29,9 +29,7 @@ def _skills(
 
 
 def _postings(rows: list[tuple[str, str]]) -> pd.DataFrame:
-    return pd.DataFrame(
-        [{"title": t, "description": d} for t, d in rows]
-    )
+    return pd.DataFrame([{"title": t, "description": d} for t, d in rows])
 
 
 def test_matches_preferred_label_in_title() -> None:
@@ -122,9 +120,7 @@ def test_focus_isco_filters_off_domain_skills() -> None:
         ],
         iscos=[["2511", "2521"], ["7549"], ["2642"]],
     )
-    df = _postings(
-        [("Data Analyst", "SQL + packaging engineering + journalism mentioned")]
-    )
+    df = _postings([("Data Analyst", "SQL + packaging engineering + journalism mentioned")])
     out = tag(df, skills, focus_isco=["2511", "2521"])
     assert out.loc[0, "skills"] == ["SQL"]
 

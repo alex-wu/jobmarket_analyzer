@@ -255,9 +255,7 @@ def export_accumulated(
             ) TO '{out.as_posix()}' (FORMAT PARQUET);
             """
         )
-        row_count_row = con.sql(
-            f"SELECT count(*) FROM read_parquet('{out.as_posix()}')"
-        ).fetchone()
+        row_count_row = con.sql(f"SELECT count(*) FROM read_parquet('{out.as_posix()}')").fetchone()
     finally:
         con.close()
 

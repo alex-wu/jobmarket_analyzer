@@ -107,9 +107,7 @@ def tag(
             except TypeError:
                 return False
 
-        skills_df = skills_df[
-            skills_df["related_isco_codes"].map(_overlaps)
-        ].reset_index(drop=True)
+        skills_df = skills_df[skills_df["related_isco_codes"].map(_overlaps)].reset_index(drop=True)
         logger.info(
             "skills: focus_isco=%s filtered dictionary %d -> %d",
             sorted(focus_set),

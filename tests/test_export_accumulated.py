@@ -117,9 +117,7 @@ def test_preserves_prior_accumulation_first_seen(tmp_path: Path) -> None:
     export_accumulated([snap_a, snap_b], out, preset_id="demo")
 
     df = pd.read_parquet(out)
-    assert pd.Timestamp(df.loc[0, "first_seen_at"]) == pd.Timestamp(
-        historical_first
-    )
+    assert pd.Timestamp(df.loc[0, "first_seen_at"]) == pd.Timestamp(historical_first)
 
 
 def test_unique_posting_ids_kept_separately(tmp_path: Path) -> None:
