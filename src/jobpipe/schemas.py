@@ -118,17 +118,17 @@ class PostingSchema(pa.DataFrameModel):
     raw_payload: Series[str] = pa.Field(nullable=True)
 
     adzuna_category: Series[str] = pa.Field(nullable=True)
-    contract_type: Series[str] = pa.Field(
-        nullable=True,
-        isin=["permanent", "contract"],
-    )
-    contract_time: Series[str] = pa.Field(
-        nullable=True,
-        isin=["full_time", "part_time"],
-    )
+    # Adzuna's API reference notes "other values likely exist" — values like
+    # `temporary`/`apprenticeship` would crash an isin-constrained weekly cron.
+    # Distribution surveillance moves to the gate step (Copilot #4).
+    contract_type: Series[str] = pa.Field(nullable=True)
+    contract_time: Series[str] = pa.Field(nullable=True)
+    # Adzuna hard-truncates to ~500 chars + ellipsis but the cap is
+    # observational, not contractual. 1000-char ceiling absorbs upstream drift
+    # without taking the weekly cron down (Copilot #5).
     description: Series[str] = pa.Field(
         nullable=True,
-        str_length={"max_value": 600},
+        str_length={"max_value": 1000},
     )
     # Object-dtype list[str]. Pandera has no native list dtype; adapters MUST
     # emit list[str] or None. The class-level @pa.check below enforces it.

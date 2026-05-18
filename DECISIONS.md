@@ -439,13 +439,15 @@ Recorded as pitfalls: [[pitfall-pandas-naT-not-tz-aware-parquet]] (new), [[pitfa
 | Column | Dtype | Constraint | Source |
 |---|---|---|---|
 | `adzuna_category` | str | `nullable` | Adzuna `category.label` |
-| `contract_type` | str | `isin=["permanent","contract"]` | Adzuna `contract_type` (~36% populated) |
-| `contract_time` | str | `isin=["full_time","part_time"]` | Adzuna `contract_time` (~42% populated) |
-| `description` | str | `str_length max=600` | Adzuna `description` (500 chars + 100-char buffer for the U+2026 + safety) |
+| `contract_type` | str | `nullable` (no enum — see amendment) | Adzuna `contract_type` (~36% populated) |
+| `contract_time` | str | `nullable` (no enum — see amendment) | Adzuna `contract_time` (~42% populated) |
+| `description` | str | `str_length max=1000` | Adzuna `description` (500 chars + ellipsis; cap raised for upstream drift) |
 | `location_area` | list[str] | class-level `@pa.check` accepts list / numpy.ndarray / null | Adzuna `location.area[]` |
 | `skills` | list[str] | same check shape | Populated by ADR-023's ESCO tagger; `[]` when no matches |
 
-`category.tag` (slug) is **not** persisted — `category.label` is the human-readable form, and the slug remains recoverable from `raw_payload`. `isin` enum lists came from a live probe (2026-05-18); strict mode will fail loudly if a new value appears, at which point we widen the enum.
+`category.tag` (slug) is **not** persisted — `category.label` is the human-readable form, and the slug remains recoverable from `raw_payload`.
+
+**Amendment 2026-05-18** (pre-merge review): `contract_type` / `contract_time` `isin` constraints DROPPED. Adzuna's own API reference notes "other values likely exist" (e.g. `temporary`, `apprenticeship`). A new value on a single posting would fail strict-mode pandera validation and red-gate the entire weekly run — unacceptable on an unattended cron. `description` cap raised 600 → 1000 for the same reason (the 100-char buffer over Adzuna's observational 500-char truncation was thin). Value-set surveillance moves to the gate step in a follow-up.
 
 Implementation pattern matches ADR-020 / commit `24192ca` (first/last_seen_at addition):
 
