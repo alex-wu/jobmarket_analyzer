@@ -27,7 +27,7 @@ def _build_automaton(skills_df: pd.DataFrame) -> ahocorasick.Automaton:
     """One automaton per call. Keys are lowercased; values are preferred_labels."""
     auto = ahocorasick.Automaton()
     for row in skills_df.itertuples(index=False):
-        preferred = (row.preferred_label or "").strip()
+        preferred = str(row.preferred_label or "").strip()
         if not preferred:
             continue
         keys = [preferred]
@@ -57,7 +57,7 @@ def _iter_strs(value: object) -> Iterable[str]:
     if isinstance(value, str):
         return (value,)
     try:
-        return [str(v) for v in value]
+        return [str(v) for v in value]  # type: ignore[attr-defined]
     except TypeError:
         return ()
 
@@ -103,7 +103,7 @@ def tag(
             if codes is None:
                 return False
             try:
-                return any(c in focus_set for c in codes)
+                return any(c in focus_set for c in codes)  # type: ignore[attr-defined]
             except TypeError:
                 return False
 
