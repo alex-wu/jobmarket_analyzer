@@ -13,7 +13,7 @@ backtracks catastrophically.
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 import ahocorasick
 import pandas as pd
@@ -72,9 +72,7 @@ def _word_boundary_match(haystack: str, end_idx: int, key_len: int) -> bool:
     if start > 0 and _is_word_char(haystack[start - 1]):
         return False
     after = end_idx + 1
-    if after < len(haystack) and _is_word_char(haystack[after]):
-        return False
-    return True
+    return not (after < len(haystack) and _is_word_char(haystack[after]))
 
 
 def tag(

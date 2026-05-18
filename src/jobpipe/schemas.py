@@ -11,7 +11,6 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
 
-
 _ACCUMULATION_COLS = ("first_seen_at", "last_seen_at")
 
 
