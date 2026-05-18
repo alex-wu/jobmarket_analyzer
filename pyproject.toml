@@ -30,6 +30,7 @@ dependencies = [
     "typer>=0.13",
     "openai>=1.55",
     "defusedxml>=0.7",
+    "pyahocorasick>=2.3.1",
 ]
 
 [project.optional-dependencies]

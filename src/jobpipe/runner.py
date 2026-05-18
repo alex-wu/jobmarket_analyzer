@@ -37,6 +37,7 @@ from jobpipe import benchmarks, duckdb_io, fx, normalise, sources
 from jobpipe.benchmarks._common import last_fetch_mtime, should_skip
 from jobpipe.isco import loader as isco_loader
 from jobpipe.schemas import BenchmarkSchema, PostingSchema, inject_accumulation_cols
+from jobpipe.skills import loader as skills_loader
 
 logger = logging.getLogger(__name__)
 
@@ -359,8 +360,17 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
 
     rates = fx.load_rates()
     labels = isco_loader.load_isco_labels()
+    skills = skills_loader.load_skills()
     since_days = preset.get("normalise", {}).get("since_days")
-    enriched = normalise.run(raw_df, rates, labels_df=labels, since_days=since_days)
+    focus_isco = preset.get("isco_focus") or None
+    enriched = normalise.run(
+        raw_df,
+        rates,
+        labels_df=labels,
+        skills_df=skills,
+        focus_isco=focus_isco,
+        since_days=since_days,
+    )
     logger.info(
         "normalise: %d rows after dedupe (%d collapsed)",
         len(enriched),

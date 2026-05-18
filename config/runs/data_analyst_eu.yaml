@@ -18,11 +18,21 @@ description: >
   Adzuna. Weekly Monday accumulation into a rolling 180-day corpus.
   Smoke-test scope at v1.1: gb (IE proxy) + es.
 
-# ISCO-08 4-digit codes the dashboard surfaces front-and-centre.
+# ISCO-08 4-digit codes the dashboard surfaces front-and-centre AND the
+# scope filter for ESCO skill extraction (jobpipe.skills.tagger). Skills are
+# filtered to those linked to at least one of these occupations — drops ~93%
+# of the 13.9k ESCO Pillar B corpus while keeping every real data-analytics
+# skill (SQL/Python/Tableau/BI/ML/statistics/etc). Empirical baseline on the
+# 2026-05-18 live fetch: kills "packaging engineering", "journalism",
+# "instrumentation equipment" noise.
 isco_focus:
-  - "2521"  # Database designers and administrators
-  - "2511"  # Systems analysts
-  - "2423"  # Personnel and careers professionals (analytics adjacent)
+  - "2511"  # Systems analysts (primary — most data-analyst skills link here)
+  - "2519"  # Software and applications developers and analysts NEC (analytics engineers)
+  - "2521"  # Database designers and administrators (data engineering)
+  - "2529"  # Database and network professionals NEC (MLOps, data platforms)
+  - "2421"  # Management and organization analysts (business analysts)
+  - "2120"  # Mathematicians, actuaries and statisticians (data scientists)
+  - "1330"  # ICT service managers (analytics managers, data team leads)
 
 sources:
   adzuna:
