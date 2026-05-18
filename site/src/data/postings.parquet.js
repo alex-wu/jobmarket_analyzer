@@ -21,13 +21,17 @@ const out = join(tmp, "out.parquet").replaceAll("\\", "/");
 const instance = await DuckDBInstance.create(":memory:");
 const conn = await instance.connect();
 
+// Cast posted_at TIMESTAMPTZ -> TIMESTAMP so duckdb-wasm avoids the
+// date_trunc(TIMESTAMPTZ) overload gap (see pitfall_duckdb_date_trunc_tz).
+// SNAPPY (not ZSTD) for the broadest duckdb-wasm reader compat across
+// browsers; the size delta on ~24-40 KB is negligible.
 await conn.run(`
   COPY (
     SELECT
       title,
       company,
       country,
-      posted_at,
+      posted_at::TIMESTAMP AS posted_at,
       posting_url,
       salary_annual_eur_p50,
       salary_imputed,
@@ -40,7 +44,7 @@ await conn.run(`
     FROM read_parquet('${sqlSrc}')
     WHERE salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 > 0
   )
-  TO '${out}' (FORMAT PARQUET, COMPRESSION ZSTD);
+  TO '${out}' (FORMAT PARQUET, COMPRESSION SNAPPY);
 `);
 
 conn.closeSync();
