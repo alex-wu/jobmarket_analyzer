@@ -6,6 +6,7 @@ adapter landed in P4, so the relaxation flag was retired).
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
@@ -14,18 +15,55 @@ from pandera.typing import Series
 _ACCUMULATION_COLS = ("first_seen_at", "last_seen_at")
 
 
+def _is_list_of_str_or_null(v: object) -> bool:
+    """Accept None, NaN, list[str], or numpy/pyarrow array of strings.
+
+    pyarrow round-trips list-typed parquet cells as np.ndarray, so the strict
+    `isinstance(v, list)` check would reject every frame loaded back from
+    disk. Both list and ndarray are valid wire shapes for our consumers.
+    """
+    if v is None:
+        return True
+    if isinstance(v, (list, np.ndarray)):
+        return all(isinstance(x, str) for x in v)
+    try:
+        if pd.isna(v):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+# Source-optional columns: Adzuna populates these per posting; other adapters
+# (Greenhouse, Lever, Ashby, ...) leave them unset. The injection helper fills
+# missing-column cases with all-null Series so the strict PostingSchema accepts
+# frames from sources that don't have them.
+_SOURCE_OPTIONAL_OBJECT_COLS = (
+    "adzuna_category",
+    "contract_type",
+    "contract_time",
+    "description",
+    "location_area",
+    "skills",
+)
+
+
 def inject_accumulation_cols(df: pd.DataFrame) -> pd.DataFrame:
-    """Inject ADR-020 accumulation cols (first/last_seen_at) as null when missing.
+    """Inject pipeline-injected and source-optional columns as null when missing.
 
-    Per-source adapters MUST NOT populate these — fetch_sources / normalise.run
-    inject them as tz-aware NaT before strict validation; export_accumulated()
-    is the sole producer of non-null values. This helper is exported so adapter
-    smoke tests that call PostingSchema.validate() directly can mirror the
-    production injection point.
+    Two flavours of null injection live here:
 
-    Columns are tz-aware (datetime64[ns, UTC]) so the resulting parquet's
-    column type matches ingested_at — DuckDB's COALESCE in export_accumulated
-    refuses mixed-tz inputs without an explicit cast.
+    - **ADR-020 accumulation cols** (`first_seen_at`, `last_seen_at`): tz-aware
+      NaT. Per-source adapters MUST NOT populate these; export_accumulated()
+      is the sole producer of non-null values. Tz-aware so DuckDB's COALESCE
+      in export_accumulated doesn't error on mixed-tz inputs.
+
+    - **Source-optional cols** (Adzuna's category/contract/description/area):
+      object-dtype None. Adzuna populates them at adapter time; other adapters
+      leave them unset, so this injection lets non-Adzuna frames pass the
+      strict PostingSchema validation.
+
+    Exported so adapter smoke tests can mirror the production injection point
+    when calling `PostingSchema.validate(...)` directly.
     """
     if df.empty:
         return df
@@ -35,6 +73,9 @@ def inject_accumulation_cols(df: pd.DataFrame) -> pd.DataFrame:
             out = out.assign(
                 **{col: pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")}
             )
+    for col in _SOURCE_OPTIONAL_OBJECT_COLS:
+        if col not in out.columns:
+            out = out.assign(**{col: pd.Series([None] * len(out), dtype="object")})
     return out
 
 
@@ -76,9 +117,37 @@ class PostingSchema(pa.DataFrameModel):
 
     raw_payload: Series[str] = pa.Field(nullable=True)
 
+    adzuna_category: Series[str] = pa.Field(nullable=True)
+    contract_type: Series[str] = pa.Field(
+        nullable=True,
+        isin=["permanent", "contract"],
+    )
+    contract_time: Series[str] = pa.Field(
+        nullable=True,
+        isin=["full_time", "part_time"],
+    )
+    description: Series[str] = pa.Field(
+        nullable=True,
+        str_length={"max_value": 600},
+    )
+    # Object-dtype list[str]. Pandera has no native list dtype; adapters MUST
+    # emit list[str] or None. The class-level @pa.check below enforces it.
+    location_area: Series[object] = pa.Field(nullable=True)
+    # Populated by jobpipe.skills.tagger in normalise.run after ISCO matching.
+    # Empty list = matched-nothing (non-null); None only for pre-PR2b legacy frames.
+    skills: Series[object] = pa.Field(nullable=True)
+
     class Config:
         strict = True
         coerce = True
+
+    @pa.check("location_area", name="location_area_is_list_of_str")
+    def _check_location_area(cls, series: pd.Series) -> pd.Series:
+        return series.map(_is_list_of_str_or_null)
+
+    @pa.check("skills", name="skills_is_list_of_str")
+    def _check_skills(cls, series: pd.Series) -> pd.Series:
+        return series.map(_is_list_of_str_or_null)
 
 
 class BenchmarkSchema(pa.DataFrameModel):

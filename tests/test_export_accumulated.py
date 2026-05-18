@@ -46,6 +46,12 @@ def _posting_row(
         "isco_match_score": 0.9,
         "raw_payload": "{}",
         "year_month": pd.Timestamp(ingested_at).strftime("%Y-%m"),
+        "adzuna_category": "IT Jobs",
+        "contract_type": "permanent",
+        "contract_time": "full_time",
+        "description": "Synthetic description",
+        "location_area": ["UK", "London"],
+        "skills": ["SQL", "Python (computer programming)"],
     }
 
 

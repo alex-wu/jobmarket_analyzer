@@ -17,7 +17,7 @@
 ## What it does
 
 1. **Ingest** — One Adzuna source adapter fetches across 7 EU countries (gb, de, fr, nl, es, it, pl) at ~105 API calls/week (42 % of free-tier quota). See [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation) for why the active source set is Adzuna-only, [ADR-018](DECISIONS.md#adr-018--weekly-cadence--multi-country-single-run) for cadence rationale.
-2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, deduplicate by `posting_id`.
+2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, extract ESCO Pillar B skills via Aho-Corasick (scoped by preset `isco_focus`, [ADR-023](DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus)), deduplicate by `posting_id`.
 3. **Archive** — Each weekly run writes an immutable `data-{preset_id}-YYYY-MM-DD.parquet` to its own dated GitHub Release. Never modified, never deleted ([ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)).
 4. **Accumulate** — Publish step unions the last 180 days of dated releases for the preset, dedupes by `posting_id`, derives `first_seen_at` / `last_seen_at`, re-clobbers `latest-{preset_id}` Release with the unified parquet. Pure function — `latest` is recomputable from the archive at any time.
 5. **Visualise** — Observable Framework dashboard on GitHub Pages reads `latest-{preset_id}.parquet` for the active preset (preset switcher in the UI). Every posting links back to its source URL.

@@ -13,7 +13,7 @@ flowchart TD
         preset["preset YAML<br/>(config/runs/{preset_id}.yaml)"] --> runner["runner.run_fetch / run_normalise / run_publish"]
         runner -->|fan-out over countries| adzuna["AdzunaAdapter<br/>countries: [gb, de, fr, nl, es, it, pl]<br/>keywords × pages"]
         adzuna --> raw["data/raw/{preset_id}__{run_id}/<br/>postings_raw.parquet"]
-        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · dedupe by posting_id<br/>since_days: 180"]
+        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · dedupe by posting_id<br/>since_days: 180"]
         normalise --> enriched["data/enriched/{preset_id}__{run_id}/<br/>postings.parquet"]
         enriched --> archive_upload["upload as<br/>data-{preset_id}-YYYY-MM-DD.parquet"]
         archive_upload --> dated_release["GitHub Release<br/>data-{preset_id}-YYYY-MM-DD<br/>(immutable, forever)"]
@@ -52,7 +52,9 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | Runner | `src/jobpipe/runner.py` | Preset loader, country fan-out, schema validation, sibling-parquet writer, accumulation orchestration. |
 | Normalise | `src/jobpipe/normalise.py` | **Pure**. FX, period, ISCO tag, dedupe by `posting_id`. |
 | ISCO tagger | `src/jobpipe/isco/` | `loader.py` reads the static ESCO snapshot; `tagger.py` runs rapidfuzz token-set matching at score cutoff 88. Pure. |
-| ESCO snapshot | `config/esco/isco08_labels.parquet` | 2 137 labels × 436 ISCO-08 unit groups, built by `scripts/build_esco_snapshot.py` ([ADR-010](../DECISIONS.md#adr-010--esco-label-snapshot-built-by-walking-the-isco-concept-tree)). |
+| Skills tagger | `src/jobpipe/skills/` | `loader.py` reads the static ESCO Pillar B snapshot; `tagger.py` runs an Aho-Corasick scan with word-boundary post-filter, scoped at runtime by `preset.isco_focus`. Adds `skills: list[str]`. Pure. See [ADR-023](../DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus). |
+| ESCO snapshot (occupations) | `config/esco/isco08_labels.parquet` | 2 137 labels × 436 ISCO-08 unit groups, built by `scripts/build_esco_snapshot.py` ([ADR-010](../DECISIONS.md#adr-010--esco-label-snapshot-built-by-walking-the-isco-concept-tree)). |
+| ESCO snapshot (skills) | `config/esco/skills_labels.parquet` | 13 896 ESCO Pillar B concepts (skill / knowledge), sourced from the `tabiya-tech/tabiya-open-dataset` mirror (v1.1.1) by `scripts/build_esco_skills_snapshot.py` ([ADR-023](../DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus)). |
 | FX | `src/jobpipe/fx.py` | ECB daily reference CSV → EUR conversion. |
 | DuckDB I/O | `src/jobpipe/duckdb_io.py` | Partitioned/flat Parquet export; **`export_accumulated()` (P13)** unions dated archive within a window and computes `first_seen_at` / `last_seen_at` per `posting_id`. Manifest writer. |
 | CLI | `src/jobpipe/cli.py` | `jobpipe fetch \| normalise \| publish \| gate \| validate` Typer commands. Installs the URL-credential scrub filter on httpx/httpcore loggers per [ADR-015](../DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger). |
@@ -65,8 +67,9 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 
 ## Schemas (the contract)
 
-- **`PostingSchema`** (`src/jobpipe/schemas.py`): the shape every source adapter must emit. Salary fields are pre-converted to EUR. `posting_url` is required — every datapoint links back to its source. `remote` (nullable bool) exists in the schema but is unpopulated by Adzuna (no raw signal); P12 will derive it from `location_raw` / `title` keyword matching. `first_seen_at` / `last_seen_at` (nullable datetimes, P13) are populated **only** in the accumulated artifact — per-source adapters leave them null.
+- **`PostingSchema`** (`src/jobpipe/schemas.py`, **manifest schema_version: "2"** as of [ADR-022](../DECISIONS.md#adr-022--postingschema-v2--persist-5-adzuna-fields--skills)): the shape every source adapter must emit. Salary fields are pre-converted to EUR. `posting_url` is required — every datapoint links back to its source. `remote` (nullable bool) exists but is unpopulated by Adzuna (no raw signal). `first_seen_at` / `last_seen_at` (nullable datetimes, P13) are populated **only** in the accumulated artifact — per-source adapters leave them null. **v2 additions** (Adzuna populates; other adapters get all-null via `inject_accumulation_cols`): `adzuna_category` (str), `contract_type` (str enum), `contract_time` (str enum), `description` (str, 500-char Adzuna-truncated), `location_area` (list[str], up to 5 levels), `skills` (list[str], populated by the skills tagger).
 - **`BenchmarkSchema`**: official wage data, joined to postings via `(isco_code, country)`. **Inert in v1 post-pivot** — benchmark adapters shelved per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation), schema retained for reactivation.
+- **Accumulation drift guard:** `tests/test_schema_accumulate_drift_guard.py` asserts every `PostingSchema` column (minus accumulation cols + `posting_id`) appears in `duckdb_io._ACCUMULATE_ANY_VALUE_COLS`. Any new column missing from the tuple is silently dropped by `export_accumulated()` — the test fails the build instead.
 
 ## Failure model
 

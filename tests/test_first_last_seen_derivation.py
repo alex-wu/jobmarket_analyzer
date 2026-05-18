@@ -40,6 +40,12 @@ def _row(idx: int, **overrides: Any) -> dict[str, Any]:
         "isco_match_method": None,
         "isco_match_score": None,
         "raw_payload": "{}",
+        "adzuna_category": None,
+        "contract_type": None,
+        "contract_time": None,
+        "description": None,
+        "location_area": None,
+        "skills": [],
     }
     base.update(overrides)
     return base

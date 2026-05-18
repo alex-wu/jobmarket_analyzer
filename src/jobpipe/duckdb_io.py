@@ -31,7 +31,7 @@ from jobpipe import __version__
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_SCHEMA_VERSION = "1"
+MANIFEST_SCHEMA_VERSION = "2"
 
 
 class PublishError(RuntimeError):
@@ -188,6 +188,12 @@ _ACCUMULATE_ANY_VALUE_COLS = (
     "isco_match_score",
     "raw_payload",
     "year_month",
+    "adzuna_category",
+    "contract_type",
+    "contract_time",
+    "description",
+    "location_area",
+    "skills",
 )
 
 
