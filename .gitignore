@@ -25,6 +25,12 @@ env/
 # uv
 .uv-cache/
 
+# Local scratch / probes (never committed — may contain masked API keys in URLs)
+tmp/
+
+# Snapshot builder download cache (regeneratable from upstream)
+.cache/
+
 # Secrets / env
 .env
 .env.local

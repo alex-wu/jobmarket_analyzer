@@ -83,6 +83,11 @@ def test_fetch_required_fields(fake_creds: None) -> None:
     assert row["salary_min_eur"] == 55000.0
     assert row["salary_max_eur"] == 70000.0
     assert row["salary_annual_eur_p50"] == 62500.0
+    assert row["adzuna_category"] == "IT Jobs"
+    assert row["contract_type"] == "permanent"
+    assert row["contract_time"] == "full_time"
+    assert row["description"].startswith("We are seeking")
+    assert row["location_area"] == ["UK", "England", "London"]
 
 
 def test_fetch_passes_max_days_old_when_set(fake_creds: None) -> None:

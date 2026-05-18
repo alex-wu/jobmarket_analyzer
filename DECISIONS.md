@@ -428,6 +428,94 @@ Recorded as pitfalls: [[pitfall-pandas-naT-not-tz-aware-parquet]] (new), [[pitfa
 
 ---
 
+## ADR-022 · PostingSchema v2 — persist 5 Adzuna fields + skills
+
+**Status:** Accepted, 2026-05-18.
+
+**Context:** The Adzuna `/jobs/{country}/search/{page}` response returns several fields the adapter drops at `_normalise_row` — they survive only inside `raw_payload` JSON: `category.label` (27-bucket Adzuna taxonomy), `contract_type` (permanent/contract), `contract_time` (full_time/part_time), `description` (500-char-truncated free text), `location.area[]` (5-level hierarchy). Dashboard panels users will ask for first (Adzuna-category × ISCO matcher cross-tab, permanent-vs-contract salary delta, location drill-down without geocoding) are invisible without these. Full empirical field inventory captured at [`docs/references/adzuna_api.md`](docs/references/adzuna_api.md). Separately, the dataset had no skill signal — ADR-023 adds the `skills` column on top of the same schema bump.
+
+**Decision:** Bump `MANIFEST_SCHEMA_VERSION` from `"1"` → `"2"` and add six nullable columns to `PostingSchema`:
+
+| Column | Dtype | Constraint | Source |
+|---|---|---|---|
+| `adzuna_category` | str | `nullable` | Adzuna `category.label` |
+| `contract_type` | str | `isin=["permanent","contract"]` | Adzuna `contract_type` (~36% populated) |
+| `contract_time` | str | `isin=["full_time","part_time"]` | Adzuna `contract_time` (~42% populated) |
+| `description` | str | `str_length max=600` | Adzuna `description` (500 chars + 100-char buffer for the U+2026 + safety) |
+| `location_area` | list[str] | class-level `@pa.check` accepts list / numpy.ndarray / null | Adzuna `location.area[]` |
+| `skills` | list[str] | same check shape | Populated by ADR-023's ESCO tagger; `[]` when no matches |
+
+`category.tag` (slug) is **not** persisted — `category.label` is the human-readable form, and the slug remains recoverable from `raw_payload`. `isin` enum lists came from a live probe (2026-05-18); strict mode will fail loudly if a new value appears, at which point we widen the enum.
+
+Implementation pattern matches ADR-020 / commit `24192ca` (first/last_seen_at addition):
+
+1. Adapter (`src/jobpipe/sources/adzuna.py`) emits the columns in `_normalise_row`.
+2. `PostingSchema` declares them with `nullable=True` so non-Adzuna adapters (Greenhouse / Lever / Ashby / Personio, currently `enabled: false`) don't break.
+3. `schemas.inject_accumulation_cols` extended with a sibling tuple `_SOURCE_OPTIONAL_OBJECT_COLS` — fills missing-column cases with all-null object Series so the strict PostingSchema accepts non-Adzuna frames.
+4. **`_ACCUMULATE_ANY_VALUE_COLS` in `duckdb_io.py:171` extended** — without this the new columns get silently dropped by `export_accumulated()`'s explicit SELECT projection.
+5. New drift-guard test `tests/test_schema_accumulate_drift_guard.py` fails the build if any future PostingSchema column is missing from that tuple (modulo the explicit `_EXCLUDED` set).
+
+**Consequences:**
+- `union_by_name=true` in `export_accumulated` makes the schema bump automatically forward-compatible: historical dated releases lack the columns, the UNION NULL-fills, no re-encoding of the archive is needed.
+- Object-dtype list columns survive pyarrow round-trip as `numpy.ndarray`, not `list` — the `pa.Check` lambda must accept both shapes. Recorded as pitfall [[pitfall-pyarrow-list-roundtrip-as-ndarray]].
+- DuckDB `ANY_VALUE` over a LIST column works without modification (probed 2026-05-18); no `arg_max` fallback needed.
+- `description` adds ~500 KB per 1000 rows to the published parquet; at 180-day accumulation this is a few MB, well inside budget.
+- 308 → 321 tests after PR; live end-to-end run validated against 982 fresh Adzuna rows.
+
+Recorded as pitfalls: [[pitfall-pyarrow-list-roundtrip-as-ndarray]] (new).
+
+---
+
+## ADR-023 · Skill enrichment via ESCO Pillar B + Aho-Corasick, scoped by preset `isco_focus`
+
+**Status:** Accepted, 2026-05-18.
+
+**Context:** The user-facing dashboard needs a skills view ("what tools / languages do data-analyst postings ask for") but Adzuna's `description` is hard-truncated at 500 chars and we already have ESCO's occupation taxonomy live in the ISCO matcher — adding ESCO's sister Pillar B (skills/competences/knowledge) is the path of least resistance. Three design questions had multiple defensible answers; user picked all four locks (see plan `generic-honking-hennessy`):
+
+1. **Dictionary source:** ESCO Pillar B (~13.9k skills), not a curated YAML list.
+2. **Output shape:** single `skills: list[str]` column.
+3. **Extractor:** word-boundary regex / multi-keyword scan; no LLM.
+4. **Pipeline slot:** embedded inside `normalise.run()` after the ISCO tagger — mirrors the existing enrichment precedent, no new CLI subcommand, no new workflow step.
+
+ESCO's public REST API caps listing endpoints at offset=100 (recorded as [[pitfall-esco-api]] from the ISCO work) so the snapshot can't be built by walking the skills concept-scheme directly. The official ESCO CSV bundle download is email-gated — not viable for unattended CI. The **tabiya-tech open-dataset** (<https://github.com/tabiya-tech/tabiya-open-dataset>) is the only stable, free public mirror; ships ESCO v1.1.1 as CSVs reachable via `raw.githubusercontent.com`. v1.2.1 (current upstream) is a future bump when tabiya releases it.
+
+**Decision:** Build a committed `config/esco/skills_labels.parquet` snapshot from the tabiya mirror; match against `title + " " + description` with an Aho-Corasick automaton; filter the skill dictionary to the preset's `isco_focus` codes BEFORE building the automaton.
+
+Snapshot schema (committed at ~2.2 MB, 13,896 rows):
+
+| col | dtype | source |
+|---|---|---|
+| `skill_uri` | str | ESCO canonical URI |
+| `preferred_label` | str | `PREFERREDLABEL` from `skills.csv` |
+| `alt_labels` | list[str] | `ALTLABELS` (newline-split) |
+| `skill_type` | str | `skill/competence` (10 831) or `knowledge` (3 059) |
+| `reuse_level` | str | `sector-specific` / `cross-sector` / `occupation-specific` / `transversal` |
+| `related_isco_codes` | list[str] | union of ISCO-08 codes whose occupations link this skill via `essential` or `optional` relation, joined through `occupation_skill_relations.csv` × `occupations.csv` |
+
+Tagger architecture (`src/jobpipe/skills/tagger.py`):
+
+- One `ahocorasick.Automaton` per call. Keys are lowercased preferred + alt labels; payload is the preferred label only (deduplicated output).
+- Word-boundary post-filter: Aho-Corasick is substring-based, so a match at `[start..end]` is accepted only if `haystack[start-1]` and `haystack[end]` are non-word chars. Stops "Java" matching "Javascript", "SQL" matching "PostgreSQL".
+- Empty matches → `[]` (not `None`) for parquet list-column compatibility.
+- **`focus_isco` parameter** (passed from `preset.isco_focus`): filters the 13.9k dictionary to skills whose `related_isco_codes` intersects the focus set. Empirically reduces noise from 13,896 → 931 skills on the `data_analyst_eu` preset, killing false positives like "packaging engineering", "journalism", "instrumentation equipment" that share generic English words with data-analyst JDs.
+
+Preset `data_analyst_eu.yaml` expanded `isco_focus` from `["2521", "2511"]` (Database admins + Systems analysts) to the seven-code data-analytics family: **`2511`** Systems analysts, **`2519`** Software/apps developers and analysts NEC, **`2521`** Database admins, **`2529`** Database/network NEC, **`2421`** Management & organization analysts, **`2120`** Mathematicians/actuaries/statisticians, **`1330`** ICT service managers. The codes were picked empirically by querying which ISCO codes the canonical data-analyst skills (SQL, Python, BI, ML, data analytics, etc.) link to in the snapshot.
+
+`pyahocorasick==2.3.1` added to `pyproject.toml`. Pure regex alternation over 13k patterns backtracks catastrophically; flashtext is unmaintained; pyahocorasick is the right shape and ships Windows + Linux wheels.
+
+**Consequences:**
+- Empirical match rate on 982 live rows: **89.0 % postings tagged** with mean 1.26 skills/posting. Top hits: statistics (823), SQL (59), business intelligence (53), data analytics (46), machine learning (27), Microsoft Access (23), data models (19), ETL tools (12), Python (10).
+- Switching presets (e.g. `software_developer_eu`) requires changing `isco_focus` in the preset YAML — no re-snapshot, no code change. The committed snapshot is the full Pillar B; runtime scoping decides what's relevant.
+- Re-run the snapshot script (`scripts/build_esco_skills_snapshot.py`) only when tabiya publishes a new ESCO version. Caches CSVs under `.cache/esco/` (gitignored).
+- English-only for v1 — multilingual ESCO labels exist but our markets so far (gb + es) post mostly in English (confirmed by [[project-p13-first-run-2026-05-17]]). Re-open if widening to FR / DE / IT / PL surfaces meaningful skill-recall drop.
+- `tabiya-tech/tabiya-open-dataset` is the supply-chain dependency for the snapshot — recorded as reference [[reference-esco-tabiya-mirror]].
+- LLM extraction stays out of scope. `src/jobpipe/llm.py` remains the unused scaffold for a future hybrid mode.
+- No new CLI subcommand. No new workflow step. The refresh.yml steps are unchanged — the tagger runs inside the existing `normalise` step.
+
+Recorded as pitfalls: [[pitfall-aho-corasick-word-boundary-needed]] (new). Reference: [[reference-esco-tabiya-mirror]] (new).
+
+---
+
 ## ADR-021 · No per-country keyword translation table in v1
 
 **Status:** Accepted, 2026-05-18.

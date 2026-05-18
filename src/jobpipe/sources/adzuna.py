@@ -165,7 +165,10 @@ def _normalise_row(
     external_id = str(raw.get("id", ""))
     posting_id = hashlib.sha1(f"adzuna:{external_id}".encode()).hexdigest()
     company = (raw.get("company") or {}).get("display_name")
-    location = (raw.get("location") or {}).get("display_name")
+    location_obj = raw.get("location") or {}
+    location = location_obj.get("display_name")
+    area = location_obj.get("area") or None
+    category_label = (raw.get("category") or {}).get("label")
     salary_min = raw.get("salary_min")
     salary_max = raw.get("salary_max")
     posted_at = raw.get("created") or ingested_at.isoformat()
@@ -206,4 +209,9 @@ def _normalise_row(
         "isco_match_method": None,
         "isco_match_score": None,
         "raw_payload": json.dumps(raw, default=str),
+        "adzuna_category": category_label,
+        "contract_type": raw.get("contract_type"),
+        "contract_time": raw.get("contract_time"),
+        "description": raw.get("description"),
+        "location_area": list(area) if area else None,
     }
