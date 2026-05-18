@@ -32,6 +32,7 @@ def _is_list_of_str_or_null(v: object) -> bool:
         pass
     return False
 
+
 # Source-optional columns: Adzuna populates these per posting; other adapters
 # (Greenhouse, Lever, Ashby, ...) leave them unset. The injection helper fills
 # missing-column cases with all-null Series so the strict PostingSchema accepts

@@ -609,9 +609,7 @@ def test_run_publish_accumulate_window_uses_archive(
     archive_df = pd.DataFrame([archive_row])
     for col in ("first_seen_at", "last_seen_at"):
         archive_df[col] = pd.to_datetime(archive_df[col], utc=True)
-    archive_df.to_parquet(
-        archive_tag_dir / "latest-data_analyst_eu.parquet", index=False
-    )
+    archive_df.to_parquet(archive_tag_dir / "latest-data_analyst_eu.parquet", index=False)
 
     run_fetch(preset_path, out_root=tmp_path / "data")
     run_normalise(preset_path, out_root=tmp_path / "data")

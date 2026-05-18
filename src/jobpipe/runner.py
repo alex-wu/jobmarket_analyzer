@@ -471,9 +471,7 @@ def run_publish(
     postings_path, bench_path = find_latest_enriched(preset_id, out_root)
     run_id = postings_path.parent.name  # `<preset_id>__<timestamp>-<hex>`
 
-    output_filename = (
-        f"latest-{preset_id}.parquet" if not partition_by else "postings.parquet"
-    )
+    output_filename = f"latest-{preset_id}.parquet" if not partition_by else "postings.parquet"
 
     bundle_root = out_root / "publish" / run_id
     git_sha = _resolve_git_sha()

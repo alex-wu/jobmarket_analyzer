@@ -39,8 +39,7 @@ import pandas as pd
 logger = logging.getLogger("build_esco_skills_snapshot")
 
 TABIYA_RAW = (
-    "https://raw.githubusercontent.com/tabiya-tech/tabiya-open-dataset/"
-    "main/tabiya-esco-v1.1.1/csv"
+    "https://raw.githubusercontent.com/tabiya-tech/tabiya-open-dataset/main/tabiya-esco-v1.1.1/csv"
 )
 SKILLS_CSV = f"{TABIYA_RAW}/skills.csv"
 OCCUPATIONS_CSV = f"{TABIYA_RAW}/occupations.csv"
@@ -110,9 +109,7 @@ def build(out_path: Path, *, cache_dir: Path = Path(".cache/esco")) -> Path:
         }
     )
     skills["alt_labels"] = skills["ALTLABELS"].map(_split_alt_labels)
-    skills["related_isco_codes"] = skills["ID"].map(
-        lambda k: skill_to_iscos.get(k, [])
-    )
+    skills["related_isco_codes"] = skills["ID"].map(lambda k: skill_to_iscos.get(k, []))
 
     out = skills[
         [
