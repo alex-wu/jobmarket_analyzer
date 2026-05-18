@@ -163,7 +163,33 @@ The data loader does not branch on environment — single code path, identical b
 
 ---
 
-## 6. First-time setup
+## 6. Rebuild the ESCO snapshots
+
+Two static snapshots ship in `config/esco/`. Rebuild only when ESCO publishes a new minor version that the upstream mirrors pick up. Neither is part of the weekly refresh — the parquets are committed and consumed read-only by `normalise.run`.
+
+### `isco08_labels.parquet` (occupation taxonomy, ADR-010)
+
+```powershell
+uv run python scripts/build_esco_snapshot.py
+# Walks ESCO concept tree from the 10 ISCO major groups; emits ~2.1k labels.
+# See `scripts/build_esco_snapshot.py` docstring + [[pitfall-esco-api]].
+```
+
+### `skills_labels.parquet` (Pillar B skills/knowledge, ADR-023)
+
+```powershell
+uv run python scripts/build_esco_skills_snapshot.py
+# Downloads three CSVs from the tabiya-tech ESCO v1.1.1 mirror (~16 MB total)
+# into `.cache/esco/`, joins skills × occupations × occupation_skill_relations,
+# emits ~13.9k skills with related_isco_codes back to the parquet.
+# Re-run forces re-download by `Remove-Item -Recurse .cache/esco/`.
+```
+
+After either rebuild: commit the regenerated parquet, bump notes in `DECISIONS.md` if the upstream ESCO version changed, and re-run `uv run pytest tests/skills tests/isco` to confirm the loaders still pass.
+
+---
+
+## 7. First-time setup
 
 If you are setting up a fork (or this canonical repo for the first time):
 
