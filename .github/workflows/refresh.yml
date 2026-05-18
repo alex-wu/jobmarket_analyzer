@@ -50,10 +50,10 @@ jobs:
         run: uv sync --frozen
 
       - name: Fetch
-        run: uv run jobpipe fetch --preset config/runs/${PRESET}.yaml
+        run: uv run jobpipe fetch --preset "config/runs/${PRESET}.yaml"
 
       - name: Normalise
-        run: uv run jobpipe normalise --preset config/runs/${PRESET}.yaml
+        run: uv run jobpipe normalise --preset "config/runs/${PRESET}.yaml"
 
       - name: Download accumulation window from archive
         # ADR-020 pure-function accumulation. Pulls every dated release within
@@ -88,15 +88,17 @@ jobs:
           BUNDLE=$(uv run jobpipe publish \
             --preset "config/runs/${PRESET}.yaml" \
             --accumulate-window-days "${ACCUMULATE_WINDOW_DAYS}")
-          echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
-          echo "date_tag=data-${PRESET}-$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-          echo "latest_tag=latest-${PRESET}" >> "$GITHUB_OUTPUT"
+          {
+            echo "bundle=$BUNDLE"
+            echo "date_tag=data-${PRESET}-$(date -u +%Y-%m-%d)"
+            echo "latest_tag=latest-${PRESET}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Gate (manifest row + coverage check)
         run: |
           uv run jobpipe gate \
             --manifest "${{ steps.publish.outputs.bundle }}/manifest.json" \
-            --preset config/runs/${PRESET}.yaml
+            --preset "config/runs/${PRESET}.yaml"
 
       - name: Stage bundle assets
         id: stage
