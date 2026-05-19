@@ -97,12 +97,13 @@ const runDist = phase === "all" || phase === "dist";
 const browser = await puppeteer.launch({headless: true, args: ["--no-sandbox"]});
 let total = 0;
 
-// ---------- Phase 1: dev server, single page ----------
+// ---------- Phase 1: dev server, every data page ----------
+const DATA_PAGES = ["/", "/geography", "/skills", "/quality", "/methodology"];
 if (runDev) {
   const devPort = process.env.DEV_PORT ?? "3000";
   const devOrigin = `http://127.0.0.1:${devPort}`;
-  {
-    const {page, issues} = await checkPage(browser, `${devOrigin}/`, {label: "dev /"});
+  for (const path of DATA_PAGES) {
+    const {page, issues} = await checkPage(browser, `${devOrigin}${path}`, {label: `dev ${path}`});
     total += issues;
     await page.close();
   }
@@ -153,9 +154,9 @@ if (runDev) {
 if (runDist) {
   const distSrv = await staticServer("dist", 4173, "/jobmarket_analyzer/");
   console.log("\n--- static dist/ server up on :4173 ---");
-  {
-    const url = "http://127.0.0.1:4173/jobmarket_analyzer/";
-    const {page, issues} = await checkPage(browser, url, {label: "dist /"});
+  for (const path of DATA_PAGES) {
+    const url = `http://127.0.0.1:4173/jobmarket_analyzer${path === "/" ? "/" : path}`;
+    const {page, issues} = await checkPage(browser, url, {label: `dist ${path}`});
     total += issues;
     await page.close();
   }

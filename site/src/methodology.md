@@ -107,6 +107,16 @@ The original spec called for `experience_level`, `work_arrangement` (remote / hy
 
 Full roadmap: [`docs/dashboard_data_gaps.md`](https://github.com/alex-wu/jobmarket_analyzer/blob/main/docs/dashboard_data_gaps.md). Dashboard architecture: [`docs/dashboard_strategy.md`](https://github.com/alex-wu/jobmarket_analyzer/blob/main/docs/dashboard_strategy.md).
 
+## Why the data re-loads on every page
+
+Observable Framework uses standard `<a href>` navigation, not SPA routing — clicking a sidebar link is a full HTTP page load. Each navigation creates a fresh DuckDB-WASM client and re-attaches the parquet. In practice this is cheap on revisits: the browser HTTP-caches the `.wasm` runtime and the `.parquet` file, and modern Chromium and Firefox cache compiled WebAssembly per-origin. First page hit pays the parse cost; subsequent pages (and refreshes) hit warm caches.
+
+There is no in-memory hand-off between pages. SPA routing was considered and rejected — it would mean abandoning Framework's documented routing model. Filter state IS preserved across navigation via URL search params — see the address bar after touching any filter.
+
+The dashboard uses `DuckDBClient.of({postings: FileAttachment(...)})` in JS cells rather than Framework's frontmatter `sql:` registration + fenced ` ```sql id= ``` ` blocks. Both are canonical patterns per the Observable docs; we use `DuckDBClient` because our chart queries compose WHERE clauses from filter state in JS (e.g. `${andClause(where)}`), and fenced `sql id=` blocks parameter-bind `${...}` interpolations rather than text-substituting them — a SQL-injection safety feature that doesn't fit dynamic SQL-fragment composition. Per the Observable docs: "DuckDBClient is required if you need greater control, including dynamic table registration."
+
+The Edge-on-Windows `TProtocolException` is upstream Chrome bug #1658 (open since 2024-03-04); migrating between the two patterns does not fix it. See the troubleshooting note below.
+
 ## Troubleshooting
 
 **`Error: Invalid Error: TProtocolException: Invalid data`** in the browser — this is client-side cache state, not a data-writer bug. Headless smoke tests and desktop DuckDB read the same parquet cleanly. Fix:

@@ -8,6 +8,7 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 ## Resolved
 
+- **Filter state persistence across pages 2026-05-19.** Shipped via URL search params (`?country=es&isco=2&salary_lo=10000&...`) + a tiny click-time anchor rewriter in `observablehq.config.js` `head:` script that appends `location.search` to internal sidebar + footer links at navigation time. `replaceState` (not `pushState`) so filter twiddling doesn't pollute back-button history. Smoke extended from 1 page → 5 pages. Also closes the **preset switcher state persistence** P13 follow-up (was URL vs localStorage; URL params chosen, applies to all filters including preset). Caveat: an earlier session iteration attempted a frontmatter `sql:` migration; reverted after discovering fenced `sql id=` blocks parameter-bind `${...}` interpolations, breaking SQL-fragment composition (see `pitfall-framework-sql-fenced-block-param-binding` memory). The shipped pattern keeps `DuckDBClient.of` for dynamic queries — both patterns are first-class per Observable docs. See [ADR-024](../DECISIONS.md#adr-024--filter-state-persistence-via-url-search-params).
 - **Scope pivot 2026-05-17 — Adzuna-only + multi-preset accumulation.** ADR-017 (scope cut), ADR-018 (weekly cadence), ADR-019 (multi-preset `latest-{preset_id}` naming), ADR-020 (pure-function accumulation). Closes several previously-open items below:
   - "Dashboard cold-load performance (P8)" — folded into P13 as a forcing function of ADR-020 (accumulated parquet at 150-250 MB forces build-time loaders).
   - "Pipeline coverage regressions (P10)" — zero-row ATS adapters closed by descope. Code remains in tree, shelved by preset config.
@@ -36,7 +37,7 @@ Items move between sections as they're resolved. When an item closes, leave a on
 
 New open questions surfaced by ADR-017..020. To resolve during P13 implementation:
 
-- **Preset switcher state persistence.** URL query param (`?preset=…`) vs `localStorage` vs both? URL is shareable, localStorage is sticky; both can be used together (URL hydrate on load, localStorage as fallback). Decide before wiring the switcher.
+- ~~**Preset switcher state persistence.**~~ Resolved 2026-05-19 — URL params chosen and shipped for ALL filters (country, ISCO, salary, dates, preset). See Resolved.
 - **First-run backfill window.** Pre-pivot dated releases (`data-2026-05-XX`) exist for the legacy `data_analyst_ireland` preset (different country mix, GB-only). Include them in the first `data_analyst_eu` accumulation? Pre-pivot rows lack the new `country` mix but `posting_id` / `ingested_at` are sound — including them backfills GB history at the cost of mixed-preset provenance.
 - **Gate `min_total_rows` after pivot.** Set to `200` in the handover spec as a guess. Revise after first 1-2 real runs ground a baseline. May want per-country sub-thresholds (`min_rows_per_country: 20`) if a single-country failure should fail the gate.
 - **Per-preset Pages deploy ordering.** `pages.yml` fires once per `refresh.yml` matrix job completion. If two presets finish 30 seconds apart, Pages may rebuild twice in quick succession. Acceptable today; revisit if it becomes annoying. Possible fix: debounce in `pages.yml` via `concurrency: pages` no-cancel.

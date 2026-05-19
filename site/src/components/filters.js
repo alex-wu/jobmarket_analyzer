@@ -4,39 +4,47 @@ import {ISCO_MAJORS} from "./isco.js";
 
 const ALL = "(all)";
 
-export function countrySelect(options) {
+export function countrySelect(options, def) {
   const list = [ALL, ...options];
-  return Inputs.select(list, {label: "Country", value: ALL});
+  const value = def && list.includes(def) ? def : ALL;
+  return Inputs.select(list, {label: "Country", value});
 }
 
-export function iscoMajorSelect(present) {
+export function iscoMajorSelect(present, def) {
   const opts = [ALL, ...present];
+  const value = def && opts.includes(def) ? def : ALL;
   return Inputs.select(opts, {
     label: "ISCO group",
-    value: ALL,
+    value,
     format: (k) => (k === ALL ? "All ISCO groups" : `${k} — ${ISCO_MAJORS[k] ?? "?"}`)
   });
 }
 
-export function salaryRange(min = 0, max = 250000) {
+export function salaryRange(min = 0, max = 250000, def) {
+  const clamp = (v, fallback) => (Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fallback);
+  const lo = clamp(def?.lo, min);
+  const hi = clamp(def?.hi, max);
   return Inputs.form(
     {
-      lo: Inputs.number([min, max], {label: "Salary min (€)", value: min, step: 5000}),
-      hi: Inputs.number([min, max], {label: "Salary max (€)", value: max, step: 5000})
+      lo: Inputs.number([min, max], {label: "Salary min (€)", value: lo, step: 5000}),
+      hi: Inputs.number([min, max], {label: "Salary max (€)", value: hi, step: 5000})
     },
     {template: (form) => html`<div>${form.lo}${form.hi}</div>`}
   );
 }
 
-export function dateRange(dates) {
+export function dateRange(dates, def) {
   const valid = dates.filter((d) => d instanceof Date && !isNaN(d));
   if (valid.length === 0) return Inputs.form({from: Inputs.date(), to: Inputs.date()});
   const min = new Date(Math.min(...valid));
   const max = new Date(Math.max(...valid));
+  const inRange = (d) => d instanceof Date && !isNaN(d) && d >= min && d <= max;
+  const from = inRange(def?.from) ? def.from : min;
+  const to = inRange(def?.to) ? def.to : max;
   return Inputs.form(
     {
-      from: Inputs.date({label: "Posted from", value: min, min, max}),
-      to: Inputs.date({label: "Posted to", value: max, min, max})
+      from: Inputs.date({label: "Posted from", value: from, min, max}),
+      to: Inputs.date({label: "Posted to", value: to, min, max})
     },
     {template: (form) => html`<div style="display:flex;gap:0.75rem">${form.from}${form.to}</div>`}
   );
