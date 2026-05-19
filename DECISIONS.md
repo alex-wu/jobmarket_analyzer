@@ -532,3 +532,42 @@ Recorded as pitfalls: [[pitfall-aho-corasick-word-boundary-needed]] (new). Refer
 - Cheap pre-v1.1 win: extend `config/esco/isco08_labels.parquet` with the three missing English titles. Single PR, no schema work, no translation infrastructure.
 
 ---
+
+## ADR-024 · Filter state persistence via URL search params
+
+**Status:** Accepted, 2026-05-19.
+
+**Context:** The 5-page dashboard restructure (ADR-019 era) introduced per-page sticky filter cards (country / ISCO major / salary range / posted-after / preset). Observable Framework's default routing is full HTTP page reloads on sidebar navigation, so cell-scoped `view()` re-initializes every filter on each page. User report: setting a country filter on `/` and clicking "Geography" reset everything; bookmarks didn't preserve state; deep links to filtered views didn't exist.
+
+The team also considered (and rejected) migrating from imperative `DuckDBClient.of({postings: FileAttachment(...)})` + `db.query(stringSql)` to declarative frontmatter `sql: { postings: ./data/postings.parquet }` + fenced ```sql id=name``` blocks. Both are first-class per Observable docs, but fenced blocks parameter-bind `${...}` interpolations as a SQL-injection safety feature — our `whereClause()` returns a SQL fragment string, which produces `Parser Error: syntax error at or near "?"` when parameter-bound. See `pitfall-framework-sql-fenced-block-param-binding` memory. The geography canary was reverted; chart queries stay on `DuckDBClient.of` + `db.query`.
+
+**Decision:** Persist filter state via URL search params using vanilla DOM APIs (`URLSearchParams` + `history.replaceState`); no SPA, no localStorage as primary store. Three pieces:
+
+1. `site/src/components/filterState.js` — `readFromURL()` returns `{country, iscoMajor, salaryLo, salaryHi, dateFrom, dateTo, preset}` for the filter constructors to seed defaults; `writeToURL(filters, defaults)` omits any param equal to its default (keeps URLs clean when filters at rest), then calls `history.replaceState` (no navigation, no history pollution).
+2. Filter primitives (`countrySelect`, `iscoMajorSelect`, `salaryRange`, `dateRange`, `presetSelect`) gain an optional `default` second arg with a defensive guard: a URL value not present in current options falls back to the hardcoded default (URL might carry a stale value not in the current data snapshot).
+3. `observablehq.config.js` `head:` config injects a tiny delegated click listener (capture phase) that, on click of any `#observablehq-sidebar a[href]` or `nav a[rel='next'|'prev']`, reads `window.location.search` at click time, appends it to the destination, and assigns to `window.location.href` (no `preventDefault` race; reads fresh state, not stale baked-in hrefs).
+
+URL key naming:
+
+| Filter | URL key | Encoding |
+|---|---|---|
+| Country | `country` | encodeURIComponent value; omit when `(all)` |
+| ISCO major | `isco` | 1-digit code; omit when `(all)` |
+| Salary min/max | `salary_lo` / `salary_hi` | integer; omit at bound default |
+| Date from/to | `date_from` / `date_to` | `YYYY-MM-DD`; omit at dataset min/max |
+| Preset | `preset` | raw id; omit when first preset |
+
+Smoke (`site/scripts/smoke.mjs`) extended to walk all 5 pages in both dev and dist phases (was 1 page only). Caught the parameter-binding regression on geography during the rejected frontmatter `sql:` experiment.
+
+**Consequences:**
+- Shareable / bookmarkable filtered URLs (`/skills?country=France&isco=2&salary_lo=40000`).
+- Filters survive page navigation in both directions (sidebar + footer next/prev rewrite covers all internal anchors).
+- Hard refresh and back-button reproduce filter state.
+- No persistence to localStorage — when the user closes the tab, filter state is gone unless bookmarked. Acceptable trade-off (shareable links > cross-session stickiness for a public dashboard).
+- Cross-page navigation still triggers a full page reload (the same DuckDB-WASM cold-start cost as before; browser HTTP cache + WebAssembly compile cache make revisits cheap). Documented in methodology page.
+- No SPA migration — explicitly rejected. Framework's documented routing model stays intact.
+- Compatible with the eventual multi-preset switcher (ADR-019); `preset` is just another URL param.
+
+Memory: [[pitfall-framework-sql-fenced-block-param-binding]] (new), [[feedback-duckdb-first-class-in-framework]] (refined to acknowledge both `sql:` frontmatter and `DuckDBClient.of` are first-class).
+
+---
