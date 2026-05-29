@@ -179,3 +179,26 @@ def test_missing_credentials_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 def test_safe_filename_strips_unsafe_chars() -> None:
     assert _safe_filename("abc123") == "abc123.txt"
     assert _safe_filename("a/b\\c.d") == "abcd.txt"
+
+
+def test_persistent_5xx_error_message_redacts_credentials(
+    fake_creds: None, tmp_path: Path
+) -> None:
+    """ADR-015 — credentials must NEVER appear in wrapped error messages."""
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, text="upstream busy")
+
+    with DetailsFetcher(
+        client=_client(httpx.MockTransport(handler)),
+        cache_dir=tmp_path,
+        inter_call_sleep=0,
+    ) as fetcher:
+        with pytest.raises(AdzunaDetailsError) as exc_info:
+            fetcher.fetch("posting-redact", "gb", "12345")
+    msg = str(exc_info.value)
+    assert "test-id" not in msg
+    assert "test-key" not in msg
+    # Confirm the scrub fired rather than accidentally hiding the URL.
+    assert "REDACTED" in msg
+    assert "12345" in msg  # external_id retained — useful for debugging

@@ -37,6 +37,7 @@ the GitHub Actions workflow ``timeout-minutes: 30`` budget.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,19 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 DEFAULT_CACHE_DIR = Path("data/cache/work_arrangement")
 DEFAULT_INTER_CALL_SLEEP_SECONDS = 0.5
+
+# ADR-015: app_id / app_key / api_key sit in the query string on every Adzuna
+# request. httpx error messages echo the request URL verbatim — wrapping that
+# message into our own RuntimeError bypasses CredentialScrubFilter, which is
+# only attached to httpx / httpcore loggers. Scrub before re-raising.
+_CREDENTIAL_PARAMS = ("app_id", "app_key", "api_key", "api-key")
+_CREDENTIAL_RE = re.compile(
+    r"(?i)\b(" + "|".join(re.escape(p) for p in _CREDENTIAL_PARAMS) + r")=[^&\s'\"]+"
+)
+
+
+def _scrub(message: str) -> str:
+    return _CREDENTIAL_RE.sub(r"\1=REDACTED", message)
 
 
 class AdzunaDetailsError(RuntimeError):
@@ -142,7 +156,7 @@ class DetailsFetcher:
             return None
         except httpx.HTTPError as exc:
             raise AdzunaDetailsError(
-                f"work_arrangement.fetcher: {country}/{external_id}: {exc}"
+                _scrub(f"work_arrangement.fetcher: {country}/{external_id}: {exc}")
             ) from exc
         finally:
             self._calls_made += 1
