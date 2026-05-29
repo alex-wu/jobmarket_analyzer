@@ -31,7 +31,7 @@ from jobpipe import __version__
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_SCHEMA_VERSION = "2"
+MANIFEST_SCHEMA_VERSION = "3"
 
 
 class PublishError(RuntimeError):
@@ -112,23 +112,27 @@ def export_partitioned(
             # path and are stripped from the file payload by DuckDB. Re-reading
             # with hive_partitioning=true reconstructs them.
             partition_cols_sql = ", ".join(partition_by)
+            select_expr = (
+                "*, strftime(posted_at, '%Y-%m') AS year_month"
+                if "year_month" in partition_by
+                else "*"
+            )
             con.sql(
                 f"""
                 COPY (
-                    SELECT *, strftime(posted_at, '%Y-%m') AS year_month
+                    SELECT {select_expr}
                     FROM postings_df
                 ) TO '{postings_dir.as_posix()}'
                 (FORMAT PARQUET, PARTITION_BY ({partition_cols_sql}), OVERWRITE_OR_IGNORE);
                 """
             )
         else:
-            # Single flat file — country + year_month stay as data columns
-            # so the dashboard can filter on them after a flat-release upload.
+            # Single flat file. country stays as a data column; year_month was
+            # historically materialised here but consumed nothing downstream.
             con.sql(
                 f"""
                 COPY (
-                    SELECT *, strftime(posted_at, '%Y-%m') AS year_month
-                    FROM postings_df
+                    SELECT * FROM postings_df
                 ) TO '{(postings_dir / output_filename).as_posix()}'
                 (FORMAT PARQUET);
                 """
@@ -172,10 +176,8 @@ _ACCUMULATE_ANY_VALUE_COLS = (
     "source",
     "title",
     "company",
-    "location_raw",
     "country",
-    "region",
-    "remote",
+    "work_arrangement",
     "salary_min_eur",
     "salary_max_eur",
     "salary_period",
@@ -187,7 +189,6 @@ _ACCUMULATE_ANY_VALUE_COLS = (
     "isco_match_method",
     "isco_match_score",
     "raw_payload",
-    "year_month",
     "adzuna_category",
     "contract_type",
     "contract_time",

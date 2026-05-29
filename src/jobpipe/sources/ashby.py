@@ -195,10 +195,8 @@ def _normalise_row(
         "source": "ashby",
         "title": (raw.get("title") or "").strip(),
         "company": slug,
-        "location_raw": location_text or None,
         "country": iso2,
-        "region": None,
-        "remote": is_remote,
+        "work_arrangement": None,
         # Native-currency values at this stage — FX step in normalise.run() converts to EUR.
         "salary_min_eur": salary_min,
         "salary_max_eur": salary_max,

@@ -19,10 +19,8 @@ def _row(idx: int, **overrides: Any) -> dict[str, Any]:
         "source": "fake",
         "title": f"Data Analyst {idx}",
         "company": "Acme",
-        "location_raw": "London",
         "country": "GB",
-        "region": None,
-        "remote": None,
+        "work_arrangement": None,
         # Native GBP — the lie that P2 fixes.
         "salary_min_eur": 50_000.0,
         "salary_max_eur": 60_000.0,
@@ -121,6 +119,22 @@ def test_run_since_days_none_keeps_everything() -> None:
     )
     out = normalise.run(df, RATES, labels_df=LABELS, since_days=None)
     assert len(out) == 2
+
+
+def test_recompute_p50_rounds_to_two_decimals() -> None:
+    """ADR-? salary precision: parquet payload caps p50 at 2 decimals."""
+    # Pick FX rates that yield non-terminating decimal midpoints.
+    rates = {"EUR": 1.0, "GBP": 1.0 / 0.873, "USD": 1.0 / 1.073}
+    df = pd.DataFrame(
+        [
+            _row(0, salary_min_eur=50_000.0, salary_max_eur=60_001.0, country="GB"),
+            _row(1, salary_min_eur=33_333.0, salary_max_eur=44_444.0, country="US"),
+        ]
+    )
+    out = normalise.run(df, rates, labels_df=LABELS)
+    for value in out["salary_annual_eur_p50"].dropna():
+        # round-trip equality only holds when no precision is lost.
+        assert value == round(value, 2)
 
 
 def test_run_handles_missing_rate_by_leaving_null() -> None:

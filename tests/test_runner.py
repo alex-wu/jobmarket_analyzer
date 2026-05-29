@@ -36,10 +36,8 @@ def _valid_posting_row(idx: int) -> dict[str, object]:
         "source": "fake",
         "title": f"Data Analyst #{idx}",
         "company": "Test Co",
-        "location_raw": "Dublin",
         "country": "IE",
-        "region": None,
-        "remote": None,
+        "work_arrangement": None,
         "salary_min_eur": 50_000.0,
         "salary_max_eur": 60_000.0,
         "salary_period": "annual",
@@ -510,7 +508,7 @@ def test_run_publish_end_to_end(
         {
             "preset_id": "demo",
             "sources": {"fake": {"enabled": True, "n_rows": 3}},
-            "publish": {"partition_by": ["country", "year_month"]},
+            "publish": {"partition_by": ["country"]},
         },
     )
     run_fetch(preset_path, out_root=tmp_path / "data")
@@ -605,7 +603,6 @@ def test_run_publish_accumulate_window_uses_archive(
     archive_row["posting_id"] = "legacy-1"
     archive_row["first_seen_at"] = pd.NaT
     archive_row["last_seen_at"] = pd.NaT
-    archive_row["year_month"] = pd.Timestamp(archive_row["posted_at"]).strftime("%Y-%m")
     archive_df = pd.DataFrame([archive_row])
     for col in ("first_seen_at", "last_seen_at"):
         archive_df[col] = pd.to_datetime(archive_df[col], utc=True)
@@ -659,7 +656,7 @@ def test_run_publish_raises_when_no_enriched_bundle(tmp_path: Path) -> None:
         {
             "preset_id": "demo",
             "sources": {"fake": {"enabled": False}},
-            "publish": {"partition_by": ["country", "year_month"]},
+            "publish": {"partition_by": ["country"]},
         },
     )
     with pytest.raises(NoEnrichedRunError):

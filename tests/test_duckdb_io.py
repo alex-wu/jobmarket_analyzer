@@ -28,10 +28,8 @@ def _posting_row(
         "source": source,
         "title": f"Data Analyst #{idx}",
         "company": "Test Co",
-        "location_raw": "Dublin",
         "country": country,
-        "region": None,
-        "remote": None,
+        "work_arrangement": None,
         "salary_min_eur": 50_000.0,
         "salary_max_eur": 60_000.0,
         "salary_period": "annual",
@@ -249,13 +247,15 @@ def test_export_partitioned_empty_partition_by_writes_single_flat_file(tmp_path:
     # Single flat file, no hive directories.
     assert files == [postings_root / "postings.parquet"]
 
-    # Country + year_month survive as real columns in the data.
+    # country survives as a real column in the data. year_month is no longer
+    # materialised for the flat-file path; consumers wanting month buckets
+    # derive from posted_at directly.
     rows = duckdb.sql(
-        f"SELECT country, year_month, count(*) "
+        f"SELECT country, count(*) "
         f"FROM '{(postings_root / 'postings.parquet').as_posix()}' "
-        f"GROUP BY country, year_month ORDER BY country, year_month"
+        f"GROUP BY country ORDER BY country"
     ).fetchall()
-    assert rows == [("GB", "2026-05", 1), ("GB", "2026-06", 1), ("IE", "2026-05", 1)]
+    assert rows == [("GB", 2), ("IE", 1)]
 
     manifest = json.loads((tmp_path / "publish" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["partition_by"] == []

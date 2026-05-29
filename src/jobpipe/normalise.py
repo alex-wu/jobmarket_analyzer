@@ -97,5 +97,5 @@ def _recompute_p50(df: pd.DataFrame) -> pd.DataFrame:
     monthly/hourly etc. must annualise before reaching this function.
     """
     out = df.copy()
-    out["salary_annual_eur_p50"] = (out["salary_min_eur"] + out["salary_max_eur"]) / 2
+    out["salary_annual_eur_p50"] = ((out["salary_min_eur"] + out["salary_max_eur"]) / 2).round(2)
     return out

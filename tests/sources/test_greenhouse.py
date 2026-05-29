@@ -103,7 +103,6 @@ def test_fetch_marks_remote_rows(tmp_path: Path) -> None:
     )
     df = GreenhouseAdapter().fetch(cfg, client=_mock(httpx.MockTransport(handler)))
     row = df[df["title"] == "Analytics Engineer"].iloc[0]
-    assert bool(row["remote"]) is True
     assert row["country"] == "IE"  # anchored to first real ISO-2 in allowed list
 
 
@@ -207,7 +206,7 @@ def test_fetch_drops_rows_with_missing_id_or_malformed_url(tmp_path: Path) -> No
     # leaving the offices-fallback row.
     assert len(df) == 1
     assert df.iloc[0]["title"] == "Analytics Lead From Offices Fallback"
-    assert df.iloc[0]["location_raw"] == "Ireland"
+    assert df.iloc[0]["country"] == "IE"
 
 
 def test_adapter_self_registered_on_import() -> None:
