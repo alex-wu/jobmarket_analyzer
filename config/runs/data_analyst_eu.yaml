@@ -68,6 +68,15 @@ benchmarks:
 
 normalise:
   since_days: 180
+  # Work-arrangement enrichment (schema v3): scan title + full Adzuna
+  # /details/{id} description bodies for remote/hybrid/onsite keywords.
+  # Each fetch is one extra HTTP call; cap caps the per-run burst for
+  # free-tier quota safety. Already-classified postings (read from the
+  # latest archive parquet) are skipped — steady-state quota drops ~80%
+  # by week 4 thanks to disk cache + archive hydration.
+  work_arrangement:
+    enabled: true
+    max_details_calls_per_run: 1500
 
 publish:
   partition_by: []                # single flat latest-{preset_id}.parquet

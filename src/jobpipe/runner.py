@@ -38,6 +38,7 @@ from jobpipe.benchmarks._common import last_fetch_mtime, should_skip
 from jobpipe.isco import loader as isco_loader
 from jobpipe.schemas import BenchmarkSchema, PostingSchema, inject_accumulation_cols
 from jobpipe.skills import loader as skills_loader
+from jobpipe.work_arrangement.fetcher import AdzunaDetailsError, DetailsFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -361,8 +362,21 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
     rates = fx.load_rates()
     labels = isco_loader.load_isco_labels()
     skills = skills_loader.load_skills()
-    since_days = preset.get("normalise", {}).get("since_days")
+    normalise_cfg = preset.get("normalise", {})
+    since_days = normalise_cfg.get("since_days")
     focus_isco = preset.get("isco_focus") or None
+
+    # work_arrangement enrichment (Cluster 3): when enabled, read prior-week
+    # classifications from the archive so already-classified postings skip
+    # the Adzuna /details/{id} call. Then fetch full descriptions for the
+    # remainder, capped by max_details_calls_per_run.
+    wa_lookup = _build_work_arrangement_lookup(
+        raw_df,
+        preset_id=preset["preset_id"],
+        out_root=out_root,
+        wa_cfg=normalise_cfg.get("work_arrangement", {}),
+    )
+
     enriched = normalise.run(
         raw_df,
         rates,
@@ -370,6 +384,7 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
         skills_df=skills,
         focus_isco=focus_isco,
         since_days=since_days,
+        work_arrangement_lookup=wa_lookup,
     )
     logger.info(
         "normalise: %d rows after dedupe (%d collapsed)",
@@ -556,3 +571,120 @@ def _accumulate_into_latest(
         fresh_latest,
         len(archived),
     )
+
+
+def _build_work_arrangement_lookup(
+    raw_df: pd.DataFrame,
+    *,
+    preset_id: str,
+    out_root: Path,
+    wa_cfg: dict[str, Any],
+) -> dict[str, str] | None:
+    """Hydrate work_arrangement classifications + fetch full descriptions.
+
+    Two-stage:
+
+    1. **Archive prior-week pass.** If `data/archive/data-{preset_id}-*/latest-{preset_id}.parquet`
+       exists, map known posting_id → work_arrangement onto the raw frame
+       in-place. The tagger then passes these rows through untouched.
+
+    2. **Adzuna /details/{id} fetch.** Iterate unclassified Adzuna rows;
+       call :class:`DetailsFetcher` (disk-cached). Build the {posting_id:
+       full_description} lookup the tagger consumes for inference.
+
+    Returns ``None`` when the toggle is off — normalise.run falls back to
+    the truncated /search description column.
+    """
+    if not wa_cfg.get("enabled"):
+        return None
+    if raw_df.empty or "posting_id" not in raw_df.columns:
+        return None
+
+    # Stage 1: archive hydration
+    archived_classifications = _load_prior_work_arrangements(out_root, preset_id)
+    if archived_classifications and "work_arrangement" in raw_df.columns:
+        mask = raw_df["posting_id"].map(archived_classifications.get)
+        # Only overwrite still-None rows; never clobber an adapter-set value.
+        existing = raw_df["work_arrangement"]
+        raw_df.loc[existing.isna(), "work_arrangement"] = mask[existing.isna()]
+        hydrated = int(mask.notna().sum())
+        logger.info(
+            "work_arrangement: hydrated %d / %d rows from archive (%s prior classifications)",
+            hydrated,
+            len(raw_df),
+            len(archived_classifications),
+        )
+
+    # Stage 2: details fetch for the still-unclassified Adzuna rows
+    needs_fetch = raw_df[
+        raw_df["work_arrangement"].isna() & (raw_df.get("source") == "adzuna")
+    ]
+    if needs_fetch.empty:
+        logger.info("work_arrangement: no rows need /details/ fetch (full archive hit)")
+        return {}
+
+    max_calls = int(wa_cfg.get("max_details_calls_per_run", len(needs_fetch)))
+    if len(needs_fetch) > max_calls:
+        logger.warning(
+            "work_arrangement: %d rows need fetching but cap is %d; %d will stay NULL",
+            len(needs_fetch),
+            max_calls,
+            len(needs_fetch) - max_calls,
+        )
+        needs_fetch = needs_fetch.head(max_calls)
+
+    lookup: dict[str, str] = {}
+    with DetailsFetcher() as fetcher:
+        for _, row in needs_fetch.iterrows():
+            external_id = _extract_external_id(row.get("raw_payload"))
+            if not external_id:
+                continue
+            country = str(row.get("country") or "").lower()
+            posting_id = str(row["posting_id"])
+            try:
+                body = fetcher.fetch(posting_id, country, external_id)
+            except AdzunaDetailsError as exc:
+                logger.warning("work_arrangement: %s — leaving NULL", exc)
+                continue
+            if body:
+                lookup[posting_id] = body
+    logger.info(
+        "work_arrangement: %d /details/ bodies fetched (%d cache misses)",
+        len(lookup),
+        fetcher.calls_made,
+    )
+    return lookup
+
+
+def _load_prior_work_arrangements(out_root: Path, preset_id: str) -> dict[str, str]:
+    """Read the most-recent archive parquet and return posting_id → arrangement."""
+    archive_dir = out_root / "archive"
+    if not archive_dir.exists():
+        return {}
+    candidates = sorted(archive_dir.glob(f"data-{preset_id}-*"))
+    for tag_dir in reversed(candidates):
+        parquet = tag_dir / f"latest-{preset_id}.parquet"
+        if not parquet.exists():
+            continue
+        try:
+            df = pd.read_parquet(parquet, columns=["posting_id", "work_arrangement"])
+        except (ValueError, KeyError):
+            # Pre-schema-v3 archives lack work_arrangement; treat as empty.
+            return {}
+        df = df.dropna(subset=["work_arrangement"])
+        return {str(pid): str(wa) for pid, wa in zip(df["posting_id"], df["work_arrangement"], strict=True)}
+    return {}
+
+
+def _extract_external_id(raw_payload: object) -> str | None:
+    """Pull Adzuna's per-posting `id` from the JSON payload."""
+    if not raw_payload:
+        return None
+    import json
+
+    try:
+        parsed = json.loads(str(raw_payload))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    value = parsed.get("id") if isinstance(parsed, dict) else None
+    return str(value) if value else None

@@ -38,6 +38,7 @@ workflow honours `min_interval_hours: 24` (currently weekly per ADR-018).
 | Endpoint | Purpose | Status |
 |---|---|---|
 | `GET /jobs/{country}/search/{page}` | Job postings list | ✅ — adapter uses |
+| `GET /jobs/{country}/details/{id}` | Full description for one posting | ✅ — work_arrangement enrichment uses |
 | `GET /jobs/{country}/categories` | List of 27 Adzuna categories for country | ✅ — unused |
 | `GET /jobs/{country}/top_companies` | Leaderboard of companies for a query | ✅ — unused |
 | `GET /jobs/{country}/geodata` | Posting counts by region/city | ✅ — unused |
@@ -45,6 +46,27 @@ workflow honours `min_interval_hours: 24` (currently weekly per ADR-018).
 | `GET /jobs/{country}/history` | 12-month monthly average salary | ✅ — unused |
 
 There is also a `GET /version` endpoint (we didn't need it).
+
+### 3a. `GET /jobs/{country}/details/{id}` — full posting body
+
+Schema-v3 work-arrangement enrichment (`src/jobpipe/work_arrangement/fetcher.py`)
+fetches one description per posting to recover the full body (the `/search`
+response truncates `description` to ~500 chars + ellipsis). The `id` is the
+same value as `raw_payload["id"]` carried through the search response.
+
+Request params — same as search: `app_id`, `app_key`, `content-type=application/json`.
+
+Response payload mirrors a single search-result entry. The relevant field
+is `description` (string, untruncated). 404 indicates the posting has been
+purged upstream (closed/expired) between the search call and the details
+call — handled by the fetcher as a silent NULL classification, written to
+the disk cache as empty so it isn't retried.
+
+The fetcher caps inter-call sleep at 0.5s and persists each body to
+`data/cache/work_arrangement/{posting_id}.txt`, so steady-state quota
+drops sharply once the cache warms (Run-4 hit rate ~80% on the active
+preset). The first publish on a fresh checkout will issue one call per
+unique posting (~1k for the active gb+es preset).
 
 ---
 
