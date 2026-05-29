@@ -121,6 +121,21 @@ def test_run_since_days_none_keeps_everything() -> None:
     assert len(out) == 2
 
 
+def test_run_populates_work_arrangement_from_lookup() -> None:
+    df = pd.DataFrame([_row(0, posting_url="https://ex.com/wa", description="Generic blurb")])
+    lookup = {"posting-0000": "100% remote role — fully distributed team."}
+    out = normalise.run(df, RATES, labels_df=LABELS, work_arrangement_lookup=lookup)
+    assert out.loc[0, "work_arrangement"] == "remote"
+
+
+def test_run_populates_work_arrangement_from_truncated_description() -> None:
+    df = pd.DataFrame(
+        [_row(0, posting_url="https://ex.com/wa", description="Hybrid role: 3 days at office")]
+    )
+    out = normalise.run(df, RATES, labels_df=LABELS)
+    assert out.loc[0, "work_arrangement"] == "hybrid"
+
+
 def test_recompute_p50_rounds_to_two_decimals() -> None:
     """ADR-? salary precision: parquet payload caps p50 at 2 decimals."""
     # Pick FX rates that yield non-terminating decimal midpoints.
