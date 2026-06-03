@@ -149,7 +149,7 @@ def _normalise_row(
             first = offices[0] or {}
             location_text = first.get("location") or first.get("name") or ""
 
-    iso2, is_remote = match_country(location_text, allowed_countries)
+    iso2, _ = match_country(location_text, allowed_countries)
     if iso2 is None:
         return None
 
@@ -166,10 +166,8 @@ def _normalise_row(
         "source": "greenhouse",
         "title": (raw.get("title") or "").strip(),
         "company": slug,
-        "location_raw": location_text or None,
         "country": iso2,
-        "region": None,
-        "remote": is_remote,
+        "work_arrangement": None,
         "salary_min_eur": None,
         "salary_max_eur": None,
         "salary_period": None,

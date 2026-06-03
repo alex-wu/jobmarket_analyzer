@@ -176,10 +176,9 @@ def _normalise_row(
         return None
 
     location_text = (raw.get("location") or raw.get("locationName") or "").strip()
-    iso2, is_remote_via_text = match_country(location_text, allowed_countries)
+    iso2, _ = match_country(location_text, allowed_countries)
     if iso2 is None:
         return None
-    is_remote = bool(raw.get("isRemote", False)) or is_remote_via_text
 
     posting_url = (raw.get("jobUrl") or "").strip()
     if not posting_url.startswith("http"):
@@ -195,10 +194,8 @@ def _normalise_row(
         "source": "ashby",
         "title": (raw.get("title") or "").strip(),
         "company": slug,
-        "location_raw": location_text or None,
         "country": iso2,
-        "region": None,
-        "remote": is_remote,
+        "work_arrangement": None,
         # Native-currency values at this stage — FX step in normalise.run() converts to EUR.
         "salary_min_eur": salary_min,
         "salary_max_eur": salary_max,

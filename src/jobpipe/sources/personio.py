@@ -144,7 +144,7 @@ def _normalise_row(
         return None
 
     office = (position.findtext("office") or "").strip()
-    iso2, is_remote = match_country(office, allowed_countries)
+    iso2, _ = match_country(office, allowed_countries)
     if iso2 is None:
         return None
 
@@ -169,10 +169,8 @@ def _normalise_row(
         "source": "personio",
         "title": title,
         "company": slug,
-        "location_raw": office or None,
         "country": iso2,
-        "region": None,
-        "remote": is_remote,
+        "work_arrangement": None,
         "salary_min_eur": None,
         "salary_max_eur": None,
         "salary_period": None,

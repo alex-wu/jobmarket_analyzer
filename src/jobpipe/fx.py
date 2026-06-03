@@ -158,5 +158,5 @@ def convert_to_eur(df: pd.DataFrame, rates: dict[str, float]) -> pd.DataFrame:
         )
 
     for col in SALARY_COLUMNS:
-        out[col] = pd.to_numeric(out[col], errors="coerce") / rate_per_eur
+        out[col] = (pd.to_numeric(out[col], errors="coerce") / rate_per_eur).round(2)
     return out

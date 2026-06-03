@@ -74,10 +74,10 @@ class MyBoardAdapter:
                 "source": "my_board",
                 "title": j["title"],
                 "company": j.get("company"),
-                "location_raw": j.get("location"),
                 "country": j["country_code"].upper(),
-                "region": None,
-                "remote": j.get("remote"),
+                # work_arrangement is populated by jobpipe.work_arrangement.tagger
+                # downstream — adapters emit None.
+                "work_arrangement": None,
                 "salary_min_eur": None,  # filled by normalise.py
                 "salary_max_eur": None,
                 "salary_period": None,

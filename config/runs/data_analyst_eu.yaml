@@ -68,6 +68,21 @@ benchmarks:
 
 normalise:
   since_days: 180
+  # Work-arrangement enrichment (schema v3, ADR-025).
+  # The tagger ALWAYS runs against the truncated 500-char description
+  # from /search — that's free.
+  # The opt-in `enabled` flag adds an Adzuna /v1/api/jobs/{country}/details/{id}
+  # fetch per posting to recover the FULL body for keyword inference.
+  # First-run cost: ~1 HTTP call per posting × 0.5s sleep + network = ~30 min
+  # wall clock on the active 2-country preset. Steady-state drops ~80% via
+  # disk cache + archive hydration in runner._build_work_arrangement_lookup.
+  # Verified 2026-05-29: marginal coverage lift from /details/ vs truncated-only
+  # is ~7 percentage points (22% vs ~15%). Disabled for v1 — keep the run
+  # cheap; reactivate once the dashboard demonstrates demand for higher
+  # work_arrangement coverage.
+  work_arrangement:
+    enabled: false
+    max_details_calls_per_run: 1500
 
 publish:
   partition_by: []                # single flat latest-{preset_id}.parquet

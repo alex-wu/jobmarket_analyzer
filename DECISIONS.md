@@ -571,3 +571,42 @@ Smoke (`site/scripts/smoke.mjs`) extended to walk all 5 pages in both dev and di
 Memory: [[pitfall-framework-sql-fenced-block-param-binding]] (new), [[feedback-duckdb-first-class-in-framework]] (refined to acknowledge both `sql:` frontmatter and `DuckDBClient.of` are first-class).
 
 ---
+
+## ADR-025 · PostingSchema v3 — drop dead-weight cols, ternary work_arrangement, /details/ off by default
+
+**Status:** Accepted, 2026-05-29.
+
+**Context:** Shape audit of the local `latest-data_analyst_eu.parquet` (sample from the 2026-05-17 P13 first run) surfaced four parallel issues:
+
+- `location_raw` was a free-text display string from Adzuna's `location.display_name`; superseded by the structured `location_area: list[str]` landed in ADR-022 (schema v2). Two adjacent columns carrying the same signal in two shapes is overhead with no payoff — the dashboard already projects neither.
+- `region` was a schema slot every adapter emitted as `None`. Always-NULL columns make storage cheap but mislead future contributors who assume the slot is populated.
+- `remote: bool | None` (introduced pre-pivot) conflated full-remote with hybrid, the two states most users want to distinguish.
+- `year_month` was synthesized at publish time (`strftime(posted_at, '%Y-%m')`) as a partition-key column. The active preset uses `partition_by: []` (per ADR-004's flat-release variant), so `year_month` was inert data column overhead with zero consumer.
+
+In parallel, salary midpoints like `52499.500000001` from `(min+max)/2` float-math leaked into the parquet — visually noisy without conveying real precision.
+
+The pivot from `remote: bool` to a structured arrangement signal raised a sub-question: where does the body to scan for keywords come from? Adzuna's `/search` returns `description` truncated to ~500 chars + `…`. The full body lives only at `/v1/api/jobs/{country}/details/{id}` — one HTTP call per posting. Verified empirically (2026-05-29 run, 966 postings): full-body inference reaches **22%** classified vs **~15%** projected from truncated alone. **Marginal lift is ~7 percentage points at a cost of ~50× wall-time** on a fresh checkout (~30 min vs ~1 min). Disk cache + archive hydration drop steady-state cost ~80%, but the first-run cost is paid every time the cache is wiped.
+
+**Decision:** Four-part v3 schema migration.
+
+1. **Drop the four columns** above. `MANIFEST_SCHEMA_VERSION` bumps `"2"` → `"3"`. Old archives stay readable via `export_accumulated()`'s `union_by_name=true` (missing cols → NULL).
+2. **Add `work_arrangement: Series[str]`** with `isin=["remote","hybrid","onsite"]`, nullable. Replaces the dropped `remote: bool` slot. `isin` constraint is safe here (unlike `contract_type` per ADR-022's wire-tolerant note) because the producer is our own deterministic tagger, not an upstream API.
+3. **Round `salary_annual_eur_p50` to 2 decimals** inside `_recompute_p50()` — once at the source. Dashboard never sees the precision-rot value.
+4. **Tagger ships ON, fetcher ships OFF by default.** `jobpipe.work_arrangement.tagger.tag(df, lookup=None)` runs unconditionally in `normalise.run()` against the truncated `description` column already on the frame — zero quota cost, ~15% coverage. The `/details/{id}` fetcher (`jobpipe.work_arrangement.fetcher.DetailsFetcher`) is opt-in via preset YAML `normalise.work_arrangement.enabled: true`. The active `data_analyst_eu.yaml` preset has it `false` for v1.
+
+The tagger uses `\b`-anchored multilingual regex (en/es/de/fr/it) keyed by ISO-639 code, with a per-country language map (English always combined). Tiebreak rule: **hybrid > remote > onsite** — a "hybrid" mention overrides any "remote" hit since hybrid postings frequently advertise "remote flexibility."
+
+The fetcher has retry (tenacity, 3 attempts), disk cache at `data/cache/work_arrangement/{posting_id}.txt`, in-memory shadow, configurable inter-call sleep (default 0.5s), 404 → silent NULL, and credential redaction on wrapped error messages (post-fix; see consequences).
+
+**Consequences:**
+- `_ACCUMULATE_ANY_VALUE_COLS` drops from 26 → 22 cols. Archive backfill not required; ADR-020 union semantics handle the v2→v3 transition transparently.
+- Dashboard `site/src/data/postings.parquet.js` projection unaffected — it never referenced the dropped columns. `work_arrangement` is NOT in the current projection; surface via a follow-up PR if a chart needs it.
+- Fixture cleanup: ~7 test files needed scrubbing of `location_raw` / `region` / `remote` / `year_month` row constructors. Pandera strict mode caught every miss loudly.
+- Empirical coverage at v1 (tagger only, `/details/` off): ~15-18% classified, ~82% NULL. ES significantly weaker than GB (~12% vs ~28%) due to thin Spanish keyword dictionary — known gap, ES dictionary expansion is a cheap follow-up.
+- The `remote: bool` → `work_arrangement: str` rename trades one bit per row for ~5 bytes per row. Worth it — `hybrid` was previously indistinguishable from `remote`.
+- **Security fix in same branch:** the fetcher initially re-raised `httpx.HTTPStatusError` wrapped in `AdzunaDetailsError(f"...: {exc}")`, and the runner logs the wrapped message at WARNING. `str(httpx.HTTPStatusError)` echoes the request URL verbatim, including `?app_id=...&app_key=...` query params. The ADR-015 `CredentialScrubFilter` is only attached to `httpx` / `httpcore` loggers — the `jobpipe.runner` logger bypassed it. Mitigation: copy the same `_CREDENTIAL_RE` substitution into `fetcher.py` before re-raising. Added `test_persistent_5xx_error_message_redacts_credentials` to lock it in.
+- Reactivation criteria for `/details/{id}`: dashboard demonstrates demand for higher work_arrangement coverage AND Spanish keyword dictionary already expanded (which would lift coverage cheaper than HTTP). Then re-open via a successor ADR.
+
+Memory: [[project-schema-v3-landed-2026-05-29]], [[pitfall-fetcher-creds-leak-in-wrapped-error]], [[feedback-truncated-description-first-fetcher-opt-in]].
+
+---

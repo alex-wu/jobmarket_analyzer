@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — schema v3 (2026-05-29)
+- `MANIFEST_SCHEMA_VERSION` bumped to `"3"`. Backward-compatible at the
+  reader layer via DuckDB `union_by_name=true` in `export_accumulated()`.
+- New `work_arrangement: Series[str]` column on `PostingSchema`, values
+  `remote | hybrid | onsite | NULL`. Replaces the prior `remote: bool`
+  slot which conflated remote with hybrid.
+- New `src/jobpipe/work_arrangement/` package:
+  - `tagger.py` — deterministic multilingual keyword classifier. Tiebreak
+    hybrid > remote > onsite. Stateless function, mirrors the skills
+    tagger shape; invoked between skills and dedupe in `normalise.run()`.
+  - `keywords.py` — `\b`-anchored regex dictionaries for en/es/de/fr/it
+    plus a country → languages map (English is always combined).
+  - `fetcher.py` — Adzuna `/v1/api/jobs/{country}/details/{id}` client.
+    Tenacity retries; disk cache at `data/cache/work_arrangement/`;
+    silent 404 swallowing; configurable inter-call sleep.
+- `runner.run_normalise()` hydrates work_arrangement from the most-recent
+  archive parquet before fetching, then issues `/details/{id}` calls
+  only for the unclassified Adzuna rows. Capped via preset YAML
+  `normalise.work_arrangement.max_details_calls_per_run`.
+- 39 new tests (29 tagger + 10 fetcher with `httpx.MockTransport`).
+
+### Changed — schema v3 (2026-05-29)
+- Dropped columns (dead-weight cleanup):
+  - `location_raw` — redundant with the structured `location_area` list
+    landed in schema v2.
+  - `region` — every adapter emitted `None`; never populated.
+  - `remote: bool | None` — replaced by ternary `work_arrangement`.
+  - `year_month` — vestige of an abandoned hive-partitioned layout.
+    Active preset uses `partition_by: []` (flat); the column is gated
+    on `partition_by` membership and synthesized only when hive
+    partitioning by month is actually requested.
+- `salary_annual_eur_p50` rounded to 2 decimals at the source
+  (`_recompute_p50()` in `normalise.py`). Replaces values like
+  `52499.500000001` with `52499.50`.
+- `_ACCUMULATE_ANY_VALUE_COLS` shrunk from 26 → 22 cols.
+- `docs/adding-a-source.md` minimal-adapter example updated.
+
 ### Added — P5 (2026-05-15)
 - `src/jobpipe/duckdb_io.py` — `export_partitioned()` writes the publishable bundle under `data/publish/<run_id>/`: hive-partitioned `postings/country=.../year_month=.../*.parquet` (via DuckDB `COPY ... PARTITION_BY` with `year_month` derived in the SQL projection), a sibling `benchmarks.parquet`, and a `manifest.json` carrying `schema_version`, `preset_id`, `run_id`, `pipeline_version`, `git_sha`, partition layout, and per-dataset row/source/country/ISCO-match-method counts. Raises `PublishError` on missing/empty input or unknown partition columns.
 - `src/jobpipe/runner.py` — `find_latest_enriched()` mirrors `find_latest_raw()` for the publish stage; `run_publish()` resolves the newest enriched bundle, reads `publish.partition_by` from the preset, and propagates the `run_id` from the enriched directory into the publish manifest. `_resolve_git_sha()` prefers `GITHUB_SHA` (CI) and falls back to `git rev-parse HEAD`.

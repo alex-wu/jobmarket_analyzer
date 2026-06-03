@@ -26,6 +26,7 @@ from jobpipe.isco import loader as isco_loader
 from jobpipe.isco import tagger as isco_tagger
 from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.skills import tagger as skills_tagger
+from jobpipe.work_arrangement import tagger as work_arrangement_tagger
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ def run(
     skills_df: pd.DataFrame | None = None,
     focus_isco: list[str] | None = None,
     since_days: int | None = None,
+    work_arrangement_lookup: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Normalise a raw postings DataFrame.
 
@@ -83,6 +85,8 @@ def run(
     if skills_df is not None:
         df = skills_tagger.tag(df, skills_df, focus_isco=focus_isco)
 
+    df = work_arrangement_tagger.tag(df, lookup=work_arrangement_lookup)
+
     df = dedupe.cross_source(df)
     df = inject_accumulation_cols(df)
     PostingSchema.validate(df, lazy=True)
@@ -97,5 +101,5 @@ def _recompute_p50(df: pd.DataFrame) -> pd.DataFrame:
     monthly/hourly etc. must annualise before reaching this function.
     """
     out = df.copy()
-    out["salary_annual_eur_p50"] = (out["salary_min_eur"] + out["salary_max_eur"]) / 2
+    out["salary_annual_eur_p50"] = ((out["salary_min_eur"] + out["salary_max_eur"]) / 2).round(2)
     return out

@@ -93,9 +93,9 @@ def test_convert_to_eur_applies_per_country_rates() -> None:
     rates = {"EUR": 1.0, "GBP": 0.85, "USD": 1.10}
     out = fx.convert_to_eur(df, rates)
 
-    assert out.loc[0, "salary_min_eur"] == pytest.approx(50_000 / 0.85)
-    assert out.loc[1, "salary_min_eur"] == pytest.approx(100_000 / 1.10)
-    assert out.loc[2, "salary_min_eur"] == pytest.approx(60_000.0)
+    assert out.loc[0, "salary_min_eur"] == 58823.53
+    assert out.loc[1, "salary_min_eur"] == 90909.09
+    assert out.loc[2, "salary_min_eur"] == 60_000.00
 
 
 def test_convert_to_eur_nulls_when_currency_missing(caplog: pytest.LogCaptureFixture) -> None:

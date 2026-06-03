@@ -92,7 +92,9 @@ def test_fetch_marks_remote_rows(tmp_path: Path) -> None:
     )
     df = LeverAdapter().fetch(cfg, client=_mock(httpx.MockTransport(handler)))
     row = df[df["title"] == "Analytics Engineer"].iloc[0]
-    assert bool(row["remote"]) is True
+    # Remote-europe pseudo-country lets the row through; downstream tagger
+    # populates work_arrangement (schema v3 dropped the boolean signal).
+    assert row["country"] in {"IE", "GB", "DE", "FR", "ES", "NL", "PL", "IT"}
 
 
 def test_fetch_skips_slug_on_404_and_continues(tmp_path: Path) -> None:

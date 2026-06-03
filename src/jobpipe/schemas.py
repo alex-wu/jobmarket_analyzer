@@ -86,10 +86,14 @@ class PostingSchema(pa.DataFrameModel):
     source: Series[str] = pa.Field(nullable=False)
     title: Series[str] = pa.Field(nullable=False, str_length={"min_value": 1, "max_value": 500})
     company: Series[str] = pa.Field(nullable=True)
-    location_raw: Series[str] = pa.Field(nullable=True)
     country: Series[str] = pa.Field(nullable=False, str_length={"min_value": 2, "max_value": 2})
-    region: Series[str] = pa.Field(nullable=True)
-    remote: Series[bool] = pa.Field(nullable=True)
+    # Populated by jobpipe.work_arrangement.tagger in normalise.run after skills.
+    # Adapters emit None; the tagger infers from full description (Adzuna /details/{id})
+    # or the truncated /search description when fetcher is disabled.
+    work_arrangement: Series[str] = pa.Field(
+        nullable=True,
+        isin=["remote", "hybrid", "onsite"],
+    )
 
     salary_min_eur: Series[float] = pa.Field(nullable=True, ge=0, le=1e7)
     salary_max_eur: Series[float] = pa.Field(nullable=True, ge=0, le=1e7)

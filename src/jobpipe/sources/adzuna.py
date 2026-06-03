@@ -166,7 +166,6 @@ def _normalise_row(
     posting_id = hashlib.sha1(f"adzuna:{external_id}".encode()).hexdigest()
     company = (raw.get("company") or {}).get("display_name")
     location_obj = raw.get("location") or {}
-    location = location_obj.get("display_name")
     area = location_obj.get("area") or None
     category_label = (raw.get("category") or {}).get("label")
     salary_min = raw.get("salary_min")
@@ -188,10 +187,8 @@ def _normalise_row(
         "source": "adzuna",
         "title": raw.get("title", "").strip(),
         "company": company,
-        "location_raw": location,
         "country": country.upper(),
-        "region": None,
-        "remote": None,
+        "work_arrangement": None,
         # Salary is in native currency here; FX conversion happens in normalise.run().
         "salary_min_eur": float(salary_min) if salary_min is not None else None,
         "salary_max_eur": float(salary_max) if salary_max is not None else None,
