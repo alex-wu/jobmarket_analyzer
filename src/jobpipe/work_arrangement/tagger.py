@@ -63,7 +63,7 @@ def tag(
 
     titles = out["title"].fillna("").astype(str)
     fallback_desc = (
-        out.get("description")
+        out["description"]
         if "description" in out.columns
         else pd.Series([""] * len(out), index=out.index)
     )
