@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pandas as pd
 import pytest
 
@@ -11,7 +9,6 @@ from jobpipe.work_arrangement import tagger
 
 
 def _row(idx: int, title: str, description: str = "", country: str = "GB") -> dict:
-    now = pd.Timestamp(datetime.now(UTC))
     return {
         "posting_id": f"posting-{idx:04d}",
         "title": title,

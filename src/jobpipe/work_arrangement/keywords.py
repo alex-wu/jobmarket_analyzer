@@ -57,7 +57,7 @@ REMOTE_PATTERNS: dict[str, list[str]] = {
         # Standalone "remote" in delimited contexts: titles like
         # "Data Analyst (Remote)", "Engineer | Remote", "Lead — Remote".
         # Avoids matching geographic "remote area / village / location".
-        r"(?:[\(\|\-–—]\s*)remote\b",
+        r"(?:[\(\|\-–—]\s*)remote\b",  # noqa: RUF001 — en/em dash are intentional delimiter chars
         r"\bremote\s*(?:[\)\|])",
     ],
     "es": [

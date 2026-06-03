@@ -149,7 +149,7 @@ def _normalise_row(
             first = offices[0] or {}
             location_text = first.get("location") or first.get("name") or ""
 
-    iso2, is_remote = match_country(location_text, allowed_countries)
+    iso2, _ = match_country(location_text, allowed_countries)
     if iso2 is None:
         return None
 

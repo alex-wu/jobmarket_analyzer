@@ -144,7 +144,7 @@ def _normalise_row(
         return None
 
     office = (position.findtext("office") or "").strip()
-    iso2, is_remote = match_country(office, allowed_countries)
+    iso2, _ = match_country(office, allowed_countries)
     if iso2 is None:
         return None
 

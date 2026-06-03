@@ -137,7 +137,7 @@ def _normalise_row(
 
     categories = raw.get("categories") or {}
     location_text = (categories.get("location") or "").strip()
-    iso2, is_remote = match_country(location_text, allowed_countries)
+    iso2, _ = match_country(location_text, allowed_countries)
     if iso2 is None:
         return None
 

@@ -123,9 +123,8 @@ def test_persistent_500_raises_after_retries(fake_creds: None, tmp_path: Path) -
         client=_client(httpx.MockTransport(handler)),
         cache_dir=tmp_path,
         inter_call_sleep=0,
-    ) as fetcher:
-        with pytest.raises(AdzunaDetailsError):
-            fetcher.fetch("posting-fff", "gb", "12345")
+    ) as fetcher, pytest.raises(AdzunaDetailsError):
+        fetcher.fetch("posting-fff", "gb", "12345")
 
 
 def test_empty_description_treated_as_none(fake_creds: None, tmp_path: Path) -> None:
@@ -171,9 +170,8 @@ def test_missing_credentials_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         client=_client(httpx.MockTransport(handler)),
         cache_dir=tmp_path,
         inter_call_sleep=0,
-    ) as fetcher:
-        with pytest.raises(AdzunaDetailsError, match="ADZUNA_APP_ID"):
-            fetcher.fetch("posting-iii", "gb", "12345")
+    ) as fetcher, pytest.raises(AdzunaDetailsError, match="ADZUNA_APP_ID"):
+        fetcher.fetch("posting-iii", "gb", "12345")
 
 
 def test_safe_filename_strips_unsafe_chars() -> None:
@@ -193,9 +191,8 @@ def test_persistent_5xx_error_message_redacts_credentials(
         client=_client(httpx.MockTransport(handler)),
         cache_dir=tmp_path,
         inter_call_sleep=0,
-    ) as fetcher:
-        with pytest.raises(AdzunaDetailsError) as exc_info:
-            fetcher.fetch("posting-redact", "gb", "12345")
+    ) as fetcher, pytest.raises(AdzunaDetailsError) as exc_info:
+        fetcher.fetch("posting-redact", "gb", "12345")
     msg = str(exc_info.value)
     assert "test-id" not in msg
     assert "test-key" not in msg
