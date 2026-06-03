@@ -119,11 +119,14 @@ def test_persistent_500_raises_after_retries(fake_creds: None, tmp_path: Path) -
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="boom")
 
-    with DetailsFetcher(
-        client=_client(httpx.MockTransport(handler)),
-        cache_dir=tmp_path,
-        inter_call_sleep=0,
-    ) as fetcher, pytest.raises(AdzunaDetailsError):
+    with (
+        DetailsFetcher(
+            client=_client(httpx.MockTransport(handler)),
+            cache_dir=tmp_path,
+            inter_call_sleep=0,
+        ) as fetcher,
+        pytest.raises(AdzunaDetailsError),
+    ):
         fetcher.fetch("posting-fff", "gb", "12345")
 
 
@@ -140,9 +143,7 @@ def test_empty_description_treated_as_none(fake_creds: None, tmp_path: Path) -> 
     assert body is None
 
 
-def test_missing_external_id_returns_none_without_http(
-    fake_creds: None, tmp_path: Path
-) -> None:
+def test_missing_external_id_returns_none_without_http(fake_creds: None, tmp_path: Path) -> None:
     calls: list[httpx.Request] = []
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -166,11 +167,14 @@ def test_missing_credentials_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"description": "x"})
 
-    with DetailsFetcher(
-        client=_client(httpx.MockTransport(handler)),
-        cache_dir=tmp_path,
-        inter_call_sleep=0,
-    ) as fetcher, pytest.raises(AdzunaDetailsError, match="ADZUNA_APP_ID"):
+    with (
+        DetailsFetcher(
+            client=_client(httpx.MockTransport(handler)),
+            cache_dir=tmp_path,
+            inter_call_sleep=0,
+        ) as fetcher,
+        pytest.raises(AdzunaDetailsError, match="ADZUNA_APP_ID"),
+    ):
         fetcher.fetch("posting-iii", "gb", "12345")
 
 
@@ -179,19 +183,20 @@ def test_safe_filename_strips_unsafe_chars() -> None:
     assert _safe_filename("a/b\\c.d") == "abcd.txt"
 
 
-def test_persistent_5xx_error_message_redacts_credentials(
-    fake_creds: None, tmp_path: Path
-) -> None:
+def test_persistent_5xx_error_message_redacts_credentials(fake_creds: None, tmp_path: Path) -> None:
     """ADR-015 — credentials must NEVER appear in wrapped error messages."""
 
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="upstream busy")
 
-    with DetailsFetcher(
-        client=_client(httpx.MockTransport(handler)),
-        cache_dir=tmp_path,
-        inter_call_sleep=0,
-    ) as fetcher, pytest.raises(AdzunaDetailsError) as exc_info:
+    with (
+        DetailsFetcher(
+            client=_client(httpx.MockTransport(handler)),
+            cache_dir=tmp_path,
+            inter_call_sleep=0,
+        ) as fetcher,
+        pytest.raises(AdzunaDetailsError) as exc_info,
+    ):
         fetcher.fetch("posting-redact", "gb", "12345")
     msg = str(exc_info.value)
     assert "test-id" not in msg

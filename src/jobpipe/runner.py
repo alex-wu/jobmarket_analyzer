@@ -616,9 +616,7 @@ def _build_work_arrangement_lookup(
         )
 
     # Stage 2: details fetch for the still-unclassified Adzuna rows
-    needs_fetch = raw_df[
-        raw_df["work_arrangement"].isna() & (raw_df.get("source") == "adzuna")
-    ]
+    needs_fetch = raw_df[raw_df["work_arrangement"].isna() & (raw_df.get("source") == "adzuna")]
     if needs_fetch.empty:
         logger.info("work_arrangement: no rows need /details/ fetch (full archive hit)")
         return {}
@@ -672,7 +670,10 @@ def _load_prior_work_arrangements(out_root: Path, preset_id: str) -> dict[str, s
             # Pre-schema-v3 archives lack work_arrangement; treat as empty.
             return {}
         df = df.dropna(subset=["work_arrangement"])
-        return {str(pid): str(wa) for pid, wa in zip(df["posting_id"], df["work_arrangement"], strict=True)}
+        return {
+            str(pid): str(wa)
+            for pid, wa in zip(df["posting_id"], df["work_arrangement"], strict=True)
+        }
     return {}
 
 

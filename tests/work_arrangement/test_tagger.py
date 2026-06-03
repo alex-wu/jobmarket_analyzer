@@ -45,8 +45,10 @@ def _df(*rows: dict) -> pd.DataFrame:
 def test_english_keywords_classify(text: str, expected: str | None) -> None:
     df = _df(_row(0, title="Data Analyst", description=text, country="GB"))
     out = tagger.tag(df)
-    assert out.loc[0, "work_arrangement"] == expected if expected else pd.isna(
-        out.loc[0, "work_arrangement"]
+    assert (
+        out.loc[0, "work_arrangement"] == expected
+        if expected
+        else pd.isna(out.loc[0, "work_arrangement"])
     )
 
 
@@ -65,8 +67,10 @@ def test_english_keywords_classify(text: str, expected: str | None) -> None:
 def test_spanish_keywords_classify(text: str, expected: str | None) -> None:
     df = _df(_row(0, title="Analista", description=text, country="ES"))
     out = tagger.tag(df)
-    assert out.loc[0, "work_arrangement"] == expected if expected else pd.isna(
-        out.loc[0, "work_arrangement"]
+    assert (
+        out.loc[0, "work_arrangement"] == expected
+        if expected
+        else pd.isna(out.loc[0, "work_arrangement"])
     )
 
 
@@ -76,7 +80,12 @@ def test_spanish_keywords_classify(text: str, expected: str | None) -> None:
 
 def test_hybrid_beats_remote_when_both_present() -> None:
     df = _df(
-        _row(0, title="Data Engineer", description="Hybrid role with remote flexibility", country="GB")
+        _row(
+            0,
+            title="Data Engineer",
+            description="Hybrid role with remote flexibility",
+            country="GB",
+        )
     )
     out = tagger.tag(df)
     assert out.loc[0, "work_arrangement"] == "hybrid"
@@ -152,7 +161,9 @@ def test_gb_posting_does_not_match_spanish_keyword() -> None:
     # English-only country shouldn't match Spanish-specific keyword
     # (test uses a Spanish-only phrase like "presencial" which doesn't appear
     # in the English dictionary).
-    df = _df(_row(0, title="Analyst", description="Some content with presencial mention", country="GB"))
+    df = _df(
+        _row(0, title="Analyst", description="Some content with presencial mention", country="GB")
+    )
     out = tagger.tag(df)
     # GB scans only English patterns; "presencial" should not match.
     assert pd.isna(out.loc[0, "work_arrangement"])

@@ -148,9 +148,7 @@ class DetailsFetcher:
         try:
             payload = self._get_details(country, external_id)
         except _NotFound:
-            logger.info(
-                "work_arrangement.fetcher: posting %s expired upstream (404)", posting_id
-            )
+            logger.info("work_arrangement.fetcher: posting %s expired upstream (404)", posting_id)
             self._memory[posting_id] = None
             self._write_cache(posting_id, "")
             return None
