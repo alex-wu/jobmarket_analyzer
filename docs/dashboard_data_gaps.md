@@ -1,5 +1,7 @@
 # Dashboard data-gaps roadmap
 
+> **SUPERSEDED (2026-07-20).** Historical roadmap, kept for context — two of its three gaps have since shipped: `skills` (ADR-022/023, top-skills chart per ADR-026) and `work_arrangement` (ADR-025 multilingual tagger; the `remote` bool it discusses was **dropped** in schema v3). Only `experience_level` remains open. Implementation details below (rapidfuzz skills matching, per-source extraction, keep-remote-one-release) do NOT describe what was built.
+
 > Companion to [`docs/dashboard_strategy.md`](dashboard_strategy.md). That doc specifies *how* the dashboard renders against today's schema; this one specifies *what* upstream extraction work would expand it.
 
 P6 ships the Observable Framework dashboard against `PostingSchema` as-is. The original visualisation brief called for `experience_level`, `work_arrangement`, and `skills` facets — none of those live in the schema today, and the `remote` boolean is too sparsely populated (1% non-null) to anchor a chart. Rather than fabricate them with thin heuristics, the dashboard documents the gap and surfaces "coverage" annotations on every chart that would otherwise mislead.

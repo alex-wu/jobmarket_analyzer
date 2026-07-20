@@ -156,4 +156,4 @@ ${dataTable(filtered, {
   )}
 </div>
 
-<small>Daily cron at 06:00 UTC writes the next snapshot. Weekly posting cadence lives on the <a href="/">Overview</a> page.</small>
+<small>Weekly cron (Mondays 06:00 UTC) writes the next snapshot. Weekly posting cadence lives on the <a href="/">Overview</a> page.</small>

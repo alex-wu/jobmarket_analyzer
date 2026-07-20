@@ -13,7 +13,7 @@ flowchart TD
         preset["preset YAML<br/>(config/runs/{preset_id}.yaml)"] --> runner["runner.run_fetch / run_normalise / run_publish"]
         runner -->|fan-out over countries| adzuna["AdzunaAdapter<br/>countries: [gb, de, fr, nl, es, it, pl]<br/>keywords × pages"]
         adzuna --> raw["data/raw/{preset_id}__{run_id}/<br/>postings_raw.parquet"]
-        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · dedupe by posting_id<br/>since_days: 180"]
+        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · work_arrangement-tag · dedupe by posting_id<br/>since_days: 180"]
         normalise --> enriched["data/enriched/{preset_id}__{run_id}/<br/>postings.parquet"]
         enriched --> archive_upload["upload as<br/>data-{preset_id}-YYYY-MM-DD.parquet"]
         archive_upload --> dated_release["GitHub Release<br/>data-{preset_id}-YYYY-MM-DD<br/>(immutable, forever)"]
@@ -50,8 +50,8 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | Source adapters (shelved) | `src/jobpipe/sources/{greenhouse,lever,ashby,personio}.py` | Per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation), kept in tree but unwired by preset config. |
 | Benchmark adapters (shelved) | `src/jobpipe/benchmarks/{cso,oecd,eurostat}.py` | Per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation), kept in tree but unwired. |
 | Runner | `src/jobpipe/runner.py` | Preset loader, country fan-out, schema validation, sibling-parquet writer, accumulation orchestration. |
-| Normalise | `src/jobpipe/normalise.py` | **Pure**. FX, period, ISCO tag, dedupe by `posting_id`. |
-| ISCO tagger | `src/jobpipe/isco/` | `loader.py` reads the static ESCO snapshot; `tagger.py` runs rapidfuzz token-set matching at score cutoff 88. Pure. |
+| Normalise | `src/jobpipe/normalise.py` | **Pure**. FX, period, ISCO tag, skills tag, work_arrangement tag, dedupe by `posting_id`. |
+| ISCO tagger | `src/jobpipe/isco/` | `loader.py` reads the static ESCO snapshot; `tagger.py` runs rapidfuzz token-set matching at score cutoff 85. Pure. |
 | Skills tagger | `src/jobpipe/skills/` | `loader.py` reads the static ESCO Pillar B snapshot; `tagger.py` runs an Aho-Corasick scan with word-boundary post-filter, scoped at runtime by `preset.isco_focus`. Adds `skills: list[str]`. Pure. See [ADR-023](../DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus). |
 | Work-arrangement tagger | `src/jobpipe/work_arrangement/` | `tagger.py` runs `\b`-anchored multilingual regex (en/es/de/fr/it) against `title + description`. Tiebreak hybrid > remote > onsite. Populates `work_arrangement: str`. `fetcher.py` adds opt-in Adzuna `/v1/api/jobs/{country}/details/{id}` calls to recover the full body (off by default per ADR-025); preset YAML toggle `normalise.work_arrangement.enabled`. Pure tagger + IO-side fetcher kept separate. |
 | ESCO snapshot (occupations) | `config/esco/isco08_labels.parquet` | 2 137 labels × 436 ISCO-08 unit groups, built by `scripts/build_esco_snapshot.py` ([ADR-010](../DECISIONS.md#adr-010--esco-label-snapshot-built-by-walking-the-isco-concept-tree)). |

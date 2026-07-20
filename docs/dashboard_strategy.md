@@ -1,5 +1,7 @@
 # Dashboard strategy: Observable Framework single-page BI
 
+> **SUPERSEDED (2026-07-20).** Historical P6 spec, kept for context. The shipped dashboard is a **6-page** site (ADR-019/024/026): the single-page constraint, the "no `pages` array" config, and the "no `work_arrangement`/`skills` in schema" claims below no longer hold. Current truth: `DECISIONS.md` ADR-026 + `docs/architecture.md` + the live Methodology page.
+
 > Spec for the P6 dashboard rebuild. The implementer in the next session executes against this doc.
 > Companion: [`docs/dashboard_data_gaps.md`](dashboard_data_gaps.md) — the upstream-pipeline extraction roadmap.
 

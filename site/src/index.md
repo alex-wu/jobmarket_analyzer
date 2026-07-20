@@ -43,7 +43,7 @@ function fmtDate(v) {
 ```
 
 <small>
-${manifest.preset_id.replaceAll("_", " ")} preset · daily snapshot ·
+${manifest.preset_id.replaceAll("_", " ")} preset · weekly snapshot ·
 as of <strong>${fmtDate(manifest.generated_at)}</strong> ·
 <strong>${manifest.postings.row_count.toLocaleString()}</strong> postings ·
 <strong>${Object.keys(manifest.postings.country_counts).length}</strong> countries ·
