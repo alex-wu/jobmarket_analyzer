@@ -610,3 +610,30 @@ The fetcher has retry (tenacity, 3 attempts), disk cache at `data/cache/work_arr
 Memory: [[project-schema-v3-landed-2026-05-29]], [[pitfall-fetcher-creds-leak-in-wrapped-error]], [[feedback-truncated-description-first-fetcher-opt-in]].
 
 ---
+
+## ADR-026 · Dashboard v2 restructure — Europe choropleth, page consolidation, CSV export
+
+**Status:** Accepted, 2026-07-20.
+
+**Context:** User review of the 6-page dashboard (post work_arrangement page) surfaced structural issues: the weekly posting-cadence chart lived on Geography (it is a market-overview signal, not a geographic one) and had a near-duplicate on Quality; Geography's two country bar charts encoded per-country metrics less directly than a map would; work-arrangement stacked bars required hover to read values; ESCO skills (in the parquet since schema v2) still had no dashboard surface; only Overview had a data table, with no export; chart colors were uncoordinated defaults.
+
+**Decision:** Seven-part restructure on `feat/dashboard-v2-restructure`, holding the "vanilla Framework/Plot features first" line:
+
+1. **Cadence consolidation.** The multi-line weekly cadence (by country) moved to Overview; the Quality single-series duplicate was deleted (cron-freshness note folded into the manifest caption).
+2. **Geography = one choropleth.** New build-time loader `site/src/data/europe.json.js` prunes `world-atlas` `countries-50m` to 42 European countries (539 kB) with a hand-maintained ISO-numeric → lowercase-ISO2 map matching the postings `country` column. `world-atlas@2` + `topojson-client` are site devDependencies read from node_modules — no network at build, no committed binary blob. `choropleth.js` is pure `Plot.geo`: conic-conformal projection with a fixed bbox domain `[[-11, 35], [32, 71]]` (frames Europe AND clips French overseas territories — world-atlas France is one MultiPolygon including Guiana, so auto-fit would zoom out to South America); stroke-only base layer renders no-data countries as gray context. An `Inputs.select` metric dropdown switches postings volume / median €p50 over a single grouped query.
+3. **Always-visible labels on arrangement charts.** Counts + percentages via `Plot.text`; stacked charts compute per-country share with a SQL window function and place labels with a `Plot.stackX` transform repeating the bars' `z`/`order`/`offset`; segments under 7% skip the label (tooltips still cover them). Plot has no built-in stacked-segment labels (upstream issue #27) — this is the documented manual approach.
+4. **Skills surfaced.** Loader now projects the `skills` LIST column; top-25 bar + top-60 word cloud query it via a subquery `unnest(skills)` (verified working in DuckDB-WASM). The word cloud uses `npm:d3-cloud` for layout rendered through `Plot.text` — the one acknowledged non-vanilla element, user-approved, isolated in `wordCloud.js` with a deterministic random source. A page-local Role/title `Inputs.select` (top-25 titles) narrows the sections below it; deliberately NOT in the shared filterCard and NOT URL-persisted — title is a skills-page concern and adding it globally would touch whereClause/filterState/every page for one page's benefit.
+5. **CSV export everywhere.** `dataTable.js` adopted verbatim from the shelved `feature/dashboard-next` branch (commit `719ea77`) — Inputs.table in a card + client-side Blob download of every queried column. One "Filtered postings" section per data page (5 pages) sharing a 14-column SELECT (now incl. `work_arrangement`; the `skills` LIST is deliberately excluded — Arrow lists serialize badly through Inputs.table/CSV). Overview's Recent-postings table was replaced by it (LIMIT 100 → 2000). Page hunks were hand-applied, not cherry-picked — the branch predates the current page structure.
+6. **Color harmonization, all built-in.** Categorical charts keep Plot's default observable10; the two value-encoded surfaces (skills heatmap, choropleth) share `color: {scheme: "blues"}` — Blues sits naturally beside observable10's blue lead color. The arrangement page pins category colors via a fixed color domain (no custom hex ranges).
+7. **Smoke coverage.** Dev-phase additions: per-page CSV-blob assertion (monkey-patched `URL.createObjectURL`) and a /geography map phase (path count + metric-switch re-render).
+
+**Consequences:**
+- europe.json adds 539 kB to the site payload (build-time pruned; would be ~1.2 MB unpruned). Gate: if a future preset needs countries outside the map, extend `ISO2_BY_NUMERIC`.
+- `filters.js` now exports `escape` (imported as `sqlEscape` — the Observable runtime forbids shadowing the browser global `escape`).
+- The role filter's non-persistence is a deliberate trade-off; revisit only if cross-page title analysis becomes a real workflow.
+- `feature/dashboard-next` is now fully superseded (its only unmerged value was dataTable.js) and can be deleted.
+- Word cloud is the single deviation from stock-Plot norms ([[feedback-observable-defaults]]); any future custom-viz request should cite this ADR's bar, not treat it as precedent.
+
+Memory: [[feedback-vanilla-libraries-first]], [[feedback-observable-defaults]], [[reference-framework-sql-frontmatter-idiom]].
+
+---

@@ -98,6 +98,9 @@ Decision log lives at [`DECISIONS.md`](https://github.com/alex-wu/jobmarket_anal
 | 021 | No per-country keyword translation table in v1 |
 | 022 | PostingSchema v2 — persist 5 Adzuna fields + skills |
 | 023 | Skill enrichment via ESCO Pillar B + Aho-Corasick |
+| 024 | Filter state persistence via URL search params |
+| 025 | PostingSchema v3 — work_arrangement, dead-weight column drop |
+| 026 | Dashboard v2 — Europe choropleth, page consolidation, CSV export |
 
 </div>
 
