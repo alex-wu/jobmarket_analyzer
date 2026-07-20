@@ -66,7 +66,8 @@ const byCountry = Array.from(await db.query(`
 
 ```js
 const valueByIso2 = new Map(
-  byCountry.filter((d) => d[metric] != null).map((d) => [d.country, Number(d[metric])])
+  // postings.country is uppercase ISO2 (GB/ES); europe.json iso2 is lowercase
+  byCountry.filter((d) => d[metric] != null).map((d) => [String(d.country).toLowerCase(), Number(d[metric])])
 );
 const metricLabel = metric === "p50" ? "Median €p50" : "Postings";
 const metricFormat = metric === "p50"

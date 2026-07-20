@@ -202,7 +202,14 @@ if (runDev) {
     await page.goto(`${devOrigin}/geography`, {waitUntil: "networkidle0", timeout: 30000});
     await new Promise((r) => setTimeout(r, 1500));
     const paths = await page.evaluate(() => document.querySelectorAll("figure svg path").length);
-    console.log(`map paths: ${paths}`);
+    const filled = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("figure svg g[aria-label='geo'] path"))
+        .filter((el) => {
+          const f = el.getAttribute("fill") ?? el.closest("g[aria-label='geo']").getAttribute("fill");
+          return f && f !== "none";
+        }).length
+    );
+    console.log(`map paths: ${paths}, filled: ${filled}`);
     const switched = await page.evaluate(() => {
       const select = Array.from(document.querySelectorAll("select")).find((s) =>
         s.closest("form")?.textContent.includes("Metric")
@@ -218,6 +225,7 @@ if (runDev) {
     const visible = await collectVisibleErrors(page);
     let issues = consoleErrors.length + pageErrors.length + visible.length + failedRequests.length;
     if (paths < 20) { console.log("MAP MISSING — too few svg paths"); issues += 1; }
+    if (filled < 1) { console.log("CHOROPLETH FILL MISSING — no filled country paths"); issues += 1; }
     if (!switched) { console.log("METRIC SELECT NOT FOUND"); issues += 1; }
     if (issues === 0) console.log("OK — map rendered, metric switch clean");
     else {

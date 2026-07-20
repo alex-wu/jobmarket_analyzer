@@ -30,7 +30,14 @@ export function choropleth(europe, valueByIso2, {
         strokeOpacity: 0.25,
         tip: true,
         title: (d) => `${d.properties.name}\n${format(valueByIso2.get(d.properties.iso2))}`
-      })
+      }),
+      Plot.text(europe.features.filter(has), Plot.centroid({
+        text: (d) => format(valueByIso2.get(d.properties.iso2)),
+        fill: "currentColor",
+        stroke: "var(--plot-background)",
+        strokeWidth: 4,
+        fontWeight: "bold"
+      }))
     ]
   });
 }
