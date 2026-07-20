@@ -71,7 +71,7 @@ const valueByIso2 = new Map(
 );
 const metricLabel = metric === "p50" ? "Median €p50" : "Postings";
 const metricFormat = metric === "p50"
-  ? (v) => `€${(v / 1000).toFixed(0)}k`
+  ? (v) => `€${(v / 1000).toFixed(1)}k`
   : (v) => v.toLocaleString();
 ```
 
