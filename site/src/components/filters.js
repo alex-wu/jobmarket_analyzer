@@ -72,7 +72,7 @@ export function andClause(where) {
   return where ? `${where} AND` : "WHERE";
 }
 
-function escape(s) {
+export function escape(s) {
   return String(s).replace(/'/g, "''");
 }
 

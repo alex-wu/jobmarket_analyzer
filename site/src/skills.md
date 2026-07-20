@@ -7,13 +7,15 @@ toc: false
 
 ```js
 import * as Plot from "npm:@observablehq/plot";
+import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {barChart} from "./components/barChart.js";
 import {heatmap} from "./components/heatmap.js";
+import {wordCloud} from "./components/wordCloud.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
-import {whereClause, andClause} from "./components/filters.js";
+import {whereClause, andClause, escape as sqlEscape} from "./components/filters.js";
 import {iscoMajorLabel} from "./components/isco.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
@@ -62,6 +64,27 @@ ${titles.length === 0
       (w, h) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: h, width: w})
     )}
 
+## Role focus
+
+Narrow the sections below to a single job title. This filter is page-local; the
+card filters above carry across pages as usual.
+
+```js
+const topTitles = Array.from(
+  await db.query(`
+    SELECT title FROM postings
+    ${andClause(where)} title IS NOT NULL
+    GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 25
+  `),
+  (r) => r.title
+);
+const titlePick = view(Inputs.select(["(all)", ...topTitles], {label: "Role / title"}));
+```
+
+```js
+const whereT = titlePick === "(all)" ? where : `${andClause(where)} title = '${sqlEscape(titlePick)}'`;
+```
+
 ## ISCO-08 major group mix
 
 ```js
@@ -69,7 +92,7 @@ const iscoMix = Array.from(
   await db.query(`
     SELECT COALESCE(isco_major, '∅') AS isco_major,
            COUNT(*)::INT AS n
-    FROM postings ${where}
+    FROM postings ${whereT}
     GROUP BY 1
     ORDER BY 2 DESC
   `),
@@ -95,7 +118,7 @@ const heatRows = Array.from(
            quantile_cont(salary_annual_eur_p50, 0.5) AS p50,
            COUNT(salary_annual_eur_p50)::INT AS n
     FROM postings
-    ${andClause(where)} salary_annual_eur_p50 IS NOT NULL AND isco_major IS NOT NULL
+    ${andClause(whereT)} salary_annual_eur_p50 IS NOT NULL AND isco_major IS NOT NULL
     GROUP BY 1, 2
     HAVING COUNT(*) >= 3
     ORDER BY 1, 2
@@ -112,4 +135,50 @@ ${heatRows.length === 0
       (w, h) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: h, width: w})
     )}
 
-<small>Skills extraction (ESCO Pillar B Aho-Corasick tagger) is in pipeline but not yet surfaced here as a chart — see Methodology &amp; Docs.</small>
+## Top skills
+
+```js
+const skillRows = Array.from(await db.query(`
+  SELECT skill, COUNT(*)::INT AS n
+  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 25
+`));
+```
+
+${skillRows.length === 0
+  ? html`<div class="card"><div>No tagged skills in current selection.</div></div>`
+  : expandable(
+      "Top 25 skills",
+      resize((width) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: 520, width})),
+      (w, h) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: h, width: w})
+    )}
+
+## Skill cloud
+
+```js
+const cloudRows = Array.from(await db.query(`
+  SELECT skill, COUNT(*)::INT AS n
+  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 60
+`));
+```
+
+${cloudRows.length === 0
+  ? html`<div class="card"><div>No tagged skills in current selection.</div></div>`
+  : expandable(
+      "Skill cloud (top 60, sized by mentions)",
+      resize((width) => wordCloud(cloudRows, {width, height: 400})),
+      (w, h) => {
+        const holder = html`<div></div>`;
+        wordCloud(cloudRows, {width: w, height: h, maxFont: 64}).then((node) => holder.append(node));
+        return holder;
+      }
+    )}
+
+<small>Skills are ESCO Pillar B labels matched in the posting text
+(Aho-Corasick, word-boundary checked) — counts are postings mentioning the
+skill at least once. See Methodology &amp; Docs.</small>

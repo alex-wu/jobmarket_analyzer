@@ -64,7 +64,7 @@ const pct = (num, den) => den > 0 ? `${Math.round((num / den) * 100)}%` : "—";
   ${kpiCard("Salary imputed", pct(coverage.n_imputed, coverage.n_salary), `${coverage.n_imputed.toLocaleString()} of ${coverage.n_salary.toLocaleString()} salaried`)}
 </div>
 
-<small>Skills coverage will appear once schema v2 postings (with <code>esco_skills</code>) reach the release artefact — see Methodology.</small>
+<small>ESCO skill tags are surfaced on the <a href="/skills">Skills &amp; Roles</a> page.</small>
 
 ## ISCO match method breakdown
 
