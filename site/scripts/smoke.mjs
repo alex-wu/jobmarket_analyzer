@@ -98,7 +98,7 @@ const browser = await puppeteer.launch({headless: true, args: ["--no-sandbox"]})
 let total = 0;
 
 // ---------- Phase 1: dev server, every data page ----------
-const DATA_PAGES = ["/", "/geography", "/skills", "/quality", "/methodology"];
+const DATA_PAGES = ["/", "/geography", "/arrangement", "/skills", "/quality", "/methodology"];
 if (runDev) {
   const devPort = process.env.DEV_PORT ?? "3000";
   const devOrigin = `http://127.0.0.1:${devPort}`;
