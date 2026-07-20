@@ -13,7 +13,6 @@ import {html} from "npm:htl";
 import {barChart} from "./components/barChart.js";
 import {dataTable} from "./components/dataTable.js";
 import {heatmap} from "./components/heatmap.js";
-import {wordCloud} from "./components/wordCloud.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause, escape as sqlEscape} from "./components/filters.js";
@@ -34,14 +33,30 @@ const iscoPresent = Array.from(
   (r) => r.isco_major
 );
 const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+// Options for the page-scoped Role/title filter. Unfiltered on purpose: the
+// select lives inside the filter card, so deriving options from the other
+// filters would be circular.
+const topTitles = Array.from(
+  await db.query(`SELECT title FROM postings WHERE title IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 25`),
+  (r) => r.title
+);
 ```
 
 ```js
-const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.lo, allDates.hi], presets}));
+const filters = view(filterCard({
+  countries,
+  iscoPresent,
+  dateBounds: [allDates.lo, allDates.hi],
+  presets,
+  extras: {title: Inputs.select(["(all)", ...topTitles], {label: "Role / title (this page)"})}
+}));
 ```
 
 ```js
 const where = whereClause(filters);
+const whereT = !filters.title || filters.title === "(all)"
+  ? where
+  : `${andClause(where)} title = '${sqlEscape(filters.title)}'`;
 ```
 
 ## Top titles
@@ -64,27 +79,6 @@ ${titles.length === 0
       resize((width) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: 380, width})),
       (w, h) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: h, width: w})
     )}
-
-## Role focus
-
-Narrow the sections below to a single job title. This filter is page-local; the
-card filters above carry across pages as usual.
-
-```js
-const topTitles = Array.from(
-  await db.query(`
-    SELECT title FROM postings
-    ${andClause(where)} title IS NOT NULL
-    GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 25
-  `),
-  (r) => r.title
-);
-const titlePick = view(Inputs.select(["(all)", ...topTitles], {label: "Role / title"}));
-```
-
-```js
-const whereT = titlePick === "(all)" ? where : `${andClause(where)} title = '${sqlEscape(titlePick)}'`;
-```
 
 ## ISCO-08 major group mix
 
@@ -154,30 +148,6 @@ ${skillRows.length === 0
       "Top 25 skills",
       resize((width) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: 520, width})),
       (w, h) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: h, width: w})
-    )}
-
-## Skill cloud
-
-```js
-const cloudRows = Array.from(await db.query(`
-  SELECT skill, COUNT(*)::INT AS n
-  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
-  GROUP BY 1
-  ORDER BY 2 DESC
-  LIMIT 60
-`));
-```
-
-${cloudRows.length === 0
-  ? html`<div class="card"><div>No tagged skills in current selection.</div></div>`
-  : expandable(
-      "Skill cloud (top 60, sized by mentions)",
-      resize((width) => wordCloud(cloudRows, {width, height: 400})),
-      (w, h) => {
-        const holder = html`<div></div>`;
-        wordCloud(cloudRows, {width: w, height: h, maxFont: 64}).then((node) => holder.append(node));
-        return holder;
-      }
     )}
 
 ## Filtered postings

@@ -11,6 +11,7 @@ export function readFromURL() {
   return {
     country: p.get("country") ?? undefined,
     iscoMajor: p.get("isco") ?? undefined,
+    arrangement: p.get("arr") ?? undefined,
     salaryLo: intOrU("salary_lo"),
     salaryHi: intOrU("salary_hi"),
     dateFrom: dateOrU("date_from"),
@@ -28,6 +29,7 @@ export function writeToURL(filters, defaults) {
 
   setOrDel("country", filters.country, filters.country == null || filters.country === ALL);
   setOrDel("isco", filters.iscoMajor, filters.iscoMajor == null || filters.iscoMajor === ALL);
+  setOrDel("arr", filters.arrangement, filters.arrangement == null || filters.arrangement === ALL);
 
   const lo = filters.salary?.lo;
   const hi = filters.salary?.hi;
