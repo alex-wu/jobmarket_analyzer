@@ -6,16 +6,17 @@ toc: false
 # Geography
 
 ```js
-import * as Plot from "npm:@observablehq/plot";
+import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
-import {barChart} from "./components/barChart.js";
+import {choropleth} from "./components/choropleth.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
+const europe = await FileAttachment("data/europe.json").json();
 const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
 ```
 
@@ -39,45 +40,47 @@ const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.l
 const where = whereClause(filters);
 ```
 
-## Median salary by country
+## Map
+
+```js
+const metric = view(Inputs.select(
+  new Map([
+    ["Postings volume", "n"],
+    ["Median salary €p50", "p50"]
+  ]),
+  {label: "Metric"}
+));
+```
 
 ```js
 const byCountry = Array.from(await db.query(`
   SELECT country,
-         quantile_cont(salary_annual_eur_p50, 0.5) AS p50,
-         COUNT(salary_annual_eur_p50)::INT AS n
-  FROM postings
-  ${andClause(where)} salary_annual_eur_p50 IS NOT NULL
-  GROUP BY 1
-  ORDER BY 2 DESC
-`));
-```
-
-${byCountry.length === 0
-  ? html`<div class="card"><div>No country breakdown in current selection.</div></div>`
-  : expandable(
-      "Median €p50 by country",
-      resize((width) => barChart(byCountry, {x: "p50", y: "country", xLabel: "Median €p50", xTickFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 50, height: 300, width})),
-      (w, h) => barChart(byCountry, {x: "p50", y: "country", xLabel: "Median €p50", xTickFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 50, height: h, width: w})
-    )}
-
-## Postings volume by country
-
-```js
-const volume = Array.from(await db.query(`
-  SELECT country, COUNT(*)::INT AS n
+         COUNT(*)::INT AS n,
+         quantile_cont(salary_annual_eur_p50, 0.5) AS p50
   FROM postings
   ${andClause(where)} country IS NOT NULL
   GROUP BY 1
-  ORDER BY 2 DESC
 `));
 ```
 
-${volume.length === 0
+```js
+const valueByIso2 = new Map(
+  byCountry.filter((d) => d[metric] != null).map((d) => [d.country, Number(d[metric])])
+);
+const metricLabel = metric === "p50" ? "Median €p50" : "Postings";
+const metricFormat = metric === "p50"
+  ? (v) => `€${(v / 1000).toFixed(0)}k`
+  : (v) => v.toLocaleString();
+```
+
+${valueByIso2.size === 0
   ? html`<div class="card"><div>No data in current selection.</div></div>`
   : expandable(
-      "Postings by country",
-      resize((width) => barChart(volume, {x: "n", y: "country", xLabel: "Postings", marginLeft: 50, height: 300, width})),
-      (w, h) => barChart(volume, {x: "n", y: "country", xLabel: "Postings", marginLeft: 50, height: h, width: w})
+      metricLabel + " by country",
+      resize((width) => choropleth(europe, valueByIso2, {label: metricLabel, format: metricFormat, width})),
+      (w, h) => choropleth(europe, valueByIso2, {label: metricLabel, format: metricFormat, width: w, height: h})
     )}
 
+<small>The map shows countries present in the current filter selection; gray
+outlines mean no data (not zero — the preset only ingests some countries).
+Median salary appears only for countries with disclosed salaries.</small>

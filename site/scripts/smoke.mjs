@@ -148,6 +148,43 @@ if (runDev) {
     total += issues;
     await page.close();
   }
+
+  // Phase 1e: choropleth render + metric switch on /geography
+  {
+    console.log("\n=== /geography map ===");
+    const page = await browser.newPage();
+    await page.setViewport({width: 1280, height: 900});
+    const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
+    await page.goto(`${devOrigin}/geography`, {waitUntil: "networkidle0", timeout: 30000});
+    await new Promise((r) => setTimeout(r, 1500));
+    const paths = await page.evaluate(() => document.querySelectorAll("figure svg path").length);
+    console.log(`map paths: ${paths}`);
+    const switched = await page.evaluate(() => {
+      const select = Array.from(document.querySelectorAll("select")).find((s) =>
+        s.closest("form")?.textContent.includes("Metric")
+      );
+      if (!select || select.options.length < 2) return false;
+      select.selectedIndex = 1;
+      select.dispatchEvent(new Event("input", {bubbles: true}));
+      select.dispatchEvent(new Event("change", {bubbles: true}));
+      return select.options[select.selectedIndex].textContent;
+    });
+    console.log(`switched metric to: ${switched}`);
+    await new Promise((r) => setTimeout(r, 2500));
+    const visible = await collectVisibleErrors(page);
+    let issues = consoleErrors.length + pageErrors.length + visible.length + failedRequests.length;
+    if (paths < 20) { console.log("MAP MISSING — too few svg paths"); issues += 1; }
+    if (!switched) { console.log("METRIC SELECT NOT FOUND"); issues += 1; }
+    if (issues === 0) console.log("OK — map rendered, metric switch clean");
+    else {
+      if (pageErrors.length)     console.log("pageerror:", pageErrors);
+      if (consoleErrors.length)  console.log("console.error:", consoleErrors);
+      if (visible.length)        console.log("visible inspector errors:", visible);
+      if (failedRequests.length) console.log("failed requests:", failedRequests);
+    }
+    total += issues;
+    await page.close();
+  }
 }
 
 // ---------- Phase 2: static dist/ with /jobmarket_analyzer/ base ----------
