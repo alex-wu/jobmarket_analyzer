@@ -16,7 +16,7 @@ import {barChart} from "./components/barChart.js";
 import {kpiCard} from "./components/kpiCard.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
-import {whereClause, andClause} from "./components/filters.js";
+import {whereClause} from "./components/filters.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
@@ -102,47 +102,6 @@ const sources = Array.from(await db.query(`
   ${Inputs.table(sources, {columns: ["source", "n"], header: {source: "Source", n: "Postings"}, width: {n: 90}})}
 </div>
 
-## Posting cadence
-
-```js
-const cadence = Array.from(await db.query(`
-  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
-         COUNT(*)::INT AS n
-  FROM postings
-  ${andClause(where)} posted_at IS NOT NULL
-  GROUP BY 1
-  ORDER BY 1
-`));
-```
-
-```js
-function cadenceChart(width, height = 240) {
-  return Plot.plot({
-    width,
-    height,
-    marginLeft: 50,
-    x: {label: null, type: "time"},
-    y: {label: "Postings / week", grid: true},
-    marks: [
-      Plot.areaY(cadence, {x: "wk", y: "n", fillOpacity: 0.2, curve: "monotone-x"}),
-      Plot.lineY(cadence, {x: "wk", y: "n", curve: "monotone-x"}),
-      Plot.dot(cadence, {x: "wk", y: "n", r: 3, tip: true}),
-      Plot.ruleY([0])
-    ]
-  });
-}
-```
-
-${cadence.length === 0
-  ? html`<div class="card"><div>No postings in current selection.</div></div>`
-  : expandable(
-      "Postings per week",
-      resize((width) => cadenceChart(width)),
-      (w, h) => cadenceChart(w, h)
-    )}
-
-<small>The first and last weeks are usually partial. Daily cron at 06:00 UTC writes the next snapshot.</small>
-
 ## Pipeline manifest
 
 <div class="card">
@@ -158,3 +117,5 @@ ${cadence.length === 0
     {header: {field: "Field", value: "Value"}}
   )}
 </div>
+
+<small>Daily cron at 06:00 UTC writes the next snapshot. Weekly posting cadence lives on the <a href="/">Overview</a> page.</small>

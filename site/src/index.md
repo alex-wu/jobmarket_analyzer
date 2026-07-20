@@ -111,6 +111,48 @@ ${salaryRows.length === 0
       (w, h) => salaryHistogram(w, h)
     )}
 
+## Posting cadence
+
+```js
+const weekly = Array.from(await db.query(`
+  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
+         country,
+         COUNT(*)::INT AS n
+  FROM postings
+  ${andClause(where)} posted_at IS NOT NULL AND country IS NOT NULL
+  GROUP BY 1, 2
+  ORDER BY 1
+`));
+```
+
+```js
+function weeklyChart(width, height = 280) {
+  return Plot.plot({
+    width,
+    height,
+    marginLeft: 50,
+    color: {legend: true},
+    x: {label: null, type: "time"},
+    y: {label: "Postings / week", grid: true},
+    marks: [
+      Plot.lineY(weekly, {x: "wk", y: "n", stroke: "country", curve: "monotone-x"}),
+      Plot.dot(weekly, {x: "wk", y: "n", stroke: "country", r: 3, tip: true}),
+      Plot.ruleY([0])
+    ]
+  });
+}
+```
+
+${weekly.length === 0
+  ? html`<div class="card"><div>No postings in current selection.</div></div>`
+  : expandable(
+      "Weekly postings by country",
+      resize((width) => weeklyChart(width)),
+      (w, h) => weeklyChart(w, h)
+    )}
+
+<small>Week buckets are <code>date_trunc('week', posted_at)</code>; the first and last weeks are usually partial.</small>
+
 ## Recent postings
 
 ```js
