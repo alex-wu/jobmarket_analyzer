@@ -6,6 +6,7 @@ export default {
   pages: [
     {name: "Overview", path: "/"},
     {name: "Geography", path: "/geography"},
+    {name: "Work Arrangement", path: "/arrangement"},
     {name: "Skills & Roles", path: "/skills"},
     {name: "Quality & Coverage", path: "/quality"},
     {name: "Methodology & Docs", path: "/methodology"}
@@ -13,7 +14,7 @@ export default {
   sidebar: true,
   toc: false,
   footer:
-    'Data: Adzuna + public ATS feeds. Source: <a href="https://github.com/alex-wu/jobmarket_analyzer">github.com/alex-wu/jobmarket_analyzer</a>',
+    'Data: Adzuna. Source: <a href="https://github.com/alex-wu/jobmarket_analyzer">github.com/alex-wu/jobmarket_analyzer</a>',
   head: `<link rel="icon" href="data:,">
 <script>document.addEventListener("click",function(e){
   var a=e.target.closest("a[href]"); if(!a) return;

@@ -8,14 +8,15 @@ export function heatmap(rows, {
   valueFormat = (v) => Math.round(v).toLocaleString(),
   width,
   height,
-  marginLeft = 220
+  marginLeft = 220,
+  scheme = "blues" // shared sequential scheme with the geography choropleth
 } = {}) {
   return Plot.plot({
     ...(width ? {width} : {}),
     ...(height ? {height} : {}),
     marginLeft,
     marginRight: 60,
-    color: {legend: true, label: valueLabel},
+    color: {scheme, legend: true, label: valueLabel},
     x: {label: null},
     y: {label: null},
     marks: [

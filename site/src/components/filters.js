@@ -20,6 +20,12 @@ export function iscoMajorSelect(present, def) {
   });
 }
 
+export function arrangementSelect(def) {
+  const opts = [ALL, "remote", "hybrid", "onsite", "unknown"];
+  const value = def && opts.includes(def) ? def : ALL;
+  return Inputs.select(opts, {label: "Arrangement", value});
+}
+
 export function salaryRange(min = 0, max = 250000, def) {
   const clamp = (v, fallback) => (Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fallback);
   const lo = clamp(def?.lo, min);
@@ -52,10 +58,13 @@ export function dateRange(dates, def) {
 
 // Compose a SQL WHERE clause from the four filter values.
 // Returns a string starting with "WHERE" (or "" if no filters active).
-export function whereClause({country, iscoMajor, salary, dates}) {
+export function whereClause({country, iscoMajor, arrangement, salary, dates}) {
   const parts = [];
   if (country && country !== ALL) parts.push(`country = '${escape(country)}'`);
   if (iscoMajor && iscoMajor !== ALL) parts.push(`isco_major = '${escape(iscoMajor)}'`);
+  if (arrangement && arrangement !== ALL) {
+    parts.push(arrangement === "unknown" ? "work_arrangement IS NULL" : `work_arrangement = '${escape(arrangement)}'`);
+  }
   if (salary && (salary.lo != null || salary.hi != null)) {
     if (salary.lo != null) parts.push(`(salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 >= ${+salary.lo})`);
     if (salary.hi != null) parts.push(`(salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 <= ${+salary.hi})`);
@@ -72,7 +81,7 @@ export function andClause(where) {
   return where ? `${where} AND` : "WHERE";
 }
 
-function escape(s) {
+export function escape(s) {
   return String(s).replace(/'/g, "''");
 }
 

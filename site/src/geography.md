@@ -6,16 +6,18 @@ toc: false
 # Geography
 
 ```js
-import * as Plot from "npm:@observablehq/plot";
+import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
-import {barChart} from "./components/barChart.js";
+import {choropleth} from "./components/choropleth.js";
+import {dataTable} from "./components/dataTable.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
+const europe = await FileAttachment("data/europe.json").json();
 const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
 ```
 
@@ -39,86 +41,84 @@ const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.l
 const where = whereClause(filters);
 ```
 
-## Median salary by country
+## Map
+
+```js
+const metric = view(Inputs.select(
+  new Map([
+    ["Postings volume", "n"],
+    ["Median salary €p50", "p50"]
+  ]),
+  {label: "Metric"}
+));
+```
 
 ```js
 const byCountry = Array.from(await db.query(`
   SELECT country,
-         quantile_cont(salary_annual_eur_p50, 0.5) AS p50,
-         COUNT(salary_annual_eur_p50)::INT AS n
-  FROM postings
-  ${andClause(where)} salary_annual_eur_p50 IS NOT NULL
-  GROUP BY 1
-  ORDER BY 2 DESC
-`));
-```
-
-${byCountry.length === 0
-  ? html`<div class="card"><div>No country breakdown in current selection.</div></div>`
-  : expandable(
-      "Median €p50 by country",
-      resize((width) => barChart(byCountry, {x: "p50", y: "country", xLabel: "Median €p50", xTickFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 50, height: 300, width})),
-      (w, h) => barChart(byCountry, {x: "p50", y: "country", xLabel: "Median €p50", xTickFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 50, height: h, width: w})
-    )}
-
-## Postings volume by country
-
-```js
-const volume = Array.from(await db.query(`
-  SELECT country, COUNT(*)::INT AS n
+         COUNT(*)::INT AS n,
+         quantile_cont(salary_annual_eur_p50, 0.5) AS p50
   FROM postings
   ${andClause(where)} country IS NOT NULL
   GROUP BY 1
-  ORDER BY 2 DESC
 `));
 ```
 
-${volume.length === 0
+```js
+const valueByIso2 = new Map(
+  // postings.country is uppercase ISO2 (GB/ES); europe.json iso2 is lowercase
+  byCountry.filter((d) => d[metric] != null).map((d) => [String(d.country).toLowerCase(), Number(d[metric])])
+);
+const metricLabel = metric === "p50" ? "Median €p50" : "Postings";
+const metricFormat = metric === "p50"
+  ? (v) => `€${(v / 1000).toFixed(1)}k`
+  : (v) => v.toLocaleString();
+```
+
+${valueByIso2.size === 0
   ? html`<div class="card"><div>No data in current selection.</div></div>`
   : expandable(
-      "Postings by country",
-      resize((width) => barChart(volume, {x: "n", y: "country", xLabel: "Postings", marginLeft: 50, height: 300, width})),
-      (w, h) => barChart(volume, {x: "n", y: "country", xLabel: "Postings", marginLeft: 50, height: h, width: w})
+      metricLabel + " by country",
+      resize((width) => choropleth(europe, valueByIso2, {label: metricLabel, format: metricFormat, width})),
+      (w, h) => choropleth(europe, valueByIso2, {label: metricLabel, format: metricFormat, width: w, height: h})
     )}
 
-## Posting cadence
+<small>The map shows countries present in the current filter selection; gray
+outlines mean no data (not zero — the preset only ingests some countries).
+Median salary appears only for countries with disclosed salaries.</small>
+
+## Filtered postings
 
 ```js
-const weekly = Array.from(await db.query(`
-  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
-         country,
-         COUNT(*)::INT AS n
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
   FROM postings
-  ${andClause(where)} posted_at IS NOT NULL AND country IS NOT NULL
-  GROUP BY 1, 2
-  ORDER BY 1
+  ${where}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
 `));
 ```
 
-```js
-function weeklyChart(width, height = 280) {
-  return Plot.plot({
-    width,
-    height,
-    marginLeft: 50,
-    color: {legend: true},
-    x: {label: null, type: "time"},
-    y: {label: "Postings / week", grid: true},
-    marks: [
-      Plot.lineY(weekly, {x: "wk", y: "n", stroke: "country", curve: "monotone-x"}),
-      Plot.dot(weekly, {x: "wk", y: "n", stroke: "country", r: 3, tip: true}),
-      Plot.ruleY([0])
-    ]
-  });
-}
-```
-
-${weekly.length === 0
-  ? html`<div class="card"><div>No postings in current selection.</div></div>`
-  : expandable(
-      "Weekly postings by country",
-      resize((width) => weeklyChart(width)),
-      (w, h) => weeklyChart(w, h)
-    )}
-
-<small>Week buckets are <code>date_trunc('week', posted_at)</code>; the first and last weeks are usually partial.</small>
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-geography.csv",
+  subtitle: "Rows behind the map (up to 2,000). CSV exports every column.",
+  columns: ["title", "company", "country", "posted_at", "salary_annual_eur_p50", "isco_major", "source"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    posted_at: "Posted",
+    salary_annual_eur_p50: "€p50",
+    isco_major: "ISCO",
+    source: "Source"
+  },
+  format: {
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, posted_at: 100, salary_annual_eur_p50: 80, isco_major: 60}
+})}

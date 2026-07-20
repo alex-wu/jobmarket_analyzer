@@ -36,7 +36,9 @@ await conn.run(`
       isco_match_method,
       isco_match_score,
       CASE WHEN isco_code IS NULL THEN NULL ELSE SUBSTR(isco_code, 1, 1) END AS isco_major,
-      source
+      source,
+      work_arrangement,
+      skills
     FROM read_parquet('${sqlSrc}')
     WHERE salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 > 0
   )

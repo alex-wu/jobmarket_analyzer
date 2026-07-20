@@ -105,11 +105,15 @@ Phase-gated build per [DECISIONS.md](DECISIONS.md):
 - [x] **P9** — CI/CD modernisation (shipped 2026-05-15).
 - [x] **P10** — Gate command + warn-mode (shipped 2026-05-16). Zero-row ATS investigation **closed by descope** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation).
 
+- [x] **P13** — Scope-pivot implementation (shipped 2026-05-18, PR #13): `data_analyst_eu.yaml` preset, `export_accumulated()`, `latest-{preset_id}` releases, matrix workflow. Preset *switcher UI* still queued below.
+- [x] **P12** — Schema expansion, largely closed: `skills` (ADR-022/023, surfaced on the dashboard per ADR-026) and `work_arrangement` (ADR-025 multilingual tagger, replacing the dropped `remote` bool). Only `experience_level` remains unfilled (no Adzuna signal).
+- [x] **Dashboard v2** — 6-page restructure (ADR-026, 2026-07-20): Europe choropleth geography, work-arrangement page + global filter, ESCO top-skills chart, per-page CSV export, always-visible labels.
+
 ### Queued
 
-- [ ] **P13** — Scope-pivot implementation. New `data_analyst_eu.yaml` preset (Adzuna-only, 7 countries), `export_accumulated()` primitive in `duckdb_io.py`, `latest-{preset_id}` workflow renaming, matrix strategy + preset-scoped concurrency, dashboard preset switcher. Folds in P8 (build-time data loaders — accumulated parquet at 150-250 MB cannot ship via DuckDB-WASM cold-load). See ADR-017..020 + the next-session handover doc.
-- [ ] **P11** — Portfolio polish + first tagged release. Second preset (e.g. `software_developer_eu`), README hero screenshot, CHANGELOG seed, `v0.1.0` tag. Depends on P13.
-- [ ] **P12** — Schema expansion. `experience_level`, `work_arrangement`, `skills`, `remote` derivation per [docs/dashboard_data_gaps.md](docs/dashboard_data_gaps.md). The `remote` column already exists in `PostingSchema` but is unpopulated for Adzuna (no raw signal in upstream payload).
+- [ ] **Pipeline automation verification** — confirm the weekly GitHub Actions cron produces correct schema-v3 artifacts end-to-end (first post-v3 publish, release assets, Pages rebuild) and hard-fail loudly when it doesn't.
+- [ ] **Dashboard preset switcher** — loader still hardcodes `data_analyst_eu`; multi-preset enumeration per ADR-019.
+- [ ] **P11** — Portfolio polish + first tagged release. Second preset (e.g. `software_developer_eu`), README hero screenshot, CHANGELOG seed, `v0.1.0` tag.
 
 ---
 

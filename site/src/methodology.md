@@ -15,16 +15,18 @@ From Adzuna's API to your browser, no backend:
 ```mermaid
 flowchart LR
   A[Adzuna API] -->|JSON pages| B[ingest adapter]
-  B -->|raw rows| C[normalise.run plus PostingSchema v2]
+  B -->|raw rows| C[normalise.run PostingSchema v3 incl work_arrangement tagger]
   C -->|EUR-normalised salaries| D[isco_tagger rapidfuzz cutoff 85]
   D -->|plus isco_code| E[skills_tagger ESCO Pillar B Aho-Corasick]
-  E -->|plus esco_skills| F[(parquet flat layout)]
+  E -->|plus skills| F[(parquet flat layout)]
   F -->|gh release upload| G[GitHub Releases latest preset parquet]
   G -->|FileAttachment| H[DuckDB-WASM browser]
   H --> I[Observable Plot]
 ```
 
 A weekly cron in GitHub Actions runs the pipeline; the dashboard is rebuilt and pushed to GitHub Pages by `deploy-pages`. No server, no API key in the browser.
+
+The dashboard itself is six pages (Overview, Geography, Work Arrangement, Skills &amp; Roles, Quality &amp; Coverage, and this one). Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a filtered-postings table with one-click CSV export of the current selection.
 
 ## ESCO skills tagger
 
@@ -39,7 +41,7 @@ flowchart TD
   D -->|standalone match| E[skill candidates]
   E --> F{ISCO focus filter}
   F -->|outside preset scope: packaging, journalism| X
-  F -->|in scope| G[esco_skills array]
+  F -->|in scope| G[skills array]
 ```
 
 The word-boundary check fixes a known substring-match pitfall (e.g. `Java` matches inside `Javascript`). The ISCO-focus filter is what makes the tagger preset-aware — the same automaton serves all presets, but each preset's YAML `isco_focus` narrows the output to relevant skills.
@@ -98,14 +100,15 @@ Decision log lives at [`DECISIONS.md`](https://github.com/alex-wu/jobmarket_anal
 | 021 | No per-country keyword translation table in v1 |
 | 022 | PostingSchema v2 — persist 5 Adzuna fields + skills |
 | 023 | Skill enrichment via ESCO Pillar B + Aho-Corasick |
+| 024 | Filter state persistence via URL search params |
+| 025 | PostingSchema v3 — work_arrangement, dead-weight column drop |
+| 026 | Dashboard v2 — Europe choropleth, page consolidation, CSV export |
 
 </div>
 
 ## Data gaps (deliberate)
 
-The original spec called for `experience_level`, `work_arrangement` (remote / hybrid / on-site), and detailed `skills` extraction. Only the last is in flight (ESCO Pillar B). The others remain unfilled because Adzuna's payload doesn't surface them and we ship only on fields we have, with explicit coverage annotations on the Quality &amp; Coverage page rather than guessing.
-
-Full roadmap: [`docs/dashboard_data_gaps.md`](https://github.com/alex-wu/jobmarket_analyzer/blob/main/docs/dashboard_data_gaps.md). Dashboard architecture: [`docs/dashboard_strategy.md`](https://github.com/alex-wu/jobmarket_analyzer/blob/main/docs/dashboard_strategy.md).
+The original spec called for `experience_level`, `work_arrangement`, and detailed `skills` extraction. Two of the three have shipped: `work_arrangement` (remote / hybrid / onsite) is inferred by a multilingual keyword tagger (ADR-025) and has its own page plus a global filter — with the dominant unclassified share shown honestly as <code>unknown</code>; ESCO `skills` (ADR-023) are surfaced as the top-skills chart on Skills &amp; Roles. Only `experience_level` remains unfilled — Adzuna's payload doesn't carry it, and we ship only fields we have rather than guessing.
 
 ## Why the data re-loads on every page
 

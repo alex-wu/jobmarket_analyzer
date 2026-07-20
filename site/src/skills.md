@@ -7,13 +7,15 @@ toc: false
 
 ```js
 import * as Plot from "npm:@observablehq/plot";
+import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {barChart} from "./components/barChart.js";
+import {dataTable} from "./components/dataTable.js";
 import {heatmap} from "./components/heatmap.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
-import {whereClause, andClause} from "./components/filters.js";
+import {whereClause, andClause, escape as sqlEscape} from "./components/filters.js";
 import {iscoMajorLabel} from "./components/isco.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
@@ -31,14 +33,30 @@ const iscoPresent = Array.from(
   (r) => r.isco_major
 );
 const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+// Options for the page-scoped Role/title filter. Unfiltered on purpose: the
+// select lives inside the filter card, so deriving options from the other
+// filters would be circular.
+const topTitles = Array.from(
+  await db.query(`SELECT title FROM postings WHERE title IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 25`),
+  (r) => r.title
+);
 ```
 
 ```js
-const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.lo, allDates.hi], presets}));
+const filters = view(filterCard({
+  countries,
+  iscoPresent,
+  dateBounds: [allDates.lo, allDates.hi],
+  presets,
+  extras: {title: Inputs.select(["(all)", ...topTitles], {label: "Role / title (this page)"})}
+}));
 ```
 
 ```js
 const where = whereClause(filters);
+const whereT = !filters.title || filters.title === "(all)"
+  ? where
+  : `${andClause(where)} title = '${sqlEscape(filters.title)}'`;
 ```
 
 ## Top titles
@@ -69,7 +87,7 @@ const iscoMix = Array.from(
   await db.query(`
     SELECT COALESCE(isco_major, '∅') AS isco_major,
            COUNT(*)::INT AS n
-    FROM postings ${where}
+    FROM postings ${whereT}
     GROUP BY 1
     ORDER BY 2 DESC
   `),
@@ -95,7 +113,7 @@ const heatRows = Array.from(
            quantile_cont(salary_annual_eur_p50, 0.5) AS p50,
            COUNT(salary_annual_eur_p50)::INT AS n
     FROM postings
-    ${andClause(where)} salary_annual_eur_p50 IS NOT NULL AND isco_major IS NOT NULL
+    ${andClause(whereT)} salary_annual_eur_p50 IS NOT NULL AND isco_major IS NOT NULL
     GROUP BY 1, 2
     HAVING COUNT(*) >= 3
     ORDER BY 1, 2
@@ -112,4 +130,61 @@ ${heatRows.length === 0
       (w, h) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: h, width: w})
     )}
 
-<small>Skills extraction (ESCO Pillar B Aho-Corasick tagger) is in pipeline but not yet surfaced here as a chart — see Methodology &amp; Docs.</small>
+## Top skills
+
+```js
+const skillRows = Array.from(await db.query(`
+  SELECT skill, COUNT(*)::INT AS n
+  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 25
+`));
+```
+
+${skillRows.length === 0
+  ? html`<div class="card"><div>No tagged skills in current selection.</div></div>`
+  : expandable(
+      "Top 25 skills",
+      resize((width) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: 520, width})),
+      (w, h) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: h, width: w})
+    )}
+
+## Filtered postings
+
+```js
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
+  FROM postings
+  ${whereT}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
+`));
+```
+
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-skills.csv",
+  subtitle: "Rows behind the charts above, incl. the role filter (up to 2,000). CSV exports every column.",
+  columns: ["title", "company", "country", "isco_major", "posted_at", "salary_annual_eur_p50"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    isco_major: "ISCO",
+    posted_at: "Posted",
+    salary_annual_eur_p50: "€p50"
+  },
+  format: {
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, isco_major: 60, posted_at: 100, salary_annual_eur_p50: 80}
+})}
+
+<small>Skills are ESCO Pillar B labels matched in the posting text
+(Aho-Corasick, word-boundary checked) — counts are postings mentioning the
+skill at least once. See Methodology &amp; Docs.</small>
