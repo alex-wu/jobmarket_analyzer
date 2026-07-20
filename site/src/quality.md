@@ -13,6 +13,7 @@ import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {barChart} from "./components/barChart.js";
+import {dataTable} from "./components/dataTable.js";
 import {kpiCard} from "./components/kpiCard.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
@@ -101,6 +102,43 @@ const sources = Array.from(await db.query(`
 <div class="card">
   ${Inputs.table(sources, {columns: ["source", "n"], header: {source: "Source", n: "Postings"}, width: {n: 90}})}
 </div>
+
+## Filtered postings
+
+```js
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
+  FROM postings
+  ${where}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
+`));
+```
+
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-quality.csv",
+  subtitle: "Rows behind the QA views above (up to 2,000). CSV exports every column.",
+  columns: ["title", "country", "isco_code", "isco_match_method", "isco_match_score", "salary_imputed", "posted_at"],
+  header: {
+    title: "Title",
+    country: "Country",
+    isco_code: "ISCO code",
+    isco_match_method: "Match",
+    isco_match_score: "Score",
+    salary_imputed: "Imputed?",
+    posted_at: "Posted"
+  },
+  format: {
+    isco_match_score: (v) => v == null ? "—" : Math.round(v),
+    salary_imputed: (v) => v ? "yes" : "",
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, isco_code: 90, isco_match_method: 80, isco_match_score: 70, salary_imputed: 70, posted_at: 100}
+})}
 
 ## Pipeline manifest
 

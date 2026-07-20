@@ -11,6 +11,7 @@ import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {barChart} from "./components/barChart.js";
+import {dataTable} from "./components/dataTable.js";
 import {heatmap} from "./components/heatmap.js";
 import {wordCloud} from "./components/wordCloud.js";
 import {filterCard} from "./components/filterCard.js";
@@ -178,6 +179,41 @@ ${cloudRows.length === 0
         return holder;
       }
     )}
+
+## Filtered postings
+
+```js
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
+  FROM postings
+  ${whereT}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
+`));
+```
+
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-skills.csv",
+  subtitle: "Rows behind the charts above, incl. the role filter (up to 2,000). CSV exports every column.",
+  columns: ["title", "company", "country", "isco_major", "posted_at", "salary_annual_eur_p50"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    isco_major: "ISCO",
+    posted_at: "Posted",
+    salary_annual_eur_p50: "€p50"
+  },
+  format: {
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, isco_major: 60, posted_at: 100, salary_annual_eur_p50: 80}
+})}
 
 <small>Skills are ESCO Pillar B labels matched in the posting text
 (Aho-Corasick, word-boundary checked) — counts are postings mentioning the

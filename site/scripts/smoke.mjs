@@ -149,6 +149,50 @@ if (runDev) {
     await page.close();
   }
 
+  // Phase 1d: CSV download — every data page must expose a working "⬇ CSV" button.
+  // We monkey-patch URL.createObjectURL + anchor.click to capture the CSV text
+  // without actually triggering a browser download.
+  for (const path of ["/", "/geography", "/arrangement", "/skills", "/quality"]) {
+    console.log(`\n=== ${path} CSV download ===`);
+    const page = await browser.newPage();
+    await page.setViewport({width: 1280, height: 900});
+    const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
+    await page.goto(`${devOrigin}${path}`, {waitUntil: "networkidle0", timeout: 30000});
+    await new Promise((r) => setTimeout(r, 2000));
+    const csv = await page.evaluate(async () => {
+      return await new Promise((resolve) => {
+        const origCreate = URL.createObjectURL;
+        const origClick = HTMLAnchorElement.prototype.click;
+        URL.createObjectURL = (blob) => {
+          blob.text().then((t) => {
+            URL.createObjectURL = origCreate;
+            HTMLAnchorElement.prototype.click = origClick;
+            resolve(t);
+          });
+          return "blob:noop";
+        };
+        HTMLAnchorElement.prototype.click = function() {};
+        const btn = Array.from(document.querySelectorAll("button")).find((b) => /⬇\s*CSV/.test(b.textContent));
+        if (!btn) { resolve(null); return; }
+        if (btn.disabled) { resolve("__disabled__"); return; }
+        btn.click();
+        setTimeout(() => resolve("__timeout__"), 5000);
+      });
+    });
+    let issues = 0;
+    if (!csv) { console.log("CSV button not found"); issues++; }
+    else if (csv === "__disabled__") { console.log("CSV button disabled (no rows)"); issues++; }
+    else if (csv === "__timeout__") { console.log("CSV click did not produce a blob"); issues++; }
+    else {
+      const lines = csv.trim().split("\n");
+      const cols = (lines[0] ?? "").split(",");
+      if (lines.length < 2 || cols.length < 3) { console.log(`CSV too small — ${lines.length} lines, ${cols.length} cols`); issues++; }
+      else console.log(`OK — ${lines.length} lines, ${cols.length} cols, header=[${cols.slice(0, 4).join(",")}...]`);
+    }
+    total += issues + consoleErrors.length + pageErrors.length + failedRequests.length;
+    await page.close();
+  }
+
   // Phase 1e: choropleth render + metric switch on /geography
   {
     console.log("\n=== /geography map ===");

@@ -7,10 +7,10 @@ toc: false
 
 ```js
 import * as Plot from "npm:@observablehq/plot";
-import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {coverageNote} from "./components/coverageNote.js";
+import {dataTable} from "./components/dataTable.js";
 import {kpiCard} from "./components/kpiCard.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
@@ -157,35 +157,37 @@ ${weekly.length === 0
 
 ```js
 const recent = Array.from(await db.query(`
-  SELECT title, company, country, salary_annual_eur_p50, salary_imputed, posted_at, posting_url
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
   FROM postings
   ${where}
   ORDER BY posted_at DESC NULLS LAST
-  LIMIT 100
+  LIMIT 2000
 `));
 ```
 
-<div class="card">
-  ${Inputs.table(recent, {
-    columns: ["title", "company", "country", "salary_annual_eur_p50", "salary_imputed", "posted_at"],
-    header: {
-      title: "Title",
-      company: "Company",
-      country: "Country",
-      salary_annual_eur_p50: "€p50",
-      salary_imputed: "Imputed?",
-      posted_at: "Posted"
-    },
-    format: {
-      salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
-      salary_imputed: (v) => v ? "yes" : "",
-      posted_at: (v) => fmtDate(v),
-      title: (t, i) => recent[i].posting_url
-        ? html`<a href="${recent[i].posting_url}" target="_blank" rel="noopener">${t}</a>`
-        : t
-    },
-    width: {country: 70, salary_annual_eur_p50: 80, salary_imputed: 70, posted_at: 100}
-  })}
-</div>
-
-<small>Up to 100 most-recent postings in the current filter. Click a title to open the original posting.</small>
+${dataTable(recent, {
+  title: "Recent postings",
+  filename: "jobmarket-overview.csv",
+  subtitle: "Up to 2,000 most-recent postings in the current filter. Click a title to open the original posting; CSV exports every column.",
+  columns: ["title", "company", "country", "salary_annual_eur_p50", "salary_imputed", "posted_at"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    salary_annual_eur_p50: "€p50",
+    salary_imputed: "Imputed?",
+    posted_at: "Posted"
+  },
+  format: {
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    salary_imputed: (v) => v ? "yes" : "",
+    posted_at: (v) => fmtDate(v),
+    title: (t, i) => recent[i].posting_url
+      ? html`<a href="${recent[i].posting_url}" target="_blank" rel="noopener">${t}</a>`
+      : t
+  },
+  width: {country: 70, salary_annual_eur_p50: 80, salary_imputed: 70, posted_at: 100}
+})}

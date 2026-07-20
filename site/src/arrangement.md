@@ -9,6 +9,7 @@ toc: false
 import * as Plot from "npm:@observablehq/plot";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {dataTable} from "./components/dataTable.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
@@ -218,6 +219,42 @@ ${classified.length === 0
       resize((width) => classifiedChart(width)),
       (w, h) => classifiedChart(w, h)
     )}
+
+## Filtered postings
+
+```js
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
+  FROM postings
+  ${where}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
+`));
+```
+
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-arrangement.csv",
+  subtitle: "Rows behind the charts above (up to 2,000). CSV exports every column.",
+  columns: ["title", "company", "country", "work_arrangement", "posted_at", "salary_annual_eur_p50"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    work_arrangement: "Arrangement",
+    posted_at: "Posted",
+    salary_annual_eur_p50: "€p50"
+  },
+  format: {
+    work_arrangement: (v) => v ?? "unknown",
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, work_arrangement: 100, posted_at: 100, salary_annual_eur_p50: 80}
+})}
 
 <small>Arrangement is a keyword inference over the posting text
 (<code>remote</code> / <code>hybrid</code> / <code>on-site</code>); it is not a

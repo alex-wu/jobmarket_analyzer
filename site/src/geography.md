@@ -10,6 +10,7 @@ import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {choropleth} from "./components/choropleth.js";
+import {dataTable} from "./components/dataTable.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
@@ -84,3 +85,39 @@ ${valueByIso2.size === 0
 <small>The map shows countries present in the current filter selection; gray
 outlines mean no data (not zero — the preset only ingests some countries).
 Median salary appears only for countries with disclosed salaries.</small>
+
+## Filtered postings
+
+```js
+const filtered = Array.from(await db.query(`
+  SELECT title, company, country, posted_at,
+         salary_annual_eur_p50, salary_imputed, salary_period,
+         isco_code, isco_major, isco_match_method, isco_match_score,
+         source, work_arrangement, posting_url
+  FROM postings
+  ${where}
+  ORDER BY posted_at DESC NULLS LAST
+  LIMIT 2000
+`));
+```
+
+${dataTable(filtered, {
+  title: "Filtered postings",
+  filename: "jobmarket-geography.csv",
+  subtitle: "Rows behind the map (up to 2,000). CSV exports every column.",
+  columns: ["title", "company", "country", "posted_at", "salary_annual_eur_p50", "isco_major", "source"],
+  header: {
+    title: "Title",
+    company: "Company",
+    country: "Country",
+    posted_at: "Posted",
+    salary_annual_eur_p50: "€p50",
+    isco_major: "ISCO",
+    source: "Source"
+  },
+  format: {
+    salary_annual_eur_p50: (v) => v == null ? "—" : `€${Math.round(v / 1000)}k`,
+    posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
+  },
+  width: {country: 70, posted_at: 100, salary_annual_eur_p50: 80, isco_major: 60}
+})}
