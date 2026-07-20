@@ -72,17 +72,24 @@ const overall = Array.from(await db.query(`
 
 ```js
 function overallChart(width, height = 260) {
+  const total = overall.reduce((s, d) => s + d.n, 0);
   return Plot.plot({
     width,
     height,
     marginLeft: 70,
-    marginRight: 36,
+    marginRight: 76,
     color,
     x: {label: "Postings", grid: true},
     y: {label: null, domain: ORDER},
     marks: [
       Plot.barX(overall, {x: "n", y: "arrangement", fill: "arrangement", tip: true}),
-      Plot.text(overall, {x: "n", y: "arrangement", text: (d) => `${d.n}`, dx: 6, textAnchor: "start"}),
+      Plot.text(overall, {
+        x: "n",
+        y: "arrangement",
+        text: (d) => `${d.n} (${total > 0 ? Math.round((d.n / total) * 100) : 0}%)`,
+        dx: 6,
+        textAnchor: "start"
+      }),
       Plot.ruleX([0])
     ]
   });
@@ -104,7 +111,8 @@ coverage stays visible.
 
 ```js
 const byCountry = Array.from(await db.query(`
-  SELECT country, COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*)::INT AS n
+  SELECT country, COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*)::INT AS n,
+         COUNT(*)::DOUBLE / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
   FROM postings
   ${andClause(where)} country IS NOT NULL
   GROUP BY 1, 2
@@ -129,6 +137,16 @@ function byCountryChart(width, height = 300, {normalize = true} = {}) {
         order: ORDER,
         tip: true
       }),
+      Plot.text(byCountry, Plot.stackX({
+        x: "n",
+        y: "country",
+        z: "arrangement",
+        order: ORDER,
+        offset: normalize ? "normalize" : null,
+        text: (d) => `${d.n} (${Math.round(d.share * 100)}%)`,
+        filter: (d) => d.share >= 0.07,
+        fill: "white"
+      })),
       Plot.ruleX([0])
     ]
   });
@@ -151,7 +169,8 @@ mix. With so few classified rows, treat small countries with caution.
 
 ```js
 const classified = Array.from(await db.query(`
-  SELECT country, work_arrangement AS arrangement, COUNT(*)::INT AS n
+  SELECT country, work_arrangement AS arrangement, COUNT(*)::INT AS n,
+         COUNT(*)::DOUBLE / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
   FROM postings
   ${andClause(where)} country IS NOT NULL AND work_arrangement IS NOT NULL
   GROUP BY 1, 2
@@ -176,6 +195,16 @@ function classifiedChart(width, height = 300) {
         order: ["remote", "hybrid", "onsite"],
         tip: true
       }),
+      Plot.text(classified, Plot.stackX({
+        x: "n",
+        y: "country",
+        z: "arrangement",
+        order: ["remote", "hybrid", "onsite"],
+        offset: "normalize",
+        text: (d) => `${d.n} (${Math.round(d.share * 100)}%)`,
+        filter: (d) => d.share >= 0.07,
+        fill: "white"
+      })),
       Plot.ruleX([0])
     ]
   });
