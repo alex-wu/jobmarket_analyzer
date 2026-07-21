@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import pytest
 
@@ -106,3 +107,58 @@ def test_installed_filter_redacts_caplog_capture(
     assert "ID123" not in joined
     assert "KEY456" not in joined
     assert "REDACTED" in joined
+
+
+def test_filter_scrubs_chained_exception_traceback(scrub: CredentialScrubFilter) -> None:
+    """logger.exception on a wrapped error prints the chained httpx message.
+
+    The credentialed URL lives in the CAUSE exception, not record.msg — the
+    filter must pre-format exc_text scrubbed so the Formatter reuses it.
+    """
+    import httpx
+
+    try:
+        try:
+            raise httpx.HTTPStatusError(
+                "Client error '401 Unauthorized' for url "
+                "'https://api.adzuna.com/v1/api/jobs/gb/search/1"
+                "?app_id=LEAK_ID&app_key=LEAK_KEY&what=analyst'",
+                request=httpx.Request("GET", "https://api.adzuna.com/"),
+                response=httpx.Response(401),
+            )
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError("adzuna 'gb' page=1: wrapped") from exc
+    except RuntimeError:
+        record = logging.LogRecord(
+            name="jobpipe.runner",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=0,
+            msg="source %s: fetch failed; continuing with other sources",
+            args=("adzuna",),
+            exc_info=sys.exc_info(),
+        )
+
+    scrub.filter(record)
+    formatted = logging.Formatter().format(record)
+    assert "LEAK_ID" not in formatted
+    assert "LEAK_KEY" not in formatted
+    assert "app_id=REDACTED" in formatted
+    # The traceback itself must survive (chained cause included).
+    assert "HTTPStatusError" in formatted
+    assert "RuntimeError" in formatted
+
+
+def test_install_attaches_filter_to_root_handlers() -> None:
+    """Wrapped httpx errors are logged on jobpipe.* loggers — only a
+    handler-level filter sees those records."""
+    root = logging.getLogger()
+    handler = logging.StreamHandler()
+    root.addHandler(handler)
+    try:
+        _install_credential_scrub()
+        _install_credential_scrub()  # idempotent at handler level too
+        scrubbers = [f for f in handler.filters if isinstance(f, CredentialScrubFilter)]
+        assert len(scrubbers) == 1
+    finally:
+        root.removeHandler(handler)

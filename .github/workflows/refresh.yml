@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write   # required for `gh release upload/create`
+  issues: write     # failure-alert step files an issue on red cron runs
 
 jobs:
   refresh:
@@ -150,3 +151,26 @@ jobs:
             --notes "Weekly snapshot for preset ${PRESET}. Immutable."
           # shellcheck disable=SC2046
           gh release upload "$TAG" $(find "${{ steps.stage.outputs.stage }}" -type f)
+
+      - name: Alert on failure
+        # A red cron run otherwise fails silently: the strict gate correctly
+        # ships nothing, the dashboard keeps serving the last good release,
+        # and nobody is notified — silent data staleness. File (or bump) a
+        # tracking issue so the failure surfaces in notifications.
+        if: failure()
+        run: |
+          set -euo pipefail
+          TITLE="refresh failed: preset ${PRESET}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="Weekly refresh for preset \`${PRESET}\` failed on $(date -u +%Y-%m-%d).
+
+          Run: ${RUN_URL}
+          Trigger: ${{ github.event_name }}
+
+          Until this is fixed the dashboard keeps serving the last good \`latest-${PRESET}\` release (data goes stale, it does not break)."
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi

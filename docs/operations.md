@@ -87,6 +87,10 @@ For each preset in the matrix, `refresh.yml` fetches Adzuna across the preset's 
 
 The Pages site rebuilds automatically when **any** preset's `refresh.yml` job completes — `pages.yml`'s `workflow_run` trigger fires off the `refresh` workflow's success conclusion. Multiple matrix jobs completing in close succession may trigger multiple rebuilds; Pages handles the queueing.
 
+**Manifest semantics:** `manifest.postings.row_count` measures the **fresh weekly fetch** — that is what `gate.min_total_rows` calibrates against (a weekly-fetch health check, not a corpus check). The shipped `latest-{preset_id}.parquet` is the much larger accumulated corpus; its size is recorded separately as `manifest.postings.accumulated_row_count` (with `accumulate_window_days`) after the accumulation rewrite.
+
+**Failure alerting:** a red `refresh.yml` run files (or comments on) a GitHub issue titled `refresh failed: preset {preset_id}` via the workflow's final `if: failure()` step. Until fixed, the dashboard keeps serving the last good release — data goes stale, it does not break.
+
 To pull the new data locally after a refresh, re-run the `gh release download` snippet from §1.
 
 ### Backfill / one-off accumulation

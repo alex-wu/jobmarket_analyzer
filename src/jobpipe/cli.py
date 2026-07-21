@@ -13,7 +13,7 @@ still skeletons until P2 / P5.
 from __future__ import annotations
 
 import logging
-import re
+import traceback
 from pathlib import Path
 
 import typer
@@ -21,6 +21,7 @@ import typer
 from jobpipe import __version__
 from jobpipe.duckdb_io import PublishError
 from jobpipe.gate import GateError, run_gate
+from jobpipe.redaction import scrub_credentials
 from jobpipe.runner import (
     EmptyRunError,
     NoEnrichedRunError,
@@ -32,13 +33,6 @@ from jobpipe.runner import (
     validate_preset,
 )
 
-# Query-param names treated as secret. Matched case-insensitively; both
-# underscore and hyphen forms covered. See DECISIONS.md ADR-015.
-_CREDENTIAL_PARAMS = ("app_id", "app_key", "api_key", "api-key")
-_CREDENTIAL_RE = re.compile(
-    r"(?i)\b(" + "|".join(re.escape(p) for p in _CREDENTIAL_PARAMS) + r")=[^&\s'\"]+"
-)
-
 
 class CredentialScrubFilter(logging.Filter):
     """Replace credential query-param values in log records with ``REDACTED``.
@@ -46,26 +40,46 @@ class CredentialScrubFilter(logging.Filter):
     httpx + httpcore log full request URLs at INFO. Adzuna (and likely future
     free-tier sources) pass credentials as URL query params, so anything
     captured to the GitHub Actions workflow log would otherwise expose them.
+
+    Also scrubs exception tracebacks: ``logger.exception`` on a wrapped
+    ``SourceFetchError`` prints the chained httpx exception, whose message
+    embeds the credentialed request URL. Pre-formatting into ``exc_text``
+    makes the Formatter reuse the scrubbed text instead of re-rendering.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str) and "=" in record.msg:
-            record.msg = _CREDENTIAL_RE.sub(r"\1=REDACTED", record.msg)
+            record.msg = scrub_credentials(record.msg)
         if record.args:
             record.args = tuple(
-                _CREDENTIAL_RE.sub(r"\1=REDACTED", a) if isinstance(a, str) else a
-                for a in record.args
+                scrub_credentials(a) if isinstance(a, str) else a for a in record.args
             )
+        if record.exc_info and record.exc_text is None:
+            exc = record.exc_info[1]
+            if exc is not None:
+                record.exc_text = scrub_credentials(
+                    "".join(traceback.format_exception(exc))
+                ).rstrip("\n")
         return True
 
 
 def _install_credential_scrub() -> None:
-    """Attach the scrubber to httpx + httpcore loggers (idempotent)."""
+    """Attach the scrubber to httpx/httpcore loggers and root handlers (idempotent).
+
+    Logger-level filters only fire for records emitted on that exact logger, so
+    the httpx/httpcore attach alone misses ``jobpipe.*`` loggers that log
+    wrapped httpx errors. Handler-level filters see every record routed through
+    the handler — attaching to the root handlers (created by ``basicConfig``)
+    covers all of them, tracebacks included.
+    """
     scrub = CredentialScrubFilter()
     for name in ("httpx", "httpcore"):
         lg = logging.getLogger(name)
         if not any(isinstance(f, CredentialScrubFilter) for f in lg.filters):
             lg.addFilter(scrub)
+    for handler in logging.getLogger().handlers:
+        if not any(isinstance(f, CredentialScrubFilter) for f in handler.filters):
+            handler.addFilter(scrub)
 
 
 app = typer.Typer(
