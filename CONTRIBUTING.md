@@ -20,7 +20,7 @@ uv run pre-commit install
 cp .env.example .env   # only ADZUNA_* needed for source-adapter dev
 ```
 
-Tooling is managed via [`uv`](https://docs.astral.sh/uv/) for Python and `npm` for the dashboard site (Node 20+). CI runs the same commands. Don't introduce per-language version managers (`pyenv`, `nvm`, etc.).
+Tooling is managed via [`uv`](https://docs.astral.sh/uv/) for Python and `npm` for the dashboard site (Node 24+). CI runs the same commands. Don't introduce per-language version managers (`pyenv`, `nvm`, etc.).
 
 ## Quality gates (also enforced by CI)
 
@@ -87,10 +87,10 @@ One PR per phase. Each PR: code + tests + README/CHANGELOG delta where relevant.
 
 ## Adding things
 
-- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`. No code change. The pages workflow auto-discovers new presets at build time.
+- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.parquet.js` (both currently pin `data_analyst_eu`). Multi-preset auto-discovery is queued per [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming); until it lands this is the honest procedure.
 - **New source adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable pattern survives; walkthrough at [docs/adding-a-source.md](docs/adding-a-source.md) is the reactivation path.
 - **New benchmark adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Walkthrough: [docs/adding-a-benchmark.md](docs/adding-a-benchmark.md).
-- **New role / geography**: add a YAML under `config/runs/`. No code change.
+- **New role / geography**: add a YAML under `config/runs/` (plus the workflow/loader touch-points above).
 
 ## Reporting an issue
 

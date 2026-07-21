@@ -11,7 +11,7 @@ flowchart TD
     subgraph pipeline["Python pipeline (uv env) — runs once per preset"]
         direction TB
         preset["preset YAML<br/>(config/runs/{preset_id}.yaml)"] --> runner["runner.run_fetch / run_normalise / run_publish"]
-        runner -->|fan-out over countries| adzuna["AdzunaAdapter<br/>countries: [gb, de, fr, nl, es, it, pl]<br/>keywords × pages"]
+        runner -->|fan-out over countries| adzuna["AdzunaAdapter<br/>countries: [gb, es] — 7-country EU expansion planned<br/>keywords × pages"]
         adzuna --> raw["data/raw/{preset_id}__{run_id}/<br/>postings_raw.parquet"]
         raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · work_arrangement-tag · dedupe by posting_id<br/>since_days: 180"]
         normalise --> enriched["data/enriched/{preset_id}__{run_id}/<br/>postings.parquet"]
@@ -59,11 +59,11 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | FX | `src/jobpipe/fx.py` | ECB daily reference CSV → EUR conversion. |
 | DuckDB I/O | `src/jobpipe/duckdb_io.py` | Partitioned/flat Parquet export; **`export_accumulated()` (P13)** unions dated archive within a window and computes `first_seen_at` / `last_seen_at` per `posting_id`. Manifest writer. |
 | CLI | `src/jobpipe/cli.py` | `jobpipe fetch \| normalise \| publish \| gate \| validate` Typer commands. Installs the URL-credential scrub filter on httpx/httpcore loggers per [ADR-015](../DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger). |
-| Configs | `config/runs/{preset_id}.yaml` | Run presets (what to fetch). Adding a role/geo = new YAML + new matrix entry + new presets-manifest entry, no Python change. |
+| Configs | `config/runs/{preset_id}.yaml` | Run presets (what to fetch). Adding a role/geo = new YAML + new matrix entry in `refresh.yml`, plus (until the switcher lands) un-hardcoding the preset in `pages.yml` and `site/src/data/postings.parquet.js`. |
 | Archived presets | `config/runs/_archived/` | Pre-pivot presets retained for historical reference. |
 | Test fixtures | `tests/fixtures/<area>/<adapter>/` | Hand-built trimmed JSON samples driving `httpx.MockTransport` unit tests (replaces VCR after P3). |
 | Refresh workflow | `.github/workflows/refresh.yml` | Weekly Monday 06:00 UTC cron + `workflow_dispatch`. Matrix over presets. Per-preset concurrency group. Per-preset release tags. |
-| Pages workflow | `.github/workflows/pages.yml` | Builds `site/`, generates `presets.json` from `config/runs/*.yaml`, downloads all `latest-{preset_id}` releases, deploys via `actions/deploy-pages`. See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo). |
+| Pages workflow | `.github/workflows/pages.yml` | Builds `site/`, downloads the single hardcoded preset's release (`PRESET_ID: data_analyst_eu`), deploys via `actions/deploy-pages`. `site/src/data/presets.json.js` enumerates local `data/gh_databuild_samples/latest-*.parquet` — no generator from `config/runs/*.yaml` exists. Multi-preset enumeration queued per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming). See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo). |
 | Site | `site/` | Observable Framework project. Preset switcher UI selects which `latest-{preset_id}.parquet` is active. Build-time data loaders (per [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute) consequence) keep cold-load tractable for the 150-250 MB accumulated artifacts. |
 
 ## Schemas (the contract)
@@ -93,7 +93,7 @@ The Adzuna adapter does not consume an incremental / "updated-since" API; the fr
 
 | Source | Endpoint pattern | Delta support upstream | What we do |
 |---|---|---|---|
-| Adzuna | `GET /v1/api/jobs/{country}/search/{page}` | Has `max_days_old` / `sort_by=date` knobs but no cursor — every call returns the current top N for the (country, keyword) query. | Full re-fetch each weekly run, all 7 countries in one pipeline run. `posting_id = sha1("adzuna:{upstream_id}")` is stable, so the same posting reappears with the same id week-over-week until upstream removes it. |
+| Adzuna | `GET /v1/api/jobs/{country}/search/{page}` | Has `max_days_old` / `sort_by=date` knobs but no cursor — every call returns the current top N for the (country, keyword) query. | Full re-fetch each weekly run, all active countries (gb, es) in one pipeline run. `posting_id = sha1("adzuna:{upstream_id}")` is stable, so the same posting reappears with the same id week-over-week until upstream removes it. |
 
 **What that means for our data:**
 
@@ -133,10 +133,10 @@ Per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-nam
 - Concurrency group `refresh-${{ matrix.preset }}` serialises same-preset runs (no race against `latest-{preset_id}`), allows cross-preset parallelism.
 - Release tag scheme: `latest-{preset_id}` (moving), `data-{preset_id}-YYYY-MM-DD` (immutable).
 - Asset names: `latest-{preset_id}.parquet`, `manifest.json` (preset-aware via the release tag namespace).
-- Adding a preset: copy a YAML in `config/runs/`, add `preset_id` to the matrix list in `refresh.yml`, add an entry to `site/src/data/presets.json` for the switcher. No Python change.
+- Adding a preset **today**: copy a YAML in `config/runs/`, add `preset_id` to the matrix list in `refresh.yml`, and un-hardcode the preset in `.github/workflows/pages.yml` (`PRESET_ID` env) and `site/src/data/postings.parquet.js` (`PRESET_ID` const) — both currently pin `data_analyst_eu`. To be simplified when multi-preset enumeration + the dashboard switcher land (queued per ADR-019).
 
 ## Deploy
 
 - **Refresh:** `.github/workflows/refresh.yml` runs the pipeline weekly + on-demand, uploads accumulated parquet to `latest-{preset_id}` GitHub Release (re-clobbered each run) and a dated `data-{preset_id}-YYYY-MM-DD` Release for audit history. See [ADR-004](../DECISIONS.md#adr-004--storage--delivery-parquet-via-github-releases-as-cdn), [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming).
-- **Pages:** `.github/workflows/pages.yml` builds `site/` with Observable Framework. Downloads all `latest-*` releases at build time, generates `site/src/data/presets.json` from `config/runs/*.yaml`, uploads via `actions/upload-pages-artifact`, deploys via `actions/deploy-pages`. Triggered by `workflow_run` after any `refresh.yml` matrix job succeeds. See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo).
+- **Pages:** `.github/workflows/pages.yml` builds `site/` with Observable Framework. Downloads the single hardcoded preset's release (`PRESET_ID: data_analyst_eu`) at build time — `site/src/data/presets.json.js` enumerates the local parquets, and multi-preset download is queued per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming) — uploads via `actions/upload-pages-artifact`, deploys via `actions/deploy-pages`. Triggered by `workflow_run` after any `refresh.yml` matrix job succeeds. See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo).
 - **One-time GitHub configuration** — secrets, Pages source, workflow permissions — is checklisted in [`docs/github-setup.md`](github-setup.md).

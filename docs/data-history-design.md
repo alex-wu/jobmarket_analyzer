@@ -86,13 +86,13 @@ Not in P9. Listed here for the implementation phase.
    - Write single accumulated parquet.
 
 2. **`src/jobpipe/runner.py`** — extend `run_publish()`:
-   - Optional `--accumulate-weeks N` flag (default unset → current snapshot behaviour).
+   - Optional accumulation-window knob (`accumulate_window_days` as shipped; default unset → current snapshot behaviour).
    - When set: shell out to `gh release list` filtered to `data-*` tags within the window, download each, call `export_accumulated()`.
 
-3. **`config/runs/data_analyst_ireland.yaml`** — add:
+3. **`config/runs/data_analyst_eu.yaml`** — add:
    ```yaml
    publish:
-     accumulate_weeks: 26
+     accumulate_window_days: 180
    ```
 
 4. **`site/src/data/postings.parquet.js`** — name unchanged; payload is now the accumulated artifact. No dashboard-side code changes needed unless we add `first_seen_at`/`last_seen_at` visualisations (then P12-ish).

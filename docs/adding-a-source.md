@@ -18,9 +18,9 @@ A source adapter ingests job postings from one external API and emits a DataFram
    - `country`: ISO-3166-1 alpha-2.
    - Leave salary fields `None` if the source doesn't expose them — normalisation handles the gap.
 
-3. **Record an HTTP cassette.**
-   - Run the live API once locally: `uv run pytest tests/sources/test_<name>.py --record-mode=new_episodes`.
-   - The cassette lands under `tests/cassettes/<name>/`. Verify no secrets in the YAML.
+3. **Build a JSON fixture.**
+   - Probe the live API once with `httpx`, save a trimmed real sample under `tests/fixtures/<name>/`. Verify no secrets in the JSON.
+   - Drive the unit test with `httpx.MockTransport` returning the fixture. (VCR cassettes were abandoned in P3 — see CONTRIBUTING.md testing discipline.)
 
 4. **Write the unit test.**
    - Path: `tests/sources/test_<name>.py`.
@@ -28,7 +28,7 @@ A source adapter ingests job postings from one external API and emits a DataFram
 
 5. **Wire into a preset.**
    - Set `enabled: true` for your adapter in `config/runs/<preset>.yaml`.
-   - Add to the v1 preset only if it materially improves coverage for data-analyst roles in Ireland/Eurozone.
+   - Add to the v1 preset (`data_analyst_eu`, currently gb + es) only if it materially improves coverage for data-analyst roles in those markets.
 
 6. **Document.**
    - Append the adapter to the source table in `docs/architecture.md`.
