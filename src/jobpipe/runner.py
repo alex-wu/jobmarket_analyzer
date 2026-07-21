@@ -11,6 +11,7 @@ enriched Parquet. Benchmarks and publish land in P4 / P5.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -198,6 +199,21 @@ def fetch_sources(preset: dict[str, Any]) -> pd.DataFrame:
             category=FutureWarning,
         )
         combined = pd.concat(frames, ignore_index=True)
+
+    # A malformed upstream `created` timestamp coerces to NaT in the adapter;
+    # posted_at is non-nullable in strict PostingSchema, so one bad row would
+    # abort the whole weekly run. Quarantine instead of failing.
+    nat_mask = combined["posted_at"].isna()
+    if bool(nat_mask.any()):
+        logger.warning(
+            "fetch: dropping %d row(s) with unparseable posted_at (posting_ids=%s)",
+            int(nat_mask.sum()),
+            combined.loc[nat_mask, "posting_id"].tolist()[:10],
+        )
+        combined = combined.loc[~nat_mask].reset_index(drop=True)
+    if combined.empty:
+        raise EmptyRunError("all fetched rows were dropped by posted_at quarantine")
+
     combined = inject_accumulation_cols(combined)
     PostingSchema.validate(combined, lazy=True)
     return combined
@@ -504,14 +520,36 @@ def run_publish(
     if accumulate_window_days is None:
         accumulate_window_days = publish_cfg.get("accumulate_window_days")
     if accumulate_window_days is not None and not partition_by:
+        latest_path = bundle_root / "postings" / output_filename
         _accumulate_into_latest(
-            bundle_root / "postings" / output_filename,
+            latest_path,
             out_root,
             preset_id,
             int(accumulate_window_days),
         )
+        # manifest.postings.row_count deliberately measures the FRESH weekly
+        # fetch (that is what the gate thresholds calibrate against). Record
+        # the shipped accumulated corpus size alongside it so the manifest
+        # describes the asset it travels with.
+        _annotate_accumulated_stats(
+            bundle_root / "manifest.json", latest_path, int(accumulate_window_days)
+        )
 
     return bundle_root
+
+
+def _annotate_accumulated_stats(manifest_path: Path, latest_path: Path, window_days: int) -> None:
+    """Add accumulated-corpus stats to an existing publish manifest."""
+    import pyarrow.parquet as pq
+
+    manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    postings = manifest.get("postings")
+    if not isinstance(postings, dict):
+        return
+    parquet_file = pq.ParquetFile(latest_path)  # type: ignore[no-untyped-call]
+    postings["accumulated_row_count"] = int(parquet_file.metadata.num_rows)
+    postings["accumulate_window_days"] = window_days
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _accumulate_into_latest(

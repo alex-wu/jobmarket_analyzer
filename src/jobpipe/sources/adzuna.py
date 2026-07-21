@@ -17,16 +17,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 import pandas as pd
 from pydantic import Field
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from jobpipe.httputil import is_retryable_http_error
+from jobpipe.redaction import scrub_credentials
 from jobpipe.settings import settings
 from jobpipe.sources import SourceConfig, SourceFetchError, register
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 
@@ -81,17 +86,28 @@ class AdzunaAdapter:
         rows: list[dict[str, Any]] = []
         ingested_at = datetime.now(UTC)
 
+        pairs = [(c, k) for c in cfg.countries for k in cfg.keywords]
+        fetched_pairs = 0
         try:
-            for country in cfg.countries:
-                for keyword in cfg.keywords:
-                    rows.extend(self._fetch_one(http, cfg, country, keyword, ingested_at))
-                    if len(rows) >= cfg.max_results:
-                        break
+            for country, keyword in pairs:
+                rows.extend(self._fetch_one(http, cfg, country, keyword, ingested_at))
+                fetched_pairs += 1
                 if len(rows) >= cfg.max_results:
                     break
         finally:
             if own_client:
                 http.close()
+
+        if fetched_pairs < len(pairs):
+            skipped = pairs[fetched_pairs:]
+            logger.warning(
+                "adzuna: max_results=%d reached after %d/%d (country, keyword) "
+                "searches — skipped %s; raise max_results or trim keywords/countries",
+                cfg.max_results,
+                fetched_pairs,
+                len(pairs),
+                skipped,
+            )
 
         df = pd.DataFrame(rows)
         if not df.empty:
@@ -120,13 +136,32 @@ class AdzunaAdapter:
                 break
         return rows
 
+    def _get_page(
+        self,
+        http: httpx.Client,
+        cfg: AdzunaConfig,
+        country: str,
+        keyword: str,
+        page: int,
+    ) -> dict[str, Any]:
+        try:
+            return self._get_page_raw(http, cfg, country, keyword, page)
+        except httpx.HTTPError as exc:
+            # ADR-015: httpx error text embeds the credentialed request URL;
+            # scrub before wrapping so the message is safe on any logger.
+            # (Converting INSIDE the retried function would hide the httpx
+            # error from tenacity's predicate and disable the retry.)
+            raise SourceFetchError(
+                scrub_credentials(f"adzuna {country!r} page={page}: {exc}")
+            ) from exc
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception_type(httpx.HTTPError),
+        retry=retry_if_exception(is_retryable_http_error),
         reraise=True,
     )
-    def _get_page(
+    def _get_page_raw(
         self,
         http: httpx.Client,
         cfg: AdzunaConfig,
@@ -144,11 +179,8 @@ class AdzunaAdapter:
         }
         if cfg.max_days_old is not None:
             params["max_days_old"] = cfg.max_days_old
-        try:
-            r = http.get(url, params=params)
-            r.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise SourceFetchError(f"adzuna {country!r} page={page}: {exc}") from exc
+        r = http.get(url, params=params)
+        r.raise_for_status()
         return r.json()  # type: ignore[no-any-return]
 
 

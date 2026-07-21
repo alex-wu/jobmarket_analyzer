@@ -159,8 +159,19 @@ def test_fetch_raises_on_missing_credentials(monkeypatch: pytest.MonkeyPatch) ->
         AdzunaAdapter().fetch(cfg)
 
 
-def test_fetch_raises_typed_error_on_http_5xx(fake_creds: None) -> None:
-    def handler(_: httpx.Request) -> httpx.Response:
+@pytest.fixture
+def no_retry_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero out tenacity's exponential backoff so retry tests run instantly."""
+    import tenacity
+
+    monkeypatch.setattr(AdzunaAdapter._get_page_raw.retry, "wait", tenacity.wait_none())
+
+
+def test_fetch_raises_typed_error_on_http_5xx(fake_creds: None, no_retry_wait: None) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
         return httpx.Response(500, text="internal")
 
     cfg = AdzunaConfig(
@@ -170,6 +181,45 @@ def test_fetch_raises_typed_error_on_http_5xx(fake_creds: None) -> None:
     )
     with pytest.raises(SourceFetchError, match="adzuna"):
         AdzunaAdapter().fetch(cfg, client=_mock_client(httpx.MockTransport(handler)))
+    # 5xx is transient — tenacity must exhaust all 3 attempts.
+    assert len(calls) == 3
+
+
+def test_fetch_4xx_not_retried_and_message_scrubbed(fake_creds: None) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(401, text="unauthorized")
+
+    cfg = AdzunaConfig(keywords=["x"], countries=["gb"], max_pages=1)
+    with pytest.raises(SourceFetchError) as excinfo:
+        AdzunaAdapter().fetch(cfg, client=_mock_client(httpx.MockTransport(handler)))
+
+    # 4xx is deterministic — exactly one attempt, no backoff burn.
+    assert len(calls) == 1
+    # ADR-015: the wrapped httpx message embeds the request URL; credentials
+    # must be scrubbed before the error can reach any logger.
+    message = str(excinfo.value)
+    assert "test-key" not in message
+    assert "test-id" not in message
+    assert "REDACTED" in message
+
+
+def test_fetch_warns_when_max_results_truncates_pairs(
+    fake_creds: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_load("search_page1.json"))
+
+    cfg = AdzunaConfig(keywords=["x"], countries=["gb", "es"], max_pages=1, max_results=2)
+    with caplog.at_level("WARNING", logger="jobpipe.sources.adzuna"):
+        df = AdzunaAdapter().fetch(cfg, client=_mock_client(httpx.MockTransport(handler)))
+
+    assert len(df) == 2
+    truncation_warnings = [r for r in caplog.records if "max_results" in r.getMessage()]
+    assert len(truncation_warnings) == 1
+    assert "1/2" in truncation_warnings[0].getMessage()
 
 
 def test_fetch_returns_empty_frame_when_no_results(fake_creds: None) -> None:

@@ -37,14 +37,15 @@ the GitHub Actions workflow ``timeout-minutes: 30`` budget.
 from __future__ import annotations
 
 import logging
-import re
 import time
 from pathlib import Path
 from typing import Any
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from jobpipe.httputil import is_retryable_http_error
+from jobpipe.redaction import scrub_credentials
 from jobpipe.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -53,18 +54,10 @@ BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 DEFAULT_CACHE_DIR = Path("data/cache/work_arrangement")
 DEFAULT_INTER_CALL_SLEEP_SECONDS = 0.5
 
-# ADR-015: app_id / app_key / api_key sit in the query string on every Adzuna
-# request. httpx error messages echo the request URL verbatim — wrapping that
-# message into our own RuntimeError bypasses CredentialScrubFilter, which is
-# only attached to httpx / httpcore loggers. Scrub before re-raising.
-_CREDENTIAL_PARAMS = ("app_id", "app_key", "api_key", "api-key")
-_CREDENTIAL_RE = re.compile(
-    r"(?i)\b(" + "|".join(re.escape(p) for p in _CREDENTIAL_PARAMS) + r")=[^&\s'\"]+"
-)
-
-
-def _scrub(message: str) -> str:
-    return _CREDENTIAL_RE.sub(r"\1=REDACTED", message)
+# ADR-015: app_id / app_key sit in the query string on every Adzuna request.
+# httpx error messages echo the request URL verbatim — scrub before re-raising
+# so wrapped errors are safe on any logger.
+_scrub = scrub_credentials
 
 
 class AdzunaDetailsError(RuntimeError):
@@ -167,7 +160,9 @@ class DetailsFetcher:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception_type(httpx.HTTPError),
+        # Excludes 4xx AND the manual _NotFound (404) — an expired posting is
+        # a terminal answer, not a transient fault worth 3 backoff attempts.
+        retry=retry_if_exception(is_retryable_http_error),
         reraise=True,
     )
     def _get_details(self, country: str, external_id: str) -> dict[str, Any]:

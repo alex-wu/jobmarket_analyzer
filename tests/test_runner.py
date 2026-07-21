@@ -189,6 +189,55 @@ def test_fetch_sources_raises_empty_when_zero_rows(raising_source_registered: ob
         fetch_sources(preset)
 
 
+def test_fetch_sources_quarantines_nat_posted_at(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A malformed upstream `created` coerces to NaT; strict PostingSchema
+    would abort the whole run on one bad row. It must be dropped with a
+    warning instead."""
+
+    class _NatAdapter:
+        name = "natsource"
+        config_model = SourceConfig
+
+        def fetch(self, config: SourceConfig) -> pd.DataFrame:
+            good = _valid_posting_row(1)
+            bad = _valid_posting_row(2)
+            bad["posted_at"] = pd.NaT
+            return pd.DataFrame([good, bad])
+
+    sources._REGISTRY["natsource"] = _NatAdapter()
+    try:
+        preset = {"preset_id": "demo", "sources": {"natsource": {"enabled": True}}}
+        with caplog.at_level("WARNING", logger="jobpipe.runner"):
+            df = fetch_sources(preset)
+    finally:
+        sources._REGISTRY.pop("natsource", None)
+
+    assert len(df) == 1
+    assert not df["posted_at"].isna().any()
+    assert any("unparseable posted_at" in r.getMessage() for r in caplog.records)
+
+
+def test_fetch_sources_raises_empty_when_all_rows_quarantined() -> None:
+    class _AllNatAdapter:
+        name = "allnat"
+        config_model = SourceConfig
+
+        def fetch(self, config: SourceConfig) -> pd.DataFrame:
+            bad = _valid_posting_row(1)
+            bad["posted_at"] = pd.NaT
+            return pd.DataFrame([bad])
+
+    sources._REGISTRY["allnat"] = _AllNatAdapter()
+    try:
+        preset = {"preset_id": "demo", "sources": {"allnat": {"enabled": True}}}
+        with pytest.raises(EmptyRunError, match="quarantine"):
+            fetch_sources(preset)
+    finally:
+        sources._REGISTRY.pop("allnat", None)
+
+
 def test_fetch_sources_concat_no_future_warning() -> None:
     """Regression: pandas 2.x FutureWarning fires on concat when one frame
     has an all-NA column and another has real values. Production refresh
@@ -685,3 +734,26 @@ def test_run_normalise_writes_sibling_benchmarks_parquet(
     df = pd.read_parquet(bench_path)
     assert len(df) == 2
     assert (df["source"] == "fake_bench").all()
+
+
+def test_annotate_accumulated_stats_records_corpus_size(tmp_path: Path) -> None:
+    """After accumulation the shipped parquet holds the rolling corpus while
+    manifest.postings.row_count keeps measuring the fresh weekly fetch (the
+    gate's calibration target). The annotation records the corpus size so the
+    manifest describes the asset it travels with."""
+    import json
+
+    from jobpipe.runner import _annotate_accumulated_stats
+
+    latest = tmp_path / "latest-demo.parquet"
+    pd.DataFrame(_valid_posting_row(i) for i in range(5)).to_parquet(latest, index=False)
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps({"postings": {"row_count": 2}}), encoding="utf-8")
+
+    _annotate_accumulated_stats(manifest_path, latest, 180)
+
+    out = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert out["postings"]["row_count"] == 2  # fresh delta untouched
+    assert out["postings"]["accumulated_row_count"] == 5
+    assert out["postings"]["accumulate_window_days"] == 180
