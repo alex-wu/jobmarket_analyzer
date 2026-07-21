@@ -145,7 +145,7 @@ Both environments read from `data/gh_databuild_samples/latest-{preset_id}.parque
 | | How the file arrives |
 |---|---|
 | **Local** | Developer runs `gh release download latest-{preset} …` from §1. |
-| **CI** (`pages.yml`) | The workflow's "Download latest dataset from release" step enumerates all `latest-*` releases and downloads each preset's `latest-{preset_id}.parquet`. |
+| **CI** (`pages.yml`) | The workflow's "Download latest dataset from release" step downloads the single hardcoded preset's `latest-data_analyst_eu.parquet` (`PRESET_ID` env in `pages.yml`). Multi-preset enumeration is queued per ADR-019. |
 
 The data loader does not branch on environment — single code path, identical bytes. If a refresh changes the schema, both environments break the same way at the same time, which is the point.
 

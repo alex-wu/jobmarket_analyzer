@@ -389,6 +389,7 @@ Added 2026-05-17 per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-pres
 
 - `site/src/data/presets.json` — generated at build time by `pages.yml` from `config/runs/*.yaml` (excluding `_archived/`). Shape: `[{preset_id, label, default, description}, …]`.
 - For each preset, the data loader fetches `data/gh_databuild_samples/latest-{preset_id}.parquet`. CI's `pages.yml` step enumerates all `latest-*` releases and downloads each preset's parquet.
+- **Correction (2026-07-21, never shipped as specced):** `pages.yml` hardcodes `PRESET_ID: data_analyst_eu` and downloads only that release; `site/src/data/presets.json.js` enumerates local `latest-*.parquet` files — no generator from `config/runs/*.yaml` exists. Multi-preset enumeration + switcher remain queued (ADR-019).
 
 ### Reactive wiring
 

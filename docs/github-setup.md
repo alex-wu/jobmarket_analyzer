@@ -46,10 +46,10 @@ Forks that originate from an already-public repo don't need this step — the up
 
 | Secret | Required? | Used by | Notes |
 |---|---|---|---|
-| `ADZUNA_APP_ID` | Optional* | `src/jobpipe/sources/adzuna.py` | Free tier via [developer.adzuna.com](https://developer.adzuna.com/). The Adzuna adapter no-ops gracefully when absent, but you lose Eurozone breadth. |
-| `ADZUNA_APP_KEY` | Optional* | `src/jobpipe/sources/adzuna.py` | Same. |
+| `ADZUNA_APP_ID` | **Required** | `src/jobpipe/sources/adzuna.py` | Free tier via [developer.adzuna.com](https://developer.adzuna.com/). |
+| `ADZUNA_APP_KEY` | **Required** | `src/jobpipe/sources/adzuna.py` | Same. |
 
-\* "Optional" = the run still succeeds without them; the Adzuna source is skipped fail-isolated. ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / Eurostat) are credential-free, so you get a partial dataset with no secrets at all.
+Required because Adzuna is the **only enabled source** in v1 — ATS and benchmark adapters are shelved (`enabled: false`, [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)). Without these secrets a run yields zero rows and the strict gate (`fail_on_issues: true`) fails the workflow.
 
 `GITHUB_TOKEN` is auto-injected by Actions per run — do not create a PAT for it. LLM secrets are not used in v1 ([ADR-013](../DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1)).
 
@@ -130,8 +130,8 @@ gh run watch
 Then verify:
 
 ```bash
-gh release view latest                    # should list postings/*.parquet and benchmarks/*.parquet
-gh release list --limit 5                 # should show "latest" plus the dated tag
+gh release view latest-data_analyst_eu   # should list latest-data_analyst_eu.parquet and manifest.json
+gh release list --limit 5                 # should show "latest-data_analyst_eu" plus the dated data-data_analyst_eu-YYYY-MM-DD tag
 ```
 
 The first Pages deploy happens automatically after the next successful `refresh.yml` (via the `workflow_run` trigger in `pages.yml`), or immediately on any push to `main` under `site/**`. Visit the URL shown by `gh api repos/:owner/:repo/pages`. Day-to-day operations are documented in [`docs/operations.md`](operations.md).

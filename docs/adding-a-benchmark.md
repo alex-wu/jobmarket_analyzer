@@ -14,7 +14,7 @@ A benchmark adapter pulls official wage statistics from a statistics agency and 
    - Convert all currencies to EUR via `jobpipe.fx` (ECB rates).
    - `source_url`: required — every benchmark row links back to its source page.
 
-3. **Record HTTP cassette + write unit test** (same pattern as source adapters; tests under `tests/benchmarks/`).
+3. **Build a JSON fixture + `httpx.MockTransport` unit test** (same pattern as source adapters; trimmed real samples under `tests/fixtures/benchmarks/<name>/`, tests under `tests/benchmarks/`).
 
 4. **Wire into the preset.** Add a block under `benchmarks:` in `config/runs/<preset>.yaml`.
 
