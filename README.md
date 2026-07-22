@@ -88,6 +88,8 @@ One-time manual GitHub setup (secrets, Pages source, workflow permissions, secre
 
 What we know we haven't solved yet (Adzuna attribution footer, gate calibration, preset switcher, …) lives in [docs/open-questions.md](docs/open-questions.md).
 
+Picking the project up for a working session? Start at [docs/bootstrap.md](docs/bootstrap.md) — read order, state snapshot, first checks, and the prioritised backlog.
+
 ---
 
 ## Project status
