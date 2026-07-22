@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Compare Periods page (2026-07-22)
+- Seventh dashboard page `/compare`: pick two periods (quarter / month / week
+  granularity) and see period-over-period movement — KPI deltas (postings,
+  median €p50, salary-disclosure rate, remote share), skill share
+  gainers/losers, ISCO + work-arrangement mix shifts, median salary by
+  country. Share-based deltas are the primary signal; a callout explains why
+  raw-count deltas across the accumulation start are collection artefacts.
+- Firefox recommended-browser note on Overview + methodology troubleshooting
+  (upstream duckdb-wasm #1658 intermittently breaks data loading in
+  Chromium-on-Windows; Firefox unaffected).
+- Global table of contents enabled; two-column chart grids on Overview,
+  Skills & Roles, and Work Arrangement; long axis labels ellipsis-clipped.
+
+### Changed — documentation release cleanup (2026-07-22)
+- `DECISIONS.md` compressed ~60%: every ADR keeps its number, date, decision,
+  and rationale; implementation diaries, run/commit identifiers, and internal
+  note references removed.
+- Deleted superseded internal design docs (`dashboard_strategy`,
+  `dashboard_data_gaps`, `data-history-design`, `adding-a-benchmark`);
+  benchmark-adapter pattern note folded into `adding-a-source.md`.
+- `docs/open-questions.md` rewritten as a public known-limitations/roadmap
+  list.
+- README status board replaced with a shipped/next summary; phase-numbering
+  and internal references removed across docs.
+- Maintainer contact in `pyproject.toml` switched to the GitHub noreply
+  address.
+- Historical note: the ISCO fuzzy-match cutoff recorded as 88 in the schema-v1
+  entry below was lowered to 85 on 2026-05-15 after measuring live match
+  rates; `data_analyst_ireland.yaml` referenced in early entries was renamed
+  to `data_analyst_eu.yaml` (archived under `config/runs/_archived/`).
+
 ### Fixed — pipeline hardening (2026-07-21, PR #33)
 - **Credential leak on Adzuna HTTP errors closed.** `adzuna.py` wrapped httpx
   errors verbatim (message embeds the credentialed request URL) and
@@ -119,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config/esco/isco08_labels.parquet` — 2 137 labels × 436 unique 4-digit ISCO codes, built from ESCO v1.2.1 via `scripts/build_esco_snapshot.py`. The snapshot walks the ISCO concept tree from the 10 major groups (ESCO's `/api/search` and `/api/resource/concept?isInScheme=...` paginations both cap at offset=100). Provenance + EUPL-1.2 attribution in `config/esco/README.md`.
 - `src/jobpipe/llm.py` — stub interface. `LLMUnavailableError` + `classify_title_to_isco(title, allowed_codes)`. Raises immediately under `LLM_ENABLED=false`; the real OpenAI-compatible client lands in a follow-up. Not invoked anywhere in this phase — exists to lock the contract.
 - `src/jobpipe/benchmarks/_common.py` — `last_fetch_mtime` (newest parquet under an adapter dir), `should_skip(now, last_fetch, min_interval_hours)` (pure throttle), `convert_benchmark_to_eur` (per-row FX via the `currency` column; drops rows whose currency is missing from the ECB feed).
-- `src/jobpipe/benchmarks/cso.py` — CSO Ireland `EHQ03` PxStat JSON-stat 2.0 adapter. EUR-native (no FX). Weekly earnings annualised x52. **Caveat documented in the module docstring + `docs/adding-a-benchmark.md`:** the cube lacks a 4-digit ISCO axis; it exposes a 3-bucket "Type of Employee" classification (managers+profs / clerical+sales / manual). The adapter maps each requested ISCO code to the umbrella bucket via the leading digit.
+- `src/jobpipe/benchmarks/cso.py` — CSO Ireland `EHQ03` PxStat JSON-stat 2.0 adapter. EUR-native (no FX). Weekly earnings annualised x52. **Caveat documented in the module docstring:** the cube lacks a 4-digit ISCO axis; it exposes a 3-bucket "Type of Employee" classification (managers+profs / clerical+sales / manual). The adapter maps each requested ISCO code to the umbrella bucket via the leading digit.
 - `src/jobpipe/benchmarks/oecd.py` — generic OECD SDMX-JSON 2.0 adapter, configurable via `dataflow_id` + `key`. Handles `UNIT_MEASURE` per-observation currency attribute. **Disabled by default** — `sdmx.oecd.org` is Cloudflare-protected and returns 403 + HTML to unauthenticated GH-Actions workers. Adapter detects this (content-type sniff) and returns an empty frame to keep the run going.
 - `src/jobpipe/benchmarks/eurostat.py` — Eurostat `earn_ses_annual` JSON-stat 2.0 adapter. Strips the `OC` prefix on the `isco08` dimension and keeps only 4-digit leaves (aggregate buckets `OC25`, `OC1-5` etc. are dropped). Auto-selects the latest SES vintage in the response; the 4-year survey lag should be flagged in the dashboard.
 - `src/jobpipe/runner.py` — `fetch_benchmarks(preset, out_root, now=None)` mirrors `fetch_sources`: fail-isolated per adapter, throttled per `min_interval_hours` via mtime of the newest parquet under `data/raw/benchmarks/<name>/`. `run_fetch` wires it in after the postings write; `run_normalise` concats each adapter's latest parquet into a sibling `data/enriched/<run_id>/benchmarks.parquet`.

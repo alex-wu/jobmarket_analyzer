@@ -65,31 +65,30 @@ A new top-level dep needs a one-line justification in the PR description.
 
 ## Testing discipline
 
-- **Hand-built JSON fixtures under `tests/fixtures/<area>/<adapter>/`** drive `httpx.MockTransport`-based unit tests. P3 abandoned `pytest-recording` VCR after the noqa-shuffle problems; keep the new pattern.
-- **Pre-flight every external endpoint** before writing a parser — probe the response shape with `httpx` + save a trimmed real sample as the fixture. Document any divergence (deprecated dataset codes, Cloudflare gating, etc.) in the session log before writing parser code.
+- **Hand-built JSON fixtures under `tests/fixtures/<area>/<adapter>/`** drive `httpx.MockTransport`-based unit tests (preferred over VCR-cassette recording).
+- **Pre-flight every external endpoint** before writing a parser — probe the response shape with `httpx` + save a trimmed real sample as the fixture. Document any divergence (deprecated dataset codes, Cloudflare gating, etc.) in the PR description.
 - **Schema tests** — every adapter test must assert `PostingSchema.validate(output, lazy=True)` or `BenchmarkSchema.validate(...)` passes.
-- **Coverage gates:** ≥80% line, ≥70% branch overall; per-adapter coverage ≥90% is the team norm (some benchmark adapters dipped into the mid-80s in P4 — pull them back up when fixtures grow).
+- **Coverage gates:** ≥80% line, ≥70% branch overall; per-adapter coverage ≥90% is the norm.
 
-**Windows pytest flake:** an intermittent `numpy: cannot load module more than once per process` import error appears when running a *single* benchmark test file in isolation. Workaround: clear `__pycache__` and run the broader `tests/benchmarks/` selection (or the full suite). Documented in P3 + P4 session logs.
+**Windows pytest flake:** an intermittent `numpy: cannot load module more than once per process` import error appears when running a *single* benchmark test file in isolation. Workaround: clear `__pycache__` and run the broader `tests/benchmarks/` selection (or the full suite).
 
-## Phase-gated build
+## Scoped PRs
 
-One PR per phase. Each PR: code + tests + README/CHANGELOG delta where relevant. Do not skip ahead. Phases are defined in [DECISIONS.md](DECISIONS.md) and the [README phase plan](README.md#project-status).
+One PR per coherent change. Each PR: code + tests + README/CHANGELOG delta where relevant.
 
 ## Git workflow
 
-- One feature branch per phase (`p1-adzuna-source`, `p2-normalise`, ...).
+- One feature branch per change (`feat/<short-name>`).
 - PR against `main`. CI must pass. No `--no-verify`.
 - Squash-merge.
 - Conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `ci:`, `perf:`, `style:`.
 - No `git push --force` to `main`.
-- Tag `v0.1.0` when all P0–P7 acceptance criteria pass simultaneously.
 
 ## Adding things
 
 - **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.parquet.js` (both currently pin `data_analyst_eu`). Multi-preset auto-discovery is queued per [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming); until it lands this is the honest procedure.
 - **New source adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable pattern survives; walkthrough at [docs/adding-a-source.md](docs/adding-a-source.md) is the reactivation path.
-- **New benchmark adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Walkthrough: [docs/adding-a-benchmark.md](docs/adding-a-benchmark.md).
+- **New benchmark adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Follows the same Protocol pattern as sources, under `src/jobpipe/benchmarks/` (see the note in [docs/adding-a-source.md](docs/adding-a-source.md)).
 - **New role / geography**: add a YAML under `config/runs/` (plus the workflow/loader touch-points above).
 
 ## Reporting an issue
