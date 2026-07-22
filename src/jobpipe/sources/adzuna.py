@@ -7,10 +7,11 @@ conservatively at ``max_pages * results_per_page`` per ``fetch`` call. Use the
 preset's ``min_interval_hours`` knob (honoured by the refresh workflow) to
 throttle across runs.
 
-Country coverage in 2026 (from public country pages): at, au, be, br, ca, ch,
-de, es, fr, gb, in, it, mx, nl, nz, pl, sg, us, za. **Ireland (``ie``) is not
-served** — for IE-focused analysis pair this adapter with the ATS adapters
-(Greenhouse / Lever / Ashby / Personio, landing in P3) or with Remotive.
+Country coverage in 2026 (per the official OpenAPI spec): at, au, be, br, ca,
+ch, de, es, fr, gb, in, it, mx, nl, nz, pl, sg, us, za. **Ireland (``ie``) is
+not served** — for IE-focused analysis pair this adapter with the shelved ATS
+adapters (Greenhouse / Lever / Ashby / Personio, ``enabled: false`` per
+ADR-017).
 """
 
 from __future__ import annotations

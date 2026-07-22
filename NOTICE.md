@@ -20,9 +20,9 @@ This project redistributes a derived subset of ESCO in three places, all under E
 
 Job postings retrieved via the [Adzuna API](https://developer.adzuna.com/) are surfaced with attribution and link-out to the original posting on Adzuna or the underlying advertiser.
 
-### Greenhouse / Lever / Ashby / Personio public board APIs
+### Greenhouse / Lever / Ashby / Personio public board APIs (shelved in v1)
 
-Postings from public job-board endpoints of these ATS providers are surfaced with links back to the original career page. No private endpoints, authentication, or proprietary data is accessed.
+ATS adapters are shelved per ADR-017 (`enabled: false`) — v1 fetches nothing from these providers. If re-enabled: postings from public job-board endpoints are surfaced with links back to the original career page. No private endpoints, authentication, or proprietary data is accessed.
 
 ### Statistical agencies (shelved in v1)
 

@@ -24,8 +24,8 @@ flowchart TD
 
     latest_artifact --> latest_release["GitHub Release<br/>latest-{preset_id}<br/>(re-clobbered each run)"]
     latest_release --> loader["Observable Framework<br/>build-time data loader"]
-    presets_manifest["site/src/data/presets.json"] --> loader
-    loader --> site["site/ static build<br/>(preset switcher UI)"]
+    presets_manifest["site/src/data/presets.json.js<br/>enumerates local latest-*.parquet"] --> loader
+    loader --> site["site/ static build<br/>(single preset today; switcher queued per ADR-019)"]
     site --> pages["GitHub Pages<br/>https://alex-wu.github.io/jobmarket_analyzer/"]
     pages -.->|user clicks posting| source_url["posting_url<br/>(back to original Adzuna board)"]
 
@@ -64,7 +64,7 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | Test fixtures | `tests/fixtures/<area>/<adapter>/` | Hand-built trimmed JSON samples driving `httpx.MockTransport` unit tests (replaces VCR after P3). |
 | Refresh workflow | `.github/workflows/refresh.yml` | Weekly Monday 06:00 UTC cron + `workflow_dispatch`. Matrix over presets. Per-preset concurrency group. Per-preset release tags. |
 | Pages workflow | `.github/workflows/pages.yml` | Builds `site/`, downloads the single hardcoded preset's release (`PRESET_ID: data_analyst_eu`), deploys via `actions/deploy-pages`. `site/src/data/presets.json.js` enumerates local `data/gh_databuild_samples/latest-*.parquet` — no generator from `config/runs/*.yaml` exists. Multi-preset enumeration queued per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming). See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo). |
-| Site | `site/` | Observable Framework project. Preset switcher UI selects which `latest-{preset_id}.parquet` is active. Build-time data loaders (per [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute) consequence) keep cold-load tractable for the 150-250 MB accumulated artifacts. |
+| Site | `site/` | Observable Framework project. Loads the single active preset's `latest-{preset_id}.parquet` (switcher queued per ADR-019). Build-time data loaders (per [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute) consequence) keep cold-load tractable for the 150-250 MB accumulated artifacts. |
 
 ## Schemas (the contract)
 
