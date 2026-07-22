@@ -1,6 +1,5 @@
 ---
 title: Quality & Coverage
-toc: false
 ---
 
 # Quality & Coverage

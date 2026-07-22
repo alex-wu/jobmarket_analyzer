@@ -1,6 +1,5 @@
 ---
 title: Geography
-toc: false
 ---
 
 # Geography

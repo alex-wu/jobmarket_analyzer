@@ -1,6 +1,5 @@
 ---
 title: Skills & Roles
-toc: false
 ---
 
 # Skills & Roles
@@ -59,7 +58,7 @@ const whereT = !filters.title || filters.title === "(all)"
   : `${andClause(where)} title = '${sqlEscape(filters.title)}'`;
 ```
 
-## Top titles
+## Top titles & top skills
 
 ```js
 const titles = Array.from(await db.query(`
@@ -72,15 +71,34 @@ const titles = Array.from(await db.query(`
 `));
 ```
 
-${titles.length === 0
-  ? html`<div class="card"><div>No titles in current selection.</div></div>`
-  : expandable(
-      "Top 15 titles",
-      resize((width) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: 380, width})),
-      (w, h) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: h, width: w})
-    )}
+```js
+const skillRows = Array.from(await db.query(`
+  SELECT skill, COUNT(*)::INT AS n
+  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 25
+`));
+```
 
-## ISCO-08 major group mix
+<div class="grid grid-cols-2">
+  ${titles.length === 0
+    ? html`<div class="card"><h2>Top 15 titles</h2><div>No titles in current selection.</div></div>`
+    : expandable(
+        "Top 15 titles",
+        resize((width) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: 460, width})),
+        (w, h) => barChart(titles, {x: "n", y: "title", xLabel: "Postings", marginLeft: 220, height: h, width: w})
+      )}
+  ${skillRows.length === 0
+    ? html`<div class="card"><h2>Top 25 skills</h2><div>No tagged skills in current selection.</div></div>`
+    : expandable(
+        "Top 25 skills",
+        resize((width) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: 460, width})),
+        (w, h) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: h, width: w})
+      )}
+</div>
+
+## ISCO-08 mix & median salary
 
 ```js
 const iscoMix = Array.from(
@@ -94,16 +112,6 @@ const iscoMix = Array.from(
   (d) => ({...d, label: d.isco_major === "∅" ? "Unclassified" : iscoMajorLabel(d.isco_major)})
 );
 ```
-
-${iscoMix.length === 0
-  ? html`<div class="card"><div>No ISCO breakdown in current selection.</div></div>`
-  : expandable(
-      "ISCO-08 major group mix",
-      resize((width) => barChart(iscoMix, {x: "n", y: "label", xLabel: "Postings", marginLeft: 220, height: 380, width})),
-      (w, h) => barChart(iscoMix, {x: "n", y: "label", xLabel: "Postings", marginLeft: 220, height: h, width: w})
-    )}
-
-## Country × ISCO median salary
 
 ```js
 const heatRows = Array.from(
@@ -122,33 +130,22 @@ const heatRows = Array.from(
 );
 ```
 
-${heatRows.length === 0
-  ? html`<div class="card"><div>Heatmap needs at least 3 salaried + ISCO-tagged postings per cell. Loosen the filter to see it populate.</div></div>`
-  : expandable(
-      "Country × ISCO median €p50",
-      resize((width) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: Math.max(220, 36 * new Set(heatRows.map((d) => d.iscoLabel)).size), width})),
-      (w, h) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: h, width: w})
-    )}
-
-## Top skills
-
-```js
-const skillRows = Array.from(await db.query(`
-  SELECT skill, COUNT(*)::INT AS n
-  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
-  GROUP BY 1
-  ORDER BY 2 DESC
-  LIMIT 25
-`));
-```
-
-${skillRows.length === 0
-  ? html`<div class="card"><div>No tagged skills in current selection.</div></div>`
-  : expandable(
-      "Top 25 skills",
-      resize((width) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: 520, width})),
-      (w, h) => barChart(skillRows, {x: "n", y: "skill", xLabel: "Postings mentioning skill", marginLeft: 220, height: h, width: w})
-    )}
+<div class="grid grid-cols-2">
+  ${iscoMix.length === 0
+    ? html`<div class="card"><h2>ISCO-08 major group mix</h2><div>No ISCO breakdown in current selection.</div></div>`
+    : expandable(
+        "ISCO-08 major group mix",
+        resize((width) => barChart(iscoMix, {x: "n", y: "label", xLabel: "Postings", marginLeft: 220, height: 380, width})),
+        (w, h) => barChart(iscoMix, {x: "n", y: "label", xLabel: "Postings", marginLeft: 220, height: h, width: w})
+      )}
+  ${heatRows.length === 0
+    ? html`<div class="card"><h2>Country × ISCO median €p50</h2><div>Heatmap needs at least 3 salaried + ISCO-tagged postings per cell. Loosen the filter to see it populate.</div></div>`
+    : expandable(
+        "Country × ISCO median €p50",
+        resize((width) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: Math.max(220, 36 * new Set(heatRows.map((d) => d.iscoLabel)).size), width})),
+        (w, h) => heatmap(heatRows, {x: "country", y: "iscoLabel", value: "p50", valueLabel: "Median €p50", valueFormat: (v) => `€${(v / 1000).toFixed(0)}k`, marginLeft: 220, height: h, width: w})
+      )}
+</div>
 
 ## Filtered postings
 

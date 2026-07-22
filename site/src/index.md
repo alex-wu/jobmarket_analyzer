@@ -1,6 +1,5 @@
 ---
 title: Overview
-toc: false
 ---
 
 # Job Market Analyzer
@@ -52,6 +51,12 @@ pipeline <code>${manifest.pipeline_version}</code>
 
 A no-backend, browser-side dashboard. Parquet ships from a GitHub Release; charts run in-browser via DuckDB-WASM. Filter once at the top — every chart re-flows.
 
+<div class="tip" label="Browser note">
+
+**Firefox is recommended.** Chromium-based browsers on Windows can intermittently fail to load the data with `TProtocolException: Invalid data` — an upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm bug (#1658)</a>, open since March 2024; Firefox is unaffected. If charts stall in Chrome/Edge, hard-refresh (`Ctrl+Shift+R`) or switch to Firefox — see the [troubleshooting notes](./methodology#troubleshooting).
+
+</div>
+
 ```js
 const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.lo, allDates.hi], presets}));
 ```
@@ -70,6 +75,8 @@ const live = await db.queryRow(`
 display(coverageNote(manifest, {n: live.n, nSalary: live.n_salary, nIsco: live.n_isco}));
 ```
 
+## Key figures
+
 <div class="grid grid-cols-4">
   ${kpiCard("Postings", live.n.toLocaleString(), `of ${manifest.postings.row_count.toLocaleString()} in snapshot`)}
   ${kpiCard("With salary", live.n ? `${Math.round((live.n_salary / live.n) * 100)}%` : "—", `${live.n_salary.toLocaleString()} disclose €p50`)}
@@ -77,7 +84,7 @@ display(coverageNote(manifest, {n: live.n, nSalary: live.n_salary, nIsco: live.n
   ${kpiCard("Date span", fmtDate(allDates.lo), `→ ${fmtDate(allDates.hi)}`)}
 </div>
 
-## Salary distribution
+## Salary & posting cadence
 
 ```js
 const salaryRows = Array.from(await db.query(`
@@ -102,16 +109,6 @@ function salaryHistogram(width, height = 260) {
   });
 }
 ```
-
-${salaryRows.length === 0
-  ? html`<div class="card"><h2>Annual salary histogram</h2><div>No salary data in current selection.</div></div>`
-  : expandable(
-      "Annual salary histogram",
-      resize((width) => salaryHistogram(width)),
-      (w, h) => salaryHistogram(w, h)
-    )}
-
-## Posting cadence
 
 ```js
 const weekly = Array.from(await db.query(`
@@ -143,13 +140,22 @@ function weeklyChart(width, height = 280) {
 }
 ```
 
-${weekly.length === 0
-  ? html`<div class="card"><div>No postings in current selection.</div></div>`
-  : expandable(
-      "Weekly postings by country",
-      resize((width) => weeklyChart(width)),
-      (w, h) => weeklyChart(w, h)
-    )}
+<div class="grid grid-cols-2">
+  ${salaryRows.length === 0
+    ? html`<div class="card"><h2>Annual salary histogram</h2><div>No salary data in current selection.</div></div>`
+    : expandable(
+        "Annual salary histogram",
+        resize((width) => salaryHistogram(width)),
+        (w, h) => salaryHistogram(w, h)
+      )}
+  ${weekly.length === 0
+    ? html`<div class="card"><h2>Weekly postings by country</h2><div>No postings in current selection.</div></div>`
+    : expandable(
+        "Weekly postings by country",
+        resize((width) => weeklyChart(width)),
+        (w, h) => weeklyChart(w, h)
+      )}
+</div>
 
 <small>Week buckets are <code>date_trunc('week', posted_at)</code>; the first and last weeks are usually partial.</small>
 

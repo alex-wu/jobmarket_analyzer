@@ -8,11 +8,12 @@ export default {
     {name: "Geography", path: "/geography"},
     {name: "Work Arrangement", path: "/arrangement"},
     {name: "Skills & Roles", path: "/skills"},
+    {name: "Compare Periods", path: "/compare"},
     {name: "Quality & Coverage", path: "/quality"},
     {name: "Methodology & Docs", path: "/methodology"}
   ],
   sidebar: true,
-  toc: false,
+  toc: true,
   footer:
     'Data: Adzuna. Source: <a href="https://github.com/alex-wu/jobmarket_analyzer">github.com/alex-wu/jobmarket_analyzer</a>',
   head: `<link rel="icon" href="data:,">
