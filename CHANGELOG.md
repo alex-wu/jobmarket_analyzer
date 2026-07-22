@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — pipeline hardening (2026-07-21, PR #33)
+- **Credential leak on Adzuna HTTP errors closed.** `adzuna.py` wrapped httpx
+  errors verbatim (message embeds the credentialed request URL) and
+  `logger.exception` on the `jobpipe.runner` logger bypassed the ADR-015
+  filter (attached only to httpx/httpcore). Now scrubbed at the wrap via the
+  new shared `src/jobpipe/redaction.py`; `CredentialScrubFilter` additionally
+  scrubs exception tracebacks (pre-sets `exc_text`) and installs on root
+  handlers.
+- **Adapter retry was dead code.** Converting to `SourceFetchError` inside
+  the retried function hid httpx errors from tenacity's predicate — no HTTP
+  error was ever retried. Split into `_get_page` (wrap + scrub) /
+  `_get_page_raw` (retried). Retry policy now 5xx/429/transport only
+  (`src/jobpipe/httputil.py`); 4xx fails fast in one attempt. The
+  work-arrangement details fetcher stops retrying 404s three times.
+- `max_results` truncation logs a warning naming the skipped
+  (country, keyword) pairs instead of silently starving trailing countries.
+- One malformed upstream `created` timestamp (NaT `posted_at`) no longer
+  aborts the whole run — rows are quarantined with a warning.
+- `manifest.postings` gains `accumulated_row_count` + `accumulate_window_days`
+  after the accumulation rewrite; `row_count` keeps measuring the fresh
+  weekly fetch (the gate's calibration target — see docs/operations.md).
+- `refresh.yml` files (or comments on) a `refresh failed: preset {id}` GitHub
+  issue on any red run (`issues: write`) — closes the silent-staleness gap.
+- +7 tests (374 total).
+
+### Changed — docs-vs-reality alignment (2026-07-21, PR #32)
+- Adzuna secrets documented as **Required** (previously "Optional" —
+  incorrect: with all non-Adzuna sources shelved per ADR-017 a no-secret run
+  yields zero rows and the strict gate fails).
+- Removed the never-built "`pages.yml` generates `presets.json` from
+  `config/runs/*.yaml` and downloads all `latest-*` releases" claim from five
+  docs; documented the actual hardcoded `PRESET_ID: data_analyst_eu`
+  behaviour and the honest add-a-preset procedure (ADR-019 enumeration
+  queued).
+- Country scope corrected to gb + es active (~30 API calls/week); 7-country
+  expansion marked planned.
+- NOTICE: removed Remotive (never integrated, ADR-009) and HN Algolia
+  (descoped, ADR-013); added `config/esco/skills_labels.parquet` attribution
+  (tabiya-tech mirror of ESCO v1.1.1, ADR-023); ATS + statistical agencies
+  marked shelved.
+- Contributor walkthroughs updated from abandoned VCR cassettes to JSON
+  fixtures + `httpx.MockTransport`; Node floor corrected to 24+.
+
+### Added — dashboard v2 (2026-07-20, PR #31, ADR-026)
+- Six-page Observable Framework site: Overview, Geography (choropleth),
+  Arrangement, Skills, Quality, Methodology.
+- `work_arrangement` global filter + dedicated `/arrangement` page.
+- Filtered-postings CSV export on every page.
+
 ### Added — schema v3 (2026-05-29)
 - `MANIFEST_SCHEMA_VERSION` bumped to `"3"`. Backward-compatible at the
   reader layer via DuckDB `union_by_name=true` in `export_accumulated()`.
