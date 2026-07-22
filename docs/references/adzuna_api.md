@@ -302,16 +302,7 @@ unlocked) ÷ (implementation cost).
 
 ## 10. Re-probing later
 
-```powershell
-# Re-runs both probes; output to tmp/adzuna_probe*.json
-uv run python tmp/_adzuna_probe.py  > tmp/adzuna_probe.json
-uv run python tmp/_adzuna_probe2.py > tmp/adzuna_probe2.json
-```
-
-Both scripts read creds from `.env` directly (no dotenv import), so they're
-safe to run without `dotenv` installed and won't pull from `os.environ` if
-`.env` is missing — they'll raise `KeyError` instead, which is the desired
-behaviour.
-
-The `tmp/` directory is gitignored (per `.gitignore`). Probes are for local
-verification only — do not commit raw payloads with our app_id/app_key in URLs.
+To re-verify any of the response-shape observations above, probe the live API
+with a short local `httpx` script reading `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`
+from `.env`. Keep probe output out of version control — raw payload URLs
+embed the credentials.

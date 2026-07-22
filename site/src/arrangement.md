@@ -1,6 +1,5 @@
 ---
 title: Work Arrangement
-toc: false
 ---
 
 # Work Arrangement
@@ -61,7 +60,10 @@ const covPct = cov.total > 0 ? Math.round((cov.classified / cov.total) * 100) : 
   the classified base, not the whole market.
 </div>
 
-## Overall breakdown
+## Overall breakdown & by country
+
+The right-hand chart shows composition within each country, **including the
+unknown share** so the sparse coverage stays visible.
 
 ```js
 const overall = Array.from(await db.query(`
@@ -96,19 +98,6 @@ function overallChart(width, height = 260) {
   });
 }
 ```
-
-${overall.length === 0
-  ? html`<div class="card"><div>No postings in current selection.</div></div>`
-  : expandable(
-      "Postings by arrangement (incl. unknown)",
-      resize((width) => overallChart(width)),
-      (w, h) => overallChart(w, h)
-    )}
-
-## By country
-
-Composition within each country, **including the unknown share** so the sparse
-coverage stays visible.
 
 ```js
 const byCountry = Array.from(await db.query(`
@@ -154,13 +143,22 @@ function byCountryChart(width, height = 300, {normalize = true} = {}) {
 }
 ```
 
-${byCountry.length === 0
-  ? html`<div class="card"><div>No country breakdown in current selection.</div></div>`
-  : expandable(
-      "Arrangement composition by country (incl. unknown)",
-      resize((width) => byCountryChart(width)),
-      (w, h) => byCountryChart(w, h)
-    )}
+<div class="grid grid-cols-2">
+  ${overall.length === 0
+    ? html`<div class="card"><h2>Postings by arrangement (incl. unknown)</h2><div>No postings in current selection.</div></div>`
+    : expandable(
+        "Postings by arrangement (incl. unknown)",
+        resize((width) => overallChart(width)),
+        (w, h) => overallChart(w, h)
+      )}
+  ${byCountry.length === 0
+    ? html`<div class="card"><h2>Arrangement composition by country (incl. unknown)</h2><div>No country breakdown in current selection.</div></div>`
+    : expandable(
+        "Arrangement composition by country (incl. unknown)",
+        resize((width) => byCountryChart(width)),
+        (w, h) => byCountryChart(w, h)
+      )}
+</div>
 
 ## Among classified only
 

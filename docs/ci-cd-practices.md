@@ -1,7 +1,7 @@
 # CI/CD practices
 
-Reference for how this repo's pipelines are wired. Distilled from P9 cleanup
-(2026-05-15). Future phases should extend the pipeline along these lines.
+Reference for how this repo's pipelines are wired. Distilled from the
+2026-05-15 CI/CD cleanup. Future work should extend the pipeline along these lines.
 
 ## What's enabled
 
@@ -126,15 +126,13 @@ Trace: `cd site && npm ls inflight glob whatwg-encoding`.
 
 These will clear when Observable Framework upgrades its rollup-commonjs +
 jsdom pins. Dependabot will open the PR. Not something to fix locally.
-
-The P7 handover doc misdiagnosed these as puppeteer's chain; bumping
-puppeteer 23 → 24 cleared a `puppeteer-core@24.43.x` peer mismatch but
-did not affect these 4. See P9 session log for the corrected diagnosis.
+(Note: these are *not* in puppeteer's chain — bumping puppeteer does not
+affect them.)
 
 ## Manual setup (one-time)
 
 - **Pages source** = "GitHub Actions" — set in repo Settings → Pages.
-- **Branch protection** — applied via `gh api` (one-time; see P9 plan for the exact PUT payload).
+- **Branch protection** — applied via `gh api` (one-time; see [docs/github-setup.md](github-setup.md)).
 - **`delete_branch_on_merge`** — `gh repo edit --delete-branch-on-merge`.
 
 All other config (Dependabot, CodeQL, Scorecard, auto-merge, actionlint) is

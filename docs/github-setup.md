@@ -1,8 +1,8 @@
 # GitHub setup checklist
 
-One-time manual configuration needed on github.com before the automated pipeline runs end-to-end. Required on the canonical repo before P5 ships; forks need the same steps to run their own preset.
+One-time manual configuration needed on github.com before the automated pipeline runs end-to-end. Forks need the same steps to run their own preset.
 
-The workflows (`refresh.yml` for P5, `pages.yml` for P7) cannot do these steps on their own — they have to be done in the web UI (or via `gh` CLI) before the first run.
+The workflows (`refresh.yml`, `pages.yml`) cannot do these steps on their own — they have to be done in the web UI (or via `gh` CLI) before the first run.
 
 ---
 
@@ -120,7 +120,7 @@ If you later want to harden the deploy path (e.g. require manual approval before
 
 ## 6. First-run smoke check
 
-After P5 lands and `refresh.yml` exists, manually trigger one run to confirm:
+After the secrets are configured, manually trigger one `refresh.yml` run to confirm:
 
 ```bash
 gh workflow run refresh.yml

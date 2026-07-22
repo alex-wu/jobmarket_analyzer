@@ -1,11 +1,11 @@
 [project]
 name = "jobpipe"
 version = "0.0.1"
-description = "Modular, free-tier job-market intelligence pipeline. Daily ingest from public APIs, normalise to Parquet, overlay official salary benchmarks, visualise on GitHub Pages."
+description = "Modular, free-tier job-market intelligence pipeline. Weekly ingest from the Adzuna API, normalise to Parquet, accumulate a rolling corpus, visualise on GitHub Pages."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
-authors = [{ name = "Alex Wu", email = "alex.w.w.h@gmail.com" }]
+authors = [{ name = "Alex Wu", email = "3050328+alex-wu@users.noreply.github.com" }]
 keywords = ["jobs", "salary", "analytics", "duckdb", "observable-framework", "github-pages"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",

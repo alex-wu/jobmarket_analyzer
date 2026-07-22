@@ -26,7 +26,7 @@ flowchart LR
 
 A weekly cron in GitHub Actions runs the pipeline; the dashboard is rebuilt and pushed to GitHub Pages by `deploy-pages`. No server, no API key in the browser.
 
-The dashboard itself is six pages (Overview, Geography, Work Arrangement, Skills &amp; Roles, Quality &amp; Coverage, and this one). Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a filtered-postings table with one-click CSV export of the current selection.
+The dashboard itself is seven pages (Overview, Geography, Work Arrangement, Skills &amp; Roles, Compare Periods, Quality &amp; Coverage, and this one). Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a filtered-postings table with one-click CSV export of the current selection. Compare Periods is the exception: it replaces the shared filter card with its own two period selectors, since its charts contrast two time slices rather than one filtered view.
 
 ## ESCO skills tagger
 
@@ -51,20 +51,23 @@ The word-boundary check fixes a known substring-match pitfall (e.g. `Java` match
 A preset is the unit of pluggability. Anyone who forks the repo can define their own; the existing one is for EU data-analyst roles:
 
 ```yaml
-# presets/data_analyst_eu.yml
-id: data_analyst_eu
-adzuna:
-  queries: [data analyst, data scientist]
-  countries: [gb, es, de, fr, ie, nl]
-  results_per_page: 50
-  max_pages: 4
-isco_focus:
+# config/runs/data_analyst_eu.yaml (abridged)
+preset_id: data_analyst_eu
+isco_focus:            # scopes the ESCO skills tagger to the analytics family
   - "2511"  # Systems analysts
+  - "2519"  # Software & applications developers/analysts NEC
   - "2521"  # Database designers and administrators
-  - "2529"  # Database/network professionals not elsewhere classified
-  - "3313"  # Accounting associate professionals (analyst overlap)
-schedule:
-  cron: "0 6 * * 1"  # weekly Mondays 06:00 UTC
+  - "2529"  # Database and network professionals NEC
+  - "2421"  # Management and organization analysts
+  - "2120"  # Mathematicians, actuaries and statisticians
+  - "1330"  # ICT service managers
+sources:
+  adzuna:
+    enabled: true
+    countries: ["gb", "es"]   # active pair; 7-country EU expansion planned
+    keywords: ["data analyst", "analytics engineer", "bi analyst"]
+publish:
+  accumulate_window_days: 180
 ```
 
 Fork-friendly by design — to spin up a `data_engineer_us` preset you copy the YAML, adjust queries + countries + `isco_focus`, and the cron will pick it up.
@@ -118,15 +121,16 @@ There is no in-memory hand-off between pages. SPA routing was considered and rej
 
 The dashboard uses `DuckDBClient.of({postings: FileAttachment(...)})` in JS cells rather than Framework's frontmatter `sql:` registration + fenced ` ```sql id= ``` ` blocks. Both are canonical patterns per the Observable docs; we use `DuckDBClient` because our chart queries compose WHERE clauses from filter state in JS (e.g. `${andClause(where)}`), and fenced `sql id=` blocks parameter-bind `${...}` interpolations rather than text-substituting them — a SQL-injection safety feature that doesn't fit dynamic SQL-fragment composition. Per the Observable docs: "DuckDBClient is required if you need greater control, including dynamic table registration."
 
-The Edge-on-Windows `TProtocolException` is upstream Chrome bug #1658 (open since 2024-03-04); migrating between the two patterns does not fix it. See the troubleshooting note below.
+The Edge-on-Windows `TProtocolException` is upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm bug #1658</a> (open since 2024-03-04); migrating between the two patterns does not fix it. See the troubleshooting note below.
 
 ## Troubleshooting
 
-**`Error: Invalid Error: TProtocolException: Invalid data`** in the browser — this is client-side cache state, not a data-writer bug. Headless smoke tests and desktop DuckDB read the same parquet cleanly. Fix:
+**`Error: Invalid Error: TProtocolException: Invalid data`** in the browser — this is client-side cache state in Chromium-based browsers (Chrome/Edge) on Windows, not a data-writer bug: upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm #1658</a>, open since 2024-03-04. Firefox is unaffected — it is the recommended browser for this dashboard. Headless smoke tests and desktop DuckDB read the same parquet cleanly. Fix:
 
-1. Hard-refresh the page (`Ctrl+Shift+R` / `Cmd+Shift+R`).
-2. If it persists: DevTools → Application → Storage → "Clear site data".
-3. Reload.
+1. Use Firefox — the bug does not reproduce there.
+2. In Chrome/Edge: hard-refresh the page (`Ctrl+Shift+R` / `Cmd+Shift+R`).
+3. If it persists: DevTools → Application → Storage → "Clear site data".
+4. Reload.
 
 Do not modify the data pipeline to "fix" this — the writer is innocent.
 

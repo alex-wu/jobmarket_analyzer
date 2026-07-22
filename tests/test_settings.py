@@ -2,9 +2,9 @@
 
 The shipped smoke test (test_smoke.py::test_settings_defaults_load) only
 exercises the ``_env_file=None`` defaults path that previously surprised us
-([[pitfall_pydantic_env_file_none]] — OS env vars still load even when the
-.env path is set to None). These tests pin the rest of the contract so
-future env additions don't quietly regress the behaviour.
+(pydantic-settings still loads OS env vars even when the .env path is set to
+None). These tests pin the rest of the contract so future env additions don't
+quietly regress the behaviour.
 """
 
 from __future__ import annotations

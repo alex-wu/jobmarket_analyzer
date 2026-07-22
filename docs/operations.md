@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-The page lives at <http://127.0.0.1:3000/>. Edits to `site/src/**` hot-reload. The preset switcher in the UI selects which `latest-{preset_id}.parquet` is active. The data loaders read from `data/gh_databuild_samples/` — refresh that directory whenever you want newer numbers.
+The page lives at <http://127.0.0.1:3000/>. Edits to `site/src/**` hot-reload. The data loader currently pins `data_analyst_eu` (a UI preset switcher is queued, ADR-019). The data loaders read from `data/gh_databuild_samples/` — refresh that directory whenever you want newer numbers.
 
 ### Running multiple presets locally
 
@@ -57,7 +57,7 @@ cd site
 npm run build && npm run smoke
 ```
 
-`npm run build` produces `site/dist/`. `npm run smoke` walks the dev server + the static build with headless Chromium and asserts zero runtime errors. **`npm run build` alone is not sufficient** — Framework doesn't execute cell JavaScript at build time ([[pitfall-duckdb-client-arrow-table]]).
+`npm run build` produces `site/dist/`. `npm run smoke` walks the dev server + the static build with headless Chromium and asserts zero runtime errors. **`npm run build` alone is not sufficient** — Framework doesn't execute cell JavaScript at build time, so runtime errors only surface in a browser.
 
 `npm run smoke` accepts a `SMOKE_PHASE` env var:
 
@@ -107,7 +107,7 @@ uv run jobpipe normalise --preset config/runs/$preset.yaml
 uv run jobpipe publish   --preset config/runs/$preset.yaml --accumulate-window-days 180
 ```
 
-A `--accumulate-only` flag that skips the fresh fetch is queued (see [[reference-phase-status]]) — useful when only the accumulation step needs re-running. Dated releases are immutable; the archive is the source of truth.
+A `--accumulate-only` flag that skips the fresh fetch is queued — useful when only the accumulation step needs re-running. Dated releases are immutable; the archive is the source of truth.
 
 ---
 
@@ -176,7 +176,7 @@ Two static snapshots ship in `config/esco/`. Rebuild only when ESCO publishes a 
 ```powershell
 uv run python scripts/build_esco_snapshot.py
 # Walks ESCO concept tree from the 10 ISCO major groups; emits ~2.1k labels.
-# See `scripts/build_esco_snapshot.py` docstring + [[pitfall-esco-api]].
+# See the script docstring and ADR-010 for why it walks the tree instead of paginating.
 ```
 
 ### `skills_labels.parquet` (Pillar B skills/knowledge, ADR-023)

@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alex-wu/jobmarket_analyzer/badge)](https://scorecard.dev/viewer/?uri=github.com/alex-wu/jobmarket_analyzer)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Status:** scope pivot in progress (2026-05-17, see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)). Dashboard live at <https://alex-wu.github.io/jobmarket_analyzer/>. v1 ships **Adzuna-only**, multi-country (gb, es active; 7-country EU expansion planned) on a **weekly** Monday 06:00 UTC cron with `workflow_dispatch` for on-demand runs. Each preset produces a distinctly named `latest-{preset_id}.parquet` accumulated from the immutable dated archive ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming), [ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)). ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / OECD / Eurostat) remain in the codebase, shelved by preset config until the multi-country unified merge proves stable end-to-end — see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Pipeline runs on Node 24 actions, Dependabot (weekly grouped npm + pip + actions), CodeQL (Python + JS), OpenSSF Scorecard, actionlint, and Dependabot auto-merge for patch+minor. Branch protection on `main` requires `test` + CodeQL checks. Day-to-day operations: [docs/operations.md](docs/operations.md). CI/CD reference: [docs/ci-cd-practices.md](docs/ci-cd-practices.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
+**Status:** v1 live and running unattended. Dashboard at <https://alex-wu.github.io/jobmarket_analyzer/>. v1 ships **Adzuna-only** ([ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)), multi-country (gb, es active; 7-country EU expansion planned) on a **weekly** Monday 06:00 UTC cron with `workflow_dispatch` for on-demand runs. Each preset produces a distinctly named `latest-{preset_id}.parquet` accumulated from the immutable dated archive ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming), [ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)). ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / OECD / Eurostat) remain in the codebase, shelved by preset config until the multi-country unified merge proves stable end-to-end — see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Pipeline runs on Node 24 actions, Dependabot (weekly grouped npm + pip + actions), CodeQL (Python + JS), OpenSSF Scorecard, actionlint, and Dependabot auto-merge for patch+minor. Branch protection on `main` requires `test` + CodeQL checks. Day-to-day operations: [docs/operations.md](docs/operations.md). CI/CD reference: [docs/ci-cd-practices.md](docs/ci-cd-practices.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
 
 **v1 preset:** `data_analyst_eu` — data-analyst roles across gb + es (7-country EU expansion planned). The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography today means a YAML file, a matrix entry in `refresh.yml`, and un-hardcoding `PRESET_ID` in `pages.yml` + `site/src/data/postings.parquet.js` (to be simplified when the multi-preset switcher lands, [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)). Presets run in parallel via GitHub Actions matrix; each produces its own `latest-{preset_id}.parquet`.
 
@@ -20,7 +20,7 @@
 2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, extract ESCO Pillar B skills via Aho-Corasick (scoped by preset `isco_focus`, [ADR-023](DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus)), deduplicate by `posting_id`.
 3. **Archive** — Each weekly run writes an immutable `data-{preset_id}-YYYY-MM-DD.parquet` to its own dated GitHub Release. Never modified, never deleted ([ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)).
 4. **Accumulate** — Publish step unions the last 180 days of dated releases for the preset, dedupes by `posting_id`, derives `first_seen_at` / `last_seen_at`, re-clobbers `latest-{preset_id}` Release with the unified parquet. Pure function — `latest` is recomputable from the archive at any time.
-5. **Visualise** — Observable Framework dashboard on GitHub Pages reads `latest-{preset_id}.parquet` for the active preset (currently hardcoded to `data_analyst_eu`; preset switcher queued per ADR-019). Every posting links back to its source URL.
+5. **Visualise** — Seven-page Observable Framework dashboard on GitHub Pages (overview, geography choropleth, work arrangement, skills & roles, period-over-period compare, quality, methodology) reads `latest-{preset_id}.parquet` for the active preset (currently hardcoded to `data_analyst_eu`; preset switcher queued per ADR-019). Every posting links back to its source URL.
 
 ---
 
@@ -69,7 +69,7 @@ Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectur
 
 - **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Then add it to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.parquet.js` (both pin `data_analyst_eu` today). To be simplified when multi-preset enumeration + the dashboard switcher land ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
 - **New source adapter** — out of scope for v1 per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable adapter pattern ([ADR-008](DECISIONS.md#adr-008--pluggable-adapter-pattern-sources--benchmarks)) survives — see [docs/adding-a-source.md](docs/adding-a-source.md) for the post-v1 pattern. Reactivation criteria documented in ADR-017.
-- **New benchmark adapter** — same status. See [docs/adding-a-benchmark.md](docs/adding-a-benchmark.md) and ADR-017.
+- **New benchmark adapter** — same status; follows the same Protocol pattern under `src/jobpipe/benchmarks/` (see the note in [docs/adding-a-source.md](docs/adding-a-source.md)).
 
 ---
 
@@ -86,34 +86,26 @@ One-time manual GitHub setup (secrets, Pages source, workflow permissions, secre
 
 ## Open questions
 
-What we know we haven't solved yet (preset switcher persistence, first-run backfill window, gate baseline after pivot, …) lives in [docs/open-questions.md](docs/open-questions.md).
+What we know we haven't solved yet (Adzuna attribution footer, gate calibration, preset switcher, …) lives in [docs/open-questions.md](docs/open-questions.md).
 
 ---
 
 ## Project status
 
-Phase-gated build per [DECISIONS.md](DECISIONS.md):
+**Shipped:**
 
-- [x] **P0** — scaffolding, git init, CI green
-- [x] **P1** — Adzuna source adapter + raw Parquet
-- [x] **P2** — normalisation + dedupe + strict schema
-- [x] **P3** — ATS source adapters (Greenhouse, Lever, Ashby, Personio). **Shelved 2026-05-17 per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation).** Code remains in tree, `enabled: false` in preset.
-- [x] **P4** — benchmark adapters (CSO PxStat, OECD SDMX, Eurostat SES) + ESCO/ISCO tagging via rapidfuzz. **Benchmark adapters shelved 2026-05-17 per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation).** ESCO/ISCO tagging stays live. HN Algolia + LLM ISCO fallback descoped from v1 per [ADR-013](DECISIONS.md#adr-013--hn-algolia--llm-client-descoped-from-v1).
-- [x] **P5** — GH Actions refresh + Release upload.
-- [x] **P6** — Observable Framework dashboard.
-- [x] **P7** — Pages deploy via `actions/deploy-pages`.
-- [x] **P9** — CI/CD modernisation (shipped 2026-05-15).
-- [x] **P10** — Gate command + warn-mode (shipped 2026-05-16). Zero-row ATS investigation **closed by descope** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation).
+- End-to-end weekly pipeline: Adzuna ingest → EUR/ISCO/skills normalisation → dated + accumulated Releases → Pages rebuild, running unattended with failure alerting (a red run files a GitHub issue).
+- Schema v3: `work_arrangement` ternary via a multilingual keyword tagger, ESCO Pillar B skills ([ADR-022](DECISIONS.md#adr-022--postingschema-v2--persist-5-adzuna-fields--skills)–[025](DECISIONS.md#adr-025--postingschema-v3--drop-dead-weight-cols-ternary-work_arrangement-details-off-by-default)). Only `experience_level` remains unfilled — Adzuna carries no signal for it.
+- Seven-page dashboard ([ADR-026](DECISIONS.md#adr-026--dashboard-v2-restructure--europe-choropleth-page-consolidation-csv-export)): Europe choropleth, work-arrangement surface + global filter, top-skills chart, period-over-period compare page, per-page CSV export, URL-persisted filters ([ADR-024](DECISIONS.md#adr-024--filter-state-persistence-via-url-search-params)).
+- Hardening for unattended runs: credential scrubbing across wrapped errors, real retry semantics (5xx/429/transport only), quarantine of malformed rows, gate command.
+- CI/CD: CodeQL, Dependabot (grouped weekly, auto-merge patch+minor), OpenSSF Scorecard, actionlint, branch protection.
 
-- [x] **P13** — Scope-pivot implementation (shipped 2026-05-18, PR #13): `data_analyst_eu.yaml` preset, `export_accumulated()`, `latest-{preset_id}` releases, matrix workflow. Preset *switcher UI* still queued below.
-- [x] **P12** — Schema expansion, largely closed: `skills` (ADR-022/023, surfaced on the dashboard per ADR-026) and `work_arrangement` (ADR-025 multilingual tagger, replacing the dropped `remote` bool). Only `experience_level` remains unfilled (no Adzuna signal).
-- [x] **Dashboard v2** — 6-page restructure (ADR-026, 2026-07-20): Europe choropleth geography, work-arrangement page + global filter, ESCO top-skills chart, per-page CSV export, always-visible labels.
+**Next** (details in [docs/open-questions.md](docs/open-questions.md)):
 
-### Queued
-
-- [ ] **Pipeline automation verification** — confirm the weekly GitHub Actions cron produces correct schema-v3 artifacts end-to-end (first post-v3 publish, release assets, Pages rebuild) and hard-fail loudly when it doesn't.
-- [ ] **Dashboard preset switcher** — loader still hardcodes `data_analyst_eu`; multi-preset enumeration per ADR-019.
-- [ ] **P11** — Portfolio polish + first tagged release. Second preset (e.g. `software_developer_eu`), README hero screenshot, CHANGELOG seed, `v0.1.0` tag.
+- [ ] Adzuna attribution footer on the dashboard (ToS hygiene).
+- [ ] Post-publish artifact correctness gate + `min_total_rows` calibration against real weekly manifests.
+- [ ] Dashboard preset switcher — the loader still hardcodes `data_analyst_eu` ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
+- [ ] Second preset (e.g. `software_developer_eu`), README hero screenshot, first tagged release.
 
 ---
 

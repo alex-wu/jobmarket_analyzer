@@ -100,8 +100,8 @@ normalise:
 
 publish:
   # Empty list = single flat postings.parquet (no hive directory tree). Keeps
-  # country + year_month as real columns survive GitHub Release's flat-asset
-  # namespace — see docs/sessions/2026-05-15-p5-cron-publish-first-push.md.
+  # country + year_month as real columns so they survive GitHub Release's
+  # flat-asset namespace (hive partition columns live only in directory paths).
   partition_by: []
   retention_days: 365
 

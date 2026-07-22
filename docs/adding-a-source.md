@@ -20,7 +20,7 @@ A source adapter ingests job postings from one external API and emits a DataFram
 
 3. **Build a JSON fixture.**
    - Probe the live API once with `httpx`, save a trimmed real sample under `tests/fixtures/<name>/`. Verify no secrets in the JSON.
-   - Drive the unit test with `httpx.MockTransport` returning the fixture. (VCR cassettes were abandoned in P3 — see CONTRIBUTING.md testing discipline.)
+   - Drive the unit test with `httpx.MockTransport` returning the fixture (the repo pattern — see CONTRIBUTING.md testing discipline).
 
 4. **Write the unit test.**
    - Path: `tests/sources/test_<name>.py`.
@@ -33,6 +33,8 @@ A source adapter ingests job postings from one external API and emits a DataFram
 6. **Document.**
    - Append the adapter to the source table in `docs/architecture.md`.
    - Add the attribution to `NOTICE.md` if the source's terms require it.
+
+**Benchmark adapters** (official salary statistics for reference lines) follow the same Protocol + `@register` pattern under `src/jobpipe/benchmarks/`, conforming to `BenchmarkSchema`. All benchmark adapters are shelved per ADR-017; reactivation starts with a superseding ADR.
 
 ## Minimal example
 
