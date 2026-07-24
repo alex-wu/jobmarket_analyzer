@@ -98,7 +98,7 @@ const browser = await puppeteer.launch({headless: true, args: ["--no-sandbox"]})
 let total = 0;
 
 // ---------- Phase 1: dev server, every data page ----------
-const DATA_PAGES = ["/", "/geography", "/arrangement", "/skills", "/compare", "/quality", "/methodology"];
+const DATA_PAGES = ["/", "/trends", "/geography", "/arrangement", "/skills", "/compare", "/quality", "/methodology"];
 if (runDev) {
   const devPort = process.env.DEV_PORT ?? "3000";
   const devOrigin = `http://127.0.0.1:${devPort}`;
@@ -152,7 +152,7 @@ if (runDev) {
   // Phase 1d: CSV download — every data page must expose a working "⬇ CSV" button.
   // We monkey-patch URL.createObjectURL + anchor.click to capture the CSV text
   // without actually triggering a browser download.
-  for (const path of ["/", "/geography", "/arrangement", "/skills", "/quality"]) {
+  for (const path of ["/", "/trends", "/geography", "/arrangement", "/skills", "/quality"]) {
     console.log(`\n=== ${path} CSV download ===`);
     const page = await browser.newPage();
     await page.setViewport({width: 1280, height: 900});

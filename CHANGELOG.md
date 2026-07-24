@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Trends page + feature roadmap (2026-07-24)
+- Eighth dashboard page `/trends`: continuous weekly/monthly time series over
+  the accumulated snapshot — market-pulse KPI cards (latest vs prior bucket),
+  postings volume and median €p50 by country, salary-disclosure rate,
+  work-arrangement mix among classified, top-skill share over time, and a
+  per-bucket summary table with CSV export. Global filter card plus a
+  page-scoped week/month granularity toggle; share/median series flagged as
+  the robust signal across the accumulation start.
+- `docs/feature-roadmap.md`: BI + AI feature track (F1–F11) with hard
+  constraints (no backend, browser-parquet column subset, Adzuna ToS/quota,
+  LLM free tiers, stock Observable defaults), statuses, and per-feature
+  acceptance criteria. Linked from bootstrap read order and open-questions.
+
 ### Added — Compare Periods page (2026-07-22)
 - Seventh dashboard page `/compare`: pick two periods (quarter / month / week
   granularity) and see period-over-period movement — KPI deltas (postings,
