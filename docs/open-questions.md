@@ -1,6 +1,6 @@
 # Open questions
 
-What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS.md) record locked decisions; this file tracks the loose ends. When an item closes, it moves to **Resolved** with a pointer to the ADR or changelog entry that closed it. New working session? Start at [bootstrap.md](bootstrap.md).
+What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS.md) record locked decisions; this file tracks the loose ends. New user-facing features live in [feature-roadmap.md](feature-roadmap.md). When an item closes, it moves to **Resolved** with a pointer to the ADR or changelog entry that closed it. New working session? Start at [bootstrap.md](bootstrap.md).
 
 ---
 

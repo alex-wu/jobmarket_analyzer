@@ -5,6 +5,7 @@ export default {
   theme: "dashboard",
   pages: [
     {name: "Overview", path: "/"},
+    {name: "Trends", path: "/trends"},
     {name: "Geography", path: "/geography"},
     {name: "Work Arrangement", path: "/arrangement"},
     {name: "Skills & Roles", path: "/skills"},
