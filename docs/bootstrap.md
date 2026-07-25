@@ -2,7 +2,7 @@
 
 Single entry point for the next working session (human or AI agent) and for anyone picking the project up cold. Read this first; everything else is linked from here.
 
-_Last updated: 2026-07-24._
+_Last updated: 2026-07-25._
 
 ---
 
@@ -17,12 +17,13 @@ _Last updated: 2026-07-24._
 7. When touching CI or repo settings: [docs/ci-cd-practices.md](ci-cd-practices.md) + [docs/github-setup.md](github-setup.md).
 8. When touching the Adzuna adapter: [docs/references/adzuna_api.md](references/adzuna_api.md) — empirical response-shape notes + ToS constraints.
 
-## State snapshot (2026-07-24)
+## State snapshot (2026-07-25)
 
 - `main` is the only long-lived branch; everything ships through squash-merged PRs (merge commits are rejected by branch protection).
 - End-to-end automation is live and unattended: Monday 06:00 UTC cron (`refresh.yml`) → fetch/normalise/publish/gate → dated + `latest-data_analyst_eu` releases → Pages rebuild via `workflow_run`. A red run files a `refresh failed: preset {id}` GitHub issue.
 - Weekly cron has run green since 2026-06-08. Pipeline hardening (credential scrubbing, real retry semantics, NaT quarantine, failure alerting) merged 2026-07-21 — **the 2026-07-27 run is the first with the hardened code.**
-- Dashboard: 8 pages (Overview, Trends, Geography, Work Arrangement, Skills & Roles, Compare Periods, Quality & Coverage, Methodology), live on GitHub Pages. Firefox is the recommended browser (upstream duckdb-wasm #1658 affects Chromium-on-Windows).
+- Dashboard: 8 pages (Overview, Trends, Geography, Work Arrangement, Skills & Roles, Compare Periods, Quality & Coverage, Methodology), live on GitHub Pages. Firefox is the recommended browser (upstream duckdb-wasm #1658 affects Chromium-on-Windows). Trends (F1) shipped 2026-07-25 via PR #37.
+- **Active feature branch: `feat/market-pulse-overview`** — F2 market-pulse KPI strip on Overview (see [feature-roadmap.md](feature-roadmap.md#f2--market-pulse-kpi-strip-in-progress)). First step there: extract the `deltaSub` delta-formatter (currently duplicated in `compare.md` + `trends.md`) into `site/src/components/`.
 - Schema v3; active preset `config/runs/data_analyst_eu.yaml` (gb + es, weekly, 180-day accumulation window).
 
 ## First checks for the next session
@@ -40,7 +41,7 @@ If the run is red, a `refresh failed:` issue should already exist — start ther
 
 ## Prioritised backlog
 
-Ops/quality items with context in [open-questions.md](open-questions.md); new-feature track (Trends page, AI features) in [feature-roadmap.md](feature-roadmap.md). Suggested ops order:
+Ops/quality items with context in [open-questions.md](open-questions.md); new-feature track in [feature-roadmap.md](feature-roadmap.md) (F1 Trends shipped; **F2 market-pulse in progress on `feat/market-pulse-overview`**; then F5 LLM ISCO fallback, F4 skill economics). Suggested ops order:
 
 1. **Adzuna attribution footer** — smallest task, ToS hygiene. The site footer currently reads "Data: Adzuna"; Adzuna's terms want attribution as "The Adzuna API" + link. One edit in `site/observablehq.config.js`.
 2. **Gate calibration** — `min_total_rows: 80` is still a guess; ground it against the fresh-delta `row_count` of the published weekly manifests (7+ exist).
