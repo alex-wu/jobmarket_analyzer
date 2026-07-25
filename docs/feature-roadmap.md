@@ -5,7 +5,7 @@ Product-feature backlog for the dashboard and the applied-AI layer. Complements
 work queue for pipeline correctness); this file tracks **new user-facing capability**.
 New session? Start at [bootstrap.md](bootstrap.md), then pick the top `planned` item here.
 
-_Last updated: 2026-07-24._
+_Last updated: 2026-07-25._
 
 ## How to use this file (session bootstrap)
 
@@ -39,8 +39,8 @@ _Last updated: 2026-07-24._
 
 | ID | Feature | Status | Effort | Value | Depends on |
 |----|---------|--------|--------|-------|------------|
-| F1 | Trends page (weekly time series) | in-progress | S | ★★★★★ | — |
-| F2 | Market-pulse KPI strip w/ WoW deltas | planned | S | ★★★★ | F1 |
+| F1 | Trends page (weekly time series) | shipped | S | ★★★★★ | — |
+| F2 | Market-pulse KPI strip w/ WoW deltas | in-progress | S | ★★★★ | F1 |
 | F3 | Posting lifetime (demand-tightness proxy) | planned | S-M | ★★★★★ | loader cols |
 | F4 | Skill-salary premium + co-occurrence | planned | M | ★★★★★ | — |
 | F5 | LLM ISCO fallback (build-time Gemini) | planned | S-M | ★★★★ | — |
@@ -51,7 +51,10 @@ _Last updated: 2026-07-24._
 | F10 | Eurostat benchmark overlay (revival) | idea | M-L | ★★★ | adapter revival |
 | F11 | Title canonicalization via embeddings | idea | M | ★★ | F5 |
 
-## F1 — Trends page `[in-progress]`
+## F1 — Trends page `[shipped]`
+
+_Shipped 2026-07-25, PR #37 (`49eb80b`). All acceptance criteria met (page live,
+nav + smoke lists, CSV export, build+smoke green)._
 
 **What:** `/trends` — continuous weekly series over the accumulated snapshot: posting
 volume by country, median €p50, salary-disclosure rate, arrangement share, top-skill
@@ -64,13 +67,19 @@ compare.md does. Guard weekly medians with `HAVING COUNT(salary) >= 3`.
 **Done when:** page live, in nav + smoke list, CSV export of the weekly aggregate table,
 build+smoke green.
 
-## F2 — Market-pulse KPI strip `[planned]`
+## F2 — Market-pulse KPI strip `[in-progress]`
+
+_Branch `feat/market-pulse-overview` (started 2026-07-25)._
 
 **What:** 4-5 KPI cards on Overview (or top of /trends): latest complete week vs prior —
 volume, median salary, remote share, disclosure rate, (later: median lifetime F3).
-WoW delta arrows, reusing compare.md's `deltaSub` pattern (extract to component).
+WoW delta arrows, reusing the `deltaSub` pattern now duplicated in compare.md and
+trends.md — **extract it to `site/src/components/` first**, then consume from all
+three pages.
 **Why:** one-glance market state; cheap once F1 lands.
-**Done when:** KPI strip renders with correct deltas; partial-week guard documented.
+**Done when:** KPI strip renders with correct deltas on Overview; `deltaSub` is a
+shared component (compare + trends refactored onto it); partial-week guard documented;
+build+smoke green.
 
 ## F3 — Posting lifetime `[planned]`
 
