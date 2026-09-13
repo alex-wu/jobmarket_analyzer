@@ -85,7 +85,7 @@ ${iscoMatch.length === 0
       (w, h) => barChart(iscoMatch, {x: "n", y: "method", xLabel: "Postings", marginLeft: 90, height: h, width: w})
     )}
 
-<small>Methods: <code>exact</code> = title hashed directly to ISCO-08, <code>fuzzy</code> = rapidfuzz partial-ratio ≥ 85, <code>none</code> = no match (title unclassified).</small>
+<small>Methods: <code>fuzzy</code> = rapidfuzz <code>token_set_ratio</code> ≥ 85 against the ESCO label snapshot, <code>none</code> = no match (title unclassified). The schema also allows <code>exact</code> and <code>llm</code>, but no current code path emits them.</small>
 
 ## Source breakdown
 
@@ -132,7 +132,7 @@ ${dataTable(filtered, {
     posted_at: "Posted"
   },
   format: {
-    isco_match_score: (v) => v == null ? "—" : Math.round(v),
+    isco_match_score: (v) => v == null ? "—" : Math.round(v * 100),
     salary_imputed: (v) => v ? "yes" : "",
     posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
   },

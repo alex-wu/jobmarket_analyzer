@@ -8,7 +8,7 @@ which is also v1's permanent CI configuration.
 
 Future use cases (post-v1):
 * ``classify_title_to_isco`` — fill ``isco_match_method="llm"`` rows where
-  rapidfuzz scored below ADR-006's 0.88 cutoff.
+  rapidfuzz scored below the ISCO tagger cutoff (85, lowered from ADR-006's 88).
 * "Who is hiring?" HN Algolia comment extraction (separate source adapter).
 """
 

@@ -6,11 +6,12 @@ Thanks for considering a contribution. This project aims to stay small, modular,
 
 1. [DECISIONS.md](DECISIONS.md) — locked architectural choices and their WHY (ADR-lite).
 2. [docs/architecture.md](docs/architecture.md) — dataflow diagram + module layout.
-3. [README.md](README.md) — quickstart + phase plan.
+3. [README.md](README.md) — quickstart + project status (shipped / next).
 4. [docs/open-questions.md](docs/open-questions.md) — what we know we haven't solved yet.
-5. [CHANGELOG.md](CHANGELOG.md) — phase-by-phase release notes.
+5. [CHANGELOG.md](CHANGELOG.md) — release notes (Keep a Changelog).
+6. [docs/bootstrap.md](docs/bootstrap.md) — session entry point; [docs/portfolio-audit.md](docs/portfolio-audit.md) — ranked priority order.
 
-If you change architecture, update ADRs (and `docs/architecture.md`). If you change scope, update the README phase plan and `docs/open-questions.md`.
+If you change architecture, update ADRs (and `docs/architecture.md`). If you change scope, update the README project status, `docs/open-questions.md`, and the roadmap/audit statuses.
 
 ## Dev setup
 
@@ -65,10 +66,10 @@ A new top-level dep needs a one-line justification in the PR description.
 
 ## Testing discipline
 
-- **Hand-built JSON fixtures under `tests/fixtures/<area>/<adapter>/`** drive `httpx.MockTransport`-based unit tests (preferred over VCR-cassette recording).
+- **Hand-built JSON fixtures under `tests/fixtures/<adapter>/` (sources) and `tests/fixtures/benchmarks/<adapter>/`** drive `httpx.MockTransport`-based unit tests (preferred over VCR-cassette recording).
 - **Pre-flight every external endpoint** before writing a parser — probe the response shape with `httpx` + save a trimmed real sample as the fixture. Document any divergence (deprecated dataset codes, Cloudflare gating, etc.) in the PR description.
 - **Schema tests** — every adapter test must assert `PostingSchema.validate(output, lazy=True)` or `BenchmarkSchema.validate(...)` passes.
-- **Coverage gates:** ≥80% line, ≥70% branch overall; per-adapter coverage ≥90% is the norm.
+- **Coverage gate:** CI enforces a single combined threshold, `--cov-fail-under=80` with branch coverage enabled (`pyproject.toml [tool.coverage.run] branch = true`). No separate branch or per-adapter gate; ≥90% per adapter is the norm, not enforced.
 
 **Windows pytest flake:** an intermittent `numpy: cannot load module more than once per process` import error appears when running a *single* benchmark test file in isolation. Workaround: clear `__pycache__` and run the broader `tests/benchmarks/` selection (or the full suite).
 

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — portfolio audit + docs re-alignment (2026-09-13)
+- `docs/portfolio-audit.md`: every roadmap + ops item ranked #1–#18 by
+  value / effort / complexity for a reviewer, with a standout checklist and a
+  three-sprint sequence. Bootstrap read order and backlog now point at it.
+- Docs aligned with the live build after a 7-week gap (full docs-vs-code
+  sweep): README + methodology page count 7 → 8 (Trends) and CSV-export claim
+  scoped (Compare has none); normalise dedupe described correctly (URL hash,
+  not `posting_id`); architecture accumulation SQL matches
+  `export_accumulated` (tag-date window, `union_by_name`); fixture layout,
+  drift-guard exclusions, `description` cap, ci.yml trigger, branch-protection
+  contexts (test + CodeQL, not Pages), action-pinning exceptions, coverage
+  gate wording, preset-switch touch-points (2 files), attribution item
+  reworded (footer exists, wording missing); `adding-a-source.md` example now
+  validates (adds `salary_imputed` + `inject_accumulation_cols`);
+  `methodology.md` release tag fixed (`latest-data_analyst_eu`);
+  `quality.md` match-method caption (token_set_ratio; `exact`/`llm` unproduced)
+  and score column now renders 0–100 instead of 0/1; `cli.py` + `llm.py`
+  docstrings de-staled. Bootstrap snapshot refreshed against the 2026-09-07
+  manifest (17 green weekly runs, 5,527 accumulated rows, ISCO fuzzy 55%).
+  Local gate green: ruff, format, mypy strict, 374 tests; `SMOKE_PHASE=dist`
+  smoke 0 issues on 8 pages (dev-phase filter step times out locally on an
+  unmodified tree too — logged in open-questions).
+
 ### Added — Trends page + feature roadmap (2026-07-24)
 - Eighth dashboard page `/trends`: continuous weekly/monthly time series over
   the accumulated snapshot — market-pulse KPI cards (latest vs prior bucket),

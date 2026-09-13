@@ -28,12 +28,14 @@ Reference for how this repo's pipelines are wired. Distilled from the
   Major bumps come ungrouped because they need attention.
 - **Auto-merge for patch + minor only.** Removes weekly toil for routine
   bumps. Majors and security alerts stay manual.
-- **Light branch protection.** Required status checks (`test` + `build-and-deploy`)
-  only; no review requirement (solo project). Linear history matches the
+- **Light branch protection.** Required status checks are `test` plus the two
+  CodeQL jobs (`analyze (python)`, `analyze (javascript)`); the Pages deploy is
+  *not* a required check. No review requirement (solo project). Linear history matches the
   squash-merge norm. `enforce_admins: false` keeps emergency-override
   available.
 - **No SHA-pinning of actions yet.** Major-version tags (`@v6`) + Dependabot
-  tracking is sufficient for a portfolio-scale repo. Escalate to SHA pins
+  tracking is sufficient for a portfolio-scale repo (exception: `astral-sh/setup-uv`
+  publishes no floating major tag, so it is pinned to an exact `vX.Y.Z`). Escalate to SHA pins
   when the OpenSSF Scorecard score drops or when going past `v1.0.0`.
 
 ## Workflow triggers
@@ -41,8 +43,8 @@ Reference for how this repo's pipelines are wired. Distilled from the
 | Workflow | Triggers | Concurrency | Notes |
 |---|---|---|---|
 | `ci` | push to `main`, PR to `main` | `ci-${{ github.ref }}` cancel-in-progress | Required check |
-| `pages` | push to `main` under `site/**`, `workflow_run` after `refresh`, `workflow_dispatch` | `pages` no-cancel | Required check |
-| `refresh` | cron `0 6 * * 1` (weekly Mon 06:00 UTC), `workflow_dispatch` | `refresh-${{ matrix.preset }}` no-cancel | Data ingest, matrix over `config/runs/*.yaml` |
+| `pages` | push to `main` under `site/**` or the workflow file, `workflow_run` after `refresh`, `workflow_dispatch` | `pages` no-cancel | Deploy (not a required check) |
+| `refresh` | cron `0 6 * * 1` (weekly Mon 06:00 UTC), `workflow_dispatch` | `refresh-${{ matrix.preset }}` no-cancel | Data ingest, matrix = literal preset list (no glob over `config/runs/`) |
 | `codeql` | push to `main`, PR to `main`, cron `0 8 * * 1` | matrix per language | Findings → Security tab |
 | `scorecard` | branch_protection_rule, push to `main`, cron `0 9 * * 1` | `scorecard` no-cancel | Score → scorecard.dev |
 | `lint-workflows` | PR or push touching `.github/workflows/**` | `lint-workflows-${{ github.ref }}` cancel-in-progress | actionlint |
@@ -58,7 +60,7 @@ with the dependency-update cycle.
 ## Multi-preset parallelism (post-2026-05-17 pivot)
 
 Per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming),
-`refresh.yml` matrixes over presets in `config/runs/*.yaml`:
+`refresh.yml` matrixes over a hand-maintained preset list (each entry must have a matching `config/runs/{preset}.yaml`; nothing globs the directory):
 
 ```yaml
 strategy:
@@ -89,14 +91,14 @@ enumeration is queued per ADR-019.
 2. `permissions:` block declared at workflow OR job level — default to `read-all` or `contents: read` and escalate only where needed.
 3. `concurrency:` group set; cancel-in-progress for fast-feedback workflows, no-cancel for deploys + uploads.
 4. `timeout-minutes:` on every job.
-5. Actions pinned to a major-version tag (`@v6`), not `@main` or `@latest`. Dependabot will keep them fresh.
+5. Actions pinned to a major-version tag (`@v6`), not `@main` or `@latest` — or to an exact `vX.Y.Z` where the publisher offers no major tag (`astral-sh/setup-uv`, `ossf/scorecard-action`). Dependabot will keep them fresh.
 6. Secrets via `${{ secrets.X }}`, never hardcoded. Reference `GITHUB_TOKEN` only for write actions; for read-only data, omit it.
 7. Long-running shell blocks: `set -euo pipefail` at the top.
 8. If touching `.github/workflows/**`, the `lint-workflows` job will gate it.
 
 ## Action version policy
 
-- **Major tag (`@v6`)** for all `actions/*` + `github/*` + `ossf/*` + `astral-sh/*` actions. Dependabot opens a PR per major bump; auto-merge handles patch + minor.
+- **Major tag (`@v6`)** for `actions/*` + `github/*`. **Exact `vX.Y.Z`** for `astral-sh/setup-uv` and `ossf/scorecard-action`, which publish no floating major tag. Dependabot opens a PR per bump; auto-merge handles patch + minor.
 - **No `@main` / no `@latest`** — unpinned actions are a supply-chain risk and a Scorecard penalty.
 - **SHA pinning** is overkill at this scale. Revisit if:
   - OpenSSF Scorecard drops below 7
@@ -119,7 +121,7 @@ All chain off `@observablehq/framework@1.13.4`, not our direct deps:
 
 - `inflight@1.0.6` ← `@rollup/plugin-commonjs@25.0.8` ← framework
 - `glob@8.1.0` ← `@rollup/plugin-commonjs@25.0.8` ← framework
-- `glob@10.5.0` ← `rimraf@5.0.10` + framework (deduped)
+- `glob@10.5.0` ← framework (our direct `rimraf@6.x` brings `glob@13`, not this one)
 - `whatwg-encoding@3.1.1` ← `jsdom@23.2.0` ← framework
 
 Trace: `cd site && npm ls inflight glob whatwg-encoding`.

@@ -8,7 +8,7 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 
 ### Data & upstream
 
-- **Adzuna ToS attribution.** Adzuna's terms restrict organisational republishing of aggregates without written consent; personal research is permitted with attribution ("The Adzuna API" + link). Action: add the attribution line to the dashboard footer; consider requesting written consent given the fork-friendly public posture.
+- **Adzuna ToS attribution.** Adzuna's terms restrict organisational republishing of aggregates without written consent; personal research is permitted with attribution ("The Adzuna API" + link). The footer already reads "Data: Adzuna"; action: change the wording to "The Adzuna API" + link; consider requesting written consent given the fork-friendly public posture.
 - **`/details/{id}` is undocumented upstream.** The work-arrangement fetcher's endpoint is absent from Adzuna's official OpenAPI spec and could vanish without notice — one more reason it ships opt-in and off (ADR-025).
 - **`raw_payload` in the public asset.** The full Adzuna JSON per row ships inside `latest-*.parquet`. It's both size bloat and additional ToS surface. Decide keep/drop.
 - **Spanish keyword dictionary is thin.** `work_arrangement` coverage is markedly lower for ES than GB. Cheap win: extend the Spanish keyword table (`100% remoto`, `presencial obligatorio`, …); the test suite already covers the table-driven shape.
@@ -24,8 +24,9 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 
 ### Dashboard & CI
 
-- **Preset switcher.** The site data loader pins one preset id; multi-preset enumeration + a UI switcher are queued (ADR-019). Until then, running a different preset means changing one constant in `site/src/data/postings.parquet.js`.
+- **Preset switcher.** The site data loader pins one preset id; multi-preset enumeration + a UI switcher are queued (ADR-019). Until then, running a different preset means changing `PRESET_ID` in two places: `site/src/data/postings.parquet.js` and `.github/workflows/pages.yml`.
 - **PR-gate smoke for `site/**`.** The headless smoke test only runs on push to `main`; a path-filtered PR job would catch dashboard regressions pre-merge at ~2-3 min per PR.
+- **Local smoke dev-phase timeout (2026-09-13).** `npm run smoke` passes all 8 dev pages and all 8 dist pages, but the "/ filter interaction" step (second `page.goto` on the dev server with `waitUntil: "networkidle0"`) times out at 30 s — reproduced on an unmodified tree, so it is environmental (dev-server websocket / hot-reload keeps the network busy), not a page regression. CI is unaffected (`pages.yml` runs `SMOKE_PHASE=dist`). Candidate fix: `networkidle2` or a DOM-ready wait for that step. Until then, `SMOKE_PHASE=dist npm run smoke` is the CI-equivalent local gate.
 - **`/details/{id}` reactivation criteria.** Re-enable only when the Spanish dictionary expansion plateaus AND coverage demand is demonstrated; keep the per-run call cap set even then so a wave of fresh postings can't exhaust the weekly quota.
 - **Dependabot auto-merge scope.** Auto-merge currently blesses any patch/minor bump including `.github/workflows/**`; consider excluding workflow files since those change CI semantics.
 - **Transitive npm warnings.** A handful of deprecation warnings chain to Observable Framework's own dependencies — not actionable downstream; Dependabot will surface the fix when upstream repins.

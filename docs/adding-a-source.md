@@ -24,7 +24,7 @@ A source adapter ingests job postings from one external API and emits a DataFram
 
 4. **Write the unit test.**
    - Path: `tests/sources/test_<name>.py`.
-   - Assertions: (a) returns a DataFrame, (b) passes `PostingSchema.validate(out, lazy=True)`, (c) empty response → empty DataFrame (no exceptions), (d) 5xx → raises `SourceFetchError`.
+   - Assertions: (a) returns a DataFrame, (b) passes `PostingSchema.validate(inject_accumulation_cols(out), lazy=True)` — `inject_accumulation_cols` (from `jobpipe.schemas`) adds the nullable v2/v3 columns and `first_seen_at`/`last_seen_at` that adapters don't emit, (c) empty response → empty DataFrame (no exceptions), (d) 5xx → raises `SourceFetchError`.
 
 5. **Wire into a preset.**
    - Set `enabled: true` for your adapter in `config/runs/<preset>.yaml`.
@@ -49,7 +49,7 @@ import httpx
 import pandas as pd
 from pydantic import Field
 
-from jobpipe.schemas import PostingSchema
+from jobpipe.schemas import PostingSchema, inject_accumulation_cols
 from jobpipe.sources import SourceConfig, SourceFetchError, register
 
 
@@ -84,6 +84,7 @@ class MyBoardAdapter:
                 "salary_max_eur": None,
                 "salary_period": None,
                 "salary_annual_eur_p50": None,
+                "salary_imputed": None,  # set by normalise.py when p50 is derived
                 "posted_at": j["posted_at"],
                 "ingested_at": now,
                 "posting_url": j["url"],
@@ -96,6 +97,11 @@ class MyBoardAdapter:
         ]
 
         df = pd.DataFrame(rows)
-        PostingSchema.validate(df, lazy=True)
+        # Adapters don't emit the source-optional v2/v3 columns
+        # (adzuna_category, contract_*, description, location_area, skills)
+        # or first_seen_at/last_seen_at; inject them as nulls before validating.
+        PostingSchema.validate(inject_accumulation_cols(df), lazy=True)
         return df
 ```
+
+(`inject_accumulation_cols` lives in `jobpipe.schemas`; `normalise.run()` calls it again before its own validate, so the double call is harmless.)

@@ -5,7 +5,7 @@ Product-feature backlog for the dashboard and the applied-AI layer. Complements
 work queue for pipeline correctness); this file tracks **new user-facing capability**.
 New session? Start at [bootstrap.md](bootstrap.md), then pick the top `planned` item here.
 
-_Last updated: 2026-07-25._
+_Last updated: 2026-09-13. Cross-track priority order (features + ops, ranked for reviewer impact) lives in [portfolio-audit.md](portfolio-audit.md)._
 
 ## How to use this file (session bootstrap)
 
@@ -30,7 +30,7 @@ _Last updated: 2026-07-25._
    batched, weekly volume only (hundreds of calls max). Client-side: BYOK, feature must
    degrade gracefully to nothing when no key present. Free-tier data may be used for
    provider training — never send user PII by default; warn in UI where user pastes text (F9).
-6. **Stock Observable defaults.** No custom CSS / fill overrides; `theme: "dashboard"`.
+6. **Stock Observable defaults.** No new custom CSS / fill overrides; `theme: "dashboard"`. The two existing exceptions (sticky `filterCard` inline style, the nav click-listener in `observablehq.config.js` `head`) are grandfathered per ADR-024/026 — don't add a third without an ADR.
 7. **Every new data page** must be added to `observablehq.config.js` `pages` AND
    `site/scripts/smoke.mjs` `DATA_PAGES` (hardcoded list), and pass
    `npm run build && npm run smoke`.
