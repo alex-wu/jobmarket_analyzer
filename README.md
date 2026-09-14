@@ -17,10 +17,10 @@
 ## What it does
 
 1. **Ingest** — One Adzuna source adapter fetches across the active countries (gb, es) at ~30 API calls/week (3 keywords × 5 pages × 2 countries — a small fraction of the free-tier quota); 7-country EU expansion is planned. See [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation) for why the active source set is Adzuna-only, [ADR-018](DECISIONS.md#adr-018--weekly-cadence--multi-country-single-run) for cadence rationale.
-2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, extract ESCO Pillar B skills via Aho-Corasick (scoped by preset `isco_focus`, [ADR-023](DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus)), deduplicate by `posting_id`.
+2. **Normalise** — Currency to EUR via ECB reference rates, salary period to annual, fuzzy-match titles to ISCO-08 occupation codes via ESCO, extract ESCO Pillar B skills via Aho-Corasick (scoped by preset `isco_focus`, [ADR-023](DECISIONS.md#adr-023--skill-enrichment-via-esco-pillar-b--aho-corasick-scoped-by-preset-isco_focus)), cross-source dedupe by normalised-URL hash (the adapter already collapses duplicate `posting_id`s within a run).
 3. **Archive** — Each weekly run writes an immutable `data-{preset_id}-YYYY-MM-DD.parquet` to its own dated GitHub Release. Never modified, never deleted ([ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)).
 4. **Accumulate** — Publish step unions the last 180 days of dated releases for the preset, dedupes by `posting_id`, derives `first_seen_at` / `last_seen_at`, re-clobbers `latest-{preset_id}` Release with the unified parquet. Pure function — `latest` is recomputable from the archive at any time.
-5. **Visualise** — Seven-page Observable Framework dashboard on GitHub Pages (overview, geography choropleth, work arrangement, skills & roles, period-over-period compare, quality, methodology) reads `latest-{preset_id}.parquet` for the active preset (currently hardcoded to `data_analyst_eu`; preset switcher queued per ADR-019). Every posting links back to its source URL.
+5. **Visualise** — Eight-page Observable Framework dashboard on GitHub Pages (overview, weekly trends, geography choropleth, work arrangement, skills & roles, period-over-period compare, quality, methodology) reads `latest-{preset_id}.parquet` for the active preset (currently hardcoded to `data_analyst_eu`; preset switcher queued per ADR-019). Every posting links back to its source URL.
 
 ---
 
@@ -78,7 +78,7 @@ Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectur
 The dashboard lives at <https://alex-wu.github.io/jobmarket_analyzer/>. Two workflows back it:
 
 - `.github/workflows/refresh.yml` — weekly Monday 06:00 UTC cron + manual dispatch, matrix over presets (currently just `data_analyst_eu`). Runs the pipeline, uploads accumulated `latest-{preset_id}.parquet` + `manifest.json` to `latest-{preset_id}` + dated `data-{preset_id}-YYYY-MM-DD` GitHub Releases.
-- `.github/workflows/pages.yml` — downloads the hardcoded `data_analyst_eu` release, builds `site/` with Observable Framework, smoke-tests it, deploys via `actions/deploy-pages`. Triggers on push to `main` under `site/**`, on `refresh.yml` completion (via `workflow_run`), or via manual `workflow_dispatch`.
+- `.github/workflows/pages.yml` — downloads the hardcoded `data_analyst_eu` release, builds `site/` with Observable Framework, smoke-tests it, deploys via `actions/deploy-pages`. Triggers on push to `main` under `site/**` or to the workflow file itself, on `refresh.yml` completion (via `workflow_run`), or via manual `workflow_dispatch`.
 
 One-time manual GitHub setup (secrets, Pages source, workflow permissions, secret scanning) is checklisted in [docs/github-setup.md](docs/github-setup.md). Architectural rationale: [ADR-004](DECISIONS.md#adr-004--storage--delivery-parquet-via-github-releases-as-cdn), [ADR-016](DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo), [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming).
 
@@ -98,13 +98,13 @@ Picking the project up for a working session? Start at [docs/bootstrap.md](docs/
 
 - End-to-end weekly pipeline: Adzuna ingest → EUR/ISCO/skills normalisation → dated + accumulated Releases → Pages rebuild, running unattended with failure alerting (a red run files a GitHub issue).
 - Schema v3: `work_arrangement` ternary via a multilingual keyword tagger, ESCO Pillar B skills ([ADR-022](DECISIONS.md#adr-022--postingschema-v2--persist-5-adzuna-fields--skills)–[025](DECISIONS.md#adr-025--postingschema-v3--drop-dead-weight-cols-ternary-work_arrangement-details-off-by-default)). Only `experience_level` remains unfilled — Adzuna carries no signal for it.
-- Seven-page dashboard ([ADR-026](DECISIONS.md#adr-026--dashboard-v2-restructure--europe-choropleth-page-consolidation-csv-export)): Europe choropleth, work-arrangement surface + global filter, top-skills chart, period-over-period compare page, per-page CSV export, URL-persisted filters ([ADR-024](DECISIONS.md#adr-024--filter-state-persistence-via-url-search-params)).
+- Eight-page dashboard ([ADR-026](DECISIONS.md#adr-026--dashboard-v2-restructure--europe-choropleth-page-consolidation-csv-export)): Europe choropleth, work-arrangement surface + global filter, top-skills chart, period-over-period compare page, weekly/monthly trends page, week-over-week market-pulse strip on Overview and Trends (latest complete period vs prior), CSV export on every data page except Compare, URL-persisted filters ([ADR-024](DECISIONS.md#adr-024--filter-state-persistence-via-url-search-params)).
 - Hardening for unattended runs: credential scrubbing across wrapped errors, real retry semantics (5xx/429/transport only), quarantine of malformed rows, gate command.
 - CI/CD: CodeQL, Dependabot (grouped weekly, auto-merge patch+minor), OpenSSF Scorecard, actionlint, branch protection.
 
 **Next** (details in [docs/open-questions.md](docs/open-questions.md)):
 
-- [ ] Adzuna attribution footer on the dashboard (ToS hygiene).
+- [ ] Adzuna attribution wording — footer says "Data: Adzuna"; terms want "The Adzuna API" + link (ToS hygiene).
 - [ ] Post-publish artifact correctness gate + `min_total_rows` calibration against real weekly manifests.
 - [ ] Dashboard preset switcher — the loader still hardcodes `data_analyst_eu` ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
 - [ ] Second preset (e.g. `software_developer_eu`), README hero screenshot, first tagged release.

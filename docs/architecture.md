@@ -13,7 +13,7 @@ flowchart TD
         preset["preset YAML<br/>(config/runs/{preset_id}.yaml)"] --> runner["runner.run_fetch / run_normalise / run_publish"]
         runner -->|fan-out over countries| adzuna["AdzunaAdapter<br/>countries: [gb, es] — 7-country EU expansion planned<br/>keywords × pages"]
         adzuna --> raw["data/raw/{preset_id}__{run_id}/<br/>postings_raw.parquet"]
-        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · work_arrangement-tag · dedupe by posting_id<br/>since_days: 180"]
+        raw --> normalise["normalise.run()<br/>FX→EUR · period→annual · ISCO-tag · skills-tag · work_arrangement-tag · cross-source dedupe by URL hash<br/>since_days: 180"]
         normalise --> enriched["data/enriched/{preset_id}__{run_id}/<br/>postings.parquet"]
         enriched --> archive_upload["upload as<br/>data-{preset_id}-YYYY-MM-DD.parquet"]
         archive_upload --> dated_release["GitHub Release<br/>data-{preset_id}-YYYY-MM-DD<br/>(immutable, forever)"]
@@ -61,16 +61,16 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | CLI | `src/jobpipe/cli.py` | `jobpipe fetch \| normalise \| publish \| gate \| validate` Typer commands. Installs the URL-credential scrub filter on httpx/httpcore loggers per [ADR-015](../DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger). |
 | Configs | `config/runs/{preset_id}.yaml` | Run presets (what to fetch). Adding a role/geo = new YAML + new matrix entry in `refresh.yml`, plus (until the switcher lands) un-hardcoding the preset in `pages.yml` and `site/src/data/postings.parquet.js`. |
 | Archived presets | `config/runs/_archived/` | Pre-pivot presets retained for historical reference. |
-| Test fixtures | `tests/fixtures/<area>/<adapter>/` | Hand-built trimmed JSON samples driving `httpx.MockTransport` unit tests. |
+| Test fixtures | `tests/fixtures/<adapter>/` (sources), `tests/fixtures/benchmarks/<adapter>/` | Hand-built trimmed JSON samples driving `httpx.MockTransport` unit tests. |
 | Refresh workflow | `.github/workflows/refresh.yml` | Weekly Monday 06:00 UTC cron + `workflow_dispatch`. Matrix over presets. Per-preset concurrency group. Per-preset release tags. |
 | Pages workflow | `.github/workflows/pages.yml` | Builds `site/`, downloads the single hardcoded preset's release (`PRESET_ID: data_analyst_eu`), deploys via `actions/deploy-pages`. `site/src/data/presets.json.js` enumerates local `data/gh_databuild_samples/latest-*.parquet` — no generator from `config/runs/*.yaml` exists. Multi-preset enumeration queued per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming). See [ADR-016](../DECISIONS.md#adr-016--github-pages-deploy-via-actionsdeploy-pages-from-the-monorepo). |
 | Site | `site/` | Observable Framework project. Loads the single active preset's `latest-{preset_id}.parquet` (switcher queued per ADR-019). Build-time data loaders (per [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute) consequence) keep cold-load tractable for the 150-250 MB accumulated artifacts. |
 
 ## Schemas (the contract)
 
-- **`PostingSchema`** (`src/jobpipe/schemas.py`, **manifest schema_version: "3"** as of [ADR-025](../DECISIONS.md#adr-025--postingschema-v3--drop-dead-weight-cols-ternary-work_arrangement-details-off-by-default)): the shape every source adapter must emit. Salary fields are pre-converted to EUR (and rounded to 2 decimals at the source — `_recompute_p50()`). `posting_url` is required — every datapoint links back to its source. `first_seen_at` / `last_seen_at` (nullable datetimes) are populated **only** in the accumulated artifact — per-source adapters leave them null. **v3 changes:** dropped `location_raw` (redundant with `location_area`), `region` (always NULL), `remote: bool` (replaced), `year_month` (vestige of abandoned hive layout); added `work_arrangement: str` with `isin=[remote, hybrid, onsite]`, populated by the work-arrangement tagger. **v2 additions** (Adzuna populates; other adapters get all-null via `inject_accumulation_cols`): `adzuna_category` (str), `contract_type` (str enum), `contract_time` (str enum), `description` (str, 500-char Adzuna-truncated), `location_area` (list[str], up to 5 levels), `skills` (list[str], populated by the skills tagger).
+- **`PostingSchema`** (`src/jobpipe/schemas.py`, **manifest schema_version: "3"** as of [ADR-025](../DECISIONS.md#adr-025--postingschema-v3--drop-dead-weight-cols-ternary-work_arrangement-details-off-by-default)): the shape every source adapter must emit. Salary fields are pre-converted to EUR (and rounded to 2 decimals at the source — `_recompute_p50()`). `posting_url` is required — every datapoint links back to its source. `first_seen_at` / `last_seen_at` (nullable datetimes) are populated **only** in the accumulated artifact — per-source adapters leave them null. **v3 changes:** dropped `location_raw` (redundant with `location_area`), `region` (always NULL), `remote: bool` (replaced), `year_month` (vestige of abandoned hive layout); added `work_arrangement: str` with `isin=[remote, hybrid, onsite]`, populated by the work-arrangement tagger. **v2 additions** (Adzuna populates; other adapters get all-null via `inject_accumulation_cols`): `adzuna_category` (str), `contract_type` (str enum), `contract_time` (str enum), `description` (str, schema cap 1000 chars; Adzuna `/search` truncates at ~500), `location_area` (list[str], up to 5 levels), `skills` (list[str], populated by the skills tagger).
 - **`BenchmarkSchema`**: official wage data, joined to postings via `(isco_code, country)`. **Inert in v1 post-pivot** — benchmark adapters shelved per [ADR-017](../DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation), schema retained for reactivation.
-- **Accumulation drift guard:** `tests/test_schema_accumulate_drift_guard.py` asserts every `PostingSchema` column (minus accumulation cols + `posting_id`) appears in `duckdb_io._ACCUMULATE_ANY_VALUE_COLS`. Any new column missing from the tuple is silently dropped by `export_accumulated()` — the test fails the build instead.
+- **Accumulation drift guard:** `tests/test_schema_accumulate_drift_guard.py` asserts every `PostingSchema` column (minus `posting_id`, `ingested_at`, and the accumulation cols) appears in `duckdb_io._ACCUMULATE_ANY_VALUE_COLS`. Any new column missing from the tuple is silently dropped by `export_accumulated()` — the test fails the build instead.
 
 ## Failure model
 
@@ -107,18 +107,25 @@ The Adzuna adapter does not consume an incremental / "updated-since" API; the fr
 Per [ADR-020](../DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute), `latest-{preset_id}.parquet` is a **pure function** over the dated archive:
 
 ```sql
+-- Inputs: the runner selects dated-release dirs whose tag date
+-- (data-{preset_id}-YYYY-MM-DD) falls inside the window, plus the fresh run,
+-- and hands their parquet paths to duckdb_io.export_accumulated().
 WITH archive AS (
-  SELECT * FROM read_parquet('data-{preset_id}-*/postings.parquet')
-  WHERE ingested_at >= now() - INTERVAL window_days DAYS
+  SELECT * FROM read_parquet([
+    'data-{preset_id}-YYYY-MM-DD/latest-{preset_id}.parquet', …, '<fresh run>/postings.parquet'
+  ], union_by_name = true)
 )
 SELECT
   posting_id,
   MIN(ingested_at) AS first_seen_at,
   MAX(ingested_at) AS last_seen_at,
+  MAX(ingested_at) AS ingested_at,
   ANY_VALUE(title), ANY_VALUE(company), ANY_VALUE(country), …
 FROM archive
 GROUP BY posting_id;
 ```
+
+The window filter is applied on the release-tag date in the directory name (`runner.py`), not on an `ingested_at` predicate inside the query.
 
 - **Window:** 180 days, matches existing `normalise.since_days` floor.
 - **Retention:** archive forever (no `cleanup.yml`). GH Releases on public repos have no published storage cap; ~1.3 GB/yr per preset.

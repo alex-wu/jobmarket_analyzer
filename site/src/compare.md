@@ -10,6 +10,7 @@ import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {kpiCard} from "./components/kpiCard.js";
+import {deltaSub} from "./components/deltaSub.js";
 import {expandable} from "./components/expand.js";
 import {iscoMajorLabel} from "./components/isco.js";
 
@@ -103,22 +104,15 @@ const B = kpiRows.find((r) => r.period === "B") ?? empty;
 const fmtK = (v) => (v == null ? "—" : `€${Math.round(v / 1000)}k`);
 const pct = (num, den) => (den > 0 ? num / den : null);
 const fmtPct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
-// Delta sub-line: "A → B" plus the movement, sign always shown.
-function deltaSub(a, b, {kind, fmt = String}) {
-  if (a == null || b == null) return `${labelA}: ${a == null ? "—" : fmt(a)}`;
-  const arrow = b > a ? "▲" : b < a ? "▼" : "＝";
-  const move = kind === "pp"
-    ? `${(b - a) >= 0 ? "+" : ""}${((b - a) * 100).toFixed(1)} pp`
-    : a === 0 ? "n/a" : `${(b - a) >= 0 ? "+" : ""}${Math.round(((b - a) / a) * 100)}%`;
-  return `${labelA}: ${fmt(a)} · ${arrow} ${move}`;
-}
+// Delta sub-line vs period A: "A: X · ▲ move" (shared component).
+const delta = (a, b, opts) => deltaSub(a, b, {...opts, label: labelA});
 ```
 
 <div class="grid grid-cols-4">
-  ${kpiCard(`Postings — ${labelB}`, B.n.toLocaleString(), deltaSub(A.n, B.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
-  ${kpiCard(`Median salary — ${labelB}`, fmtK(B.med_salary), deltaSub(A.med_salary, B.med_salary, {kind: "pct", fmt: fmtK}))}
-  ${kpiCard(`Disclose salary — ${labelB}`, fmtPct(pct(B.n_salary, B.n)), deltaSub(pct(A.n_salary, A.n), pct(B.n_salary, B.n), {kind: "pp", fmt: fmtPct}))}
-  ${kpiCard(`Remote (of classified) — ${labelB}`, fmtPct(pct(B.n_remote, B.n_arr)), deltaSub(pct(A.n_remote, A.n_arr), pct(B.n_remote, B.n_arr), {kind: "pp", fmt: fmtPct}))}
+  ${kpiCard(`Postings — ${labelB}`, B.n.toLocaleString(), delta(A.n, B.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
+  ${kpiCard(`Median salary — ${labelB}`, fmtK(B.med_salary), delta(A.med_salary, B.med_salary, {kind: "pct", fmt: fmtK}))}
+  ${kpiCard(`Disclose salary — ${labelB}`, fmtPct(pct(B.n_salary, B.n)), delta(pct(A.n_salary, A.n), pct(B.n_salary, B.n), {kind: "pp", fmt: fmtPct}))}
+  ${kpiCard(`Remote (of classified) — ${labelB}`, fmtPct(pct(B.n_remote, B.n_arr)), delta(pct(A.n_remote, A.n_arr), pct(B.n_remote, B.n_arr), {kind: "pp", fmt: fmtPct}))}
 </div>
 
 <small>Median salary is over disclosed <code>€p50</code> only (${A.n_salary.toLocaleString()} postings in ${labelA}, ${B.n_salary.toLocaleString()} in ${labelB}); remote share is among arrangement-classified postings (${A.n_arr.toLocaleString()} / ${B.n_arr.toLocaleString()}).</small>

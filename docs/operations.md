@@ -57,7 +57,7 @@ cd site
 npm run build && npm run smoke
 ```
 
-`npm run build` produces `site/dist/`. `npm run smoke` walks the dev server + the static build with headless Chromium and asserts zero runtime errors. **`npm run build` alone is not sufficient** — Framework doesn't execute cell JavaScript at build time, so runtime errors only surface in a browser.
+`npm run build` produces `site/dist/`. `npm run smoke` walks the dev server + the static build with headless Chromium and asserts zero runtime errors. **`npm run build` alone is not sufficient** — Framework doesn't execute cell JavaScript at build time, so runtime errors only surface in a browser. If the dev-phase "filter interaction" step times out locally (known, see open-questions), run the CI-equivalent `SMOKE_PHASE=dist npm run smoke` instead.
 
 `npm run smoke` accepts a `SMOKE_PHASE` env var:
 
@@ -163,7 +163,7 @@ The data loader does not branch on environment — single code path, identical b
 | `gh workflow run refresh.yml` | `refresh.yml` (matrix over presets) | Re-runs the pipeline for every preset; uploads new releases; chains to `pages.yml`. |
 | Weekly Monday 06:00 UTC cron | `refresh.yml` | Same as above, automatic. |
 | `gh workflow run pages.yml` | `pages.yml` | Manual deploy (no upstream change required). |
-| Push to `main` (Python code) | `ci.yml` | Ruff / Mypy / pytest. Does NOT deploy. |
+| Any push to `main`, any PR to `main` (no path filter) | `ci.yml` | Ruff / Mypy / pytest. Does NOT deploy. |
 
 ---
 

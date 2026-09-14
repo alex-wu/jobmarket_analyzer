@@ -1,13 +1,12 @@
 """``jobpipe`` CLI — Typer entry point.
 
-Three commands wire the phased build:
+Five commands, all implemented and wired into ``refresh.yml``:
 
 * ``jobpipe fetch``      — invoke enabled source adapters, write raw Parquet.
 * ``jobpipe normalise``  — run :mod:`jobpipe.normalise`, write enriched Parquet.
-* ``jobpipe publish``    — partition + export + manifest for GitHub Release upload.
-
-P1 wires ``fetch`` to :mod:`jobpipe.runner`. ``normalise`` and ``publish`` are
-still skeletons until P2 / P5.
+* ``jobpipe publish``    — accumulate + export + manifest for GitHub Release upload.
+* ``jobpipe gate``       — post-publish manifest assertions (:mod:`jobpipe.gate`).
+* ``jobpipe validate``   — preset YAML sanity check, no HTTP.
 """
 
 from __future__ import annotations

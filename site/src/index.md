@@ -11,6 +11,7 @@ import {html} from "npm:htl";
 import {coverageNote} from "./components/coverageNote.js";
 import {dataTable} from "./components/dataTable.js";
 import {kpiCard} from "./components/kpiCard.js";
+import {marketPulse, derivePulse} from "./components/marketPulse.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
@@ -44,7 +45,7 @@ function fmtDate(v) {
 <small>
 ${manifest.preset_id.replaceAll("_", " ")} preset · weekly snapshot ·
 as of <strong>${fmtDate(manifest.generated_at)}</strong> ·
-<strong>${manifest.postings.row_count.toLocaleString()}</strong> postings ·
+<strong>${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()}</strong> postings (${manifest.postings.row_count.toLocaleString()} new this week) ·
 <strong>${Object.keys(manifest.postings.country_counts).length}</strong> countries ·
 pipeline <code>${manifest.pipeline_version}</code>
 </small>
@@ -75,10 +76,43 @@ const live = await db.queryRow(`
 display(coverageNote(manifest, {n: live.n, nSalary: live.n_salary, nIsco: live.n_isco}));
 ```
 
+## Market pulse
+
+```js
+// Latest *complete* week vs the one before. The week containing the newest
+// posting in the snapshot is always partial (weekly Monday ingestion), so it is
+// excluded — the cutoff is computed over the whole snapshot, not the filter, so
+// the reference week is stable while filters change. Medians on <3 disclosed
+// salaries are suppressed as noise.
+const pulseWeeks = Array.from(await db.query(`
+  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
+         COUNT(*)::INT AS n,
+         COUNT(salary_annual_eur_p50)::INT AS n_salary,
+         MEDIAN(salary_annual_eur_p50) AS med_salary,
+         COUNT(work_arrangement)::INT AS n_arr,
+         COUNT(*) FILTER (WHERE work_arrangement = 'remote')::INT AS n_remote
+  FROM postings
+  ${andClause(where)} posted_at IS NOT NULL
+    AND posted_at::TIMESTAMP < (SELECT date_trunc('week', MAX(posted_at)::TIMESTAMP) FROM postings)
+  GROUP BY 1
+  ORDER BY 1 DESC
+  LIMIT 2
+`)).map(derivePulse);
+const pulse = pulseWeeks[0];
+```
+
+${marketPulse(pulse, pulseWeeks[1], {
+  periodLabel: pulse ? `wk of ${fmtDate(pulse.wk)}` : "",
+  priorLabel: "prior wk",
+  emptyText: "No postings in a complete week for the current filter — widen the selection."
+})}
+
+<small>Latest <em>complete</em> week (Mon–Sun by <code>posted_at</code>) vs the week before; the newest, still-filling week is excluded. Median salary needs ≥3 disclosed <code>€p50</code>; remote share is among arrangement-classified postings. The <a href="./trends">Trends</a> page shows the same strip plus the full path.</small>
+
 ## Key figures
 
 <div class="grid grid-cols-4">
-  ${kpiCard("Postings", live.n.toLocaleString(), `of ${manifest.postings.row_count.toLocaleString()} in snapshot`)}
+  ${kpiCard("Postings", live.n.toLocaleString(), `of ${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()} in snapshot`)}
   ${kpiCard("With salary", live.n ? `${Math.round((live.n_salary / live.n) * 100)}%` : "—", `${live.n_salary.toLocaleString()} disclose €p50`)}
   ${kpiCard("ISCO-tagged", live.n ? `${Math.round((live.n_isco / live.n) * 100)}%` : "—", "rapidfuzz cutoff 85")}
   ${kpiCard("Date span", fmtDate(allDates.lo), `→ ${fmtDate(allDates.hi)}`)}

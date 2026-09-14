@@ -5,7 +5,7 @@ Product-feature backlog for the dashboard and the applied-AI layer. Complements
 work queue for pipeline correctness); this file tracks **new user-facing capability**.
 New session? Start at [bootstrap.md](bootstrap.md), then pick the top `planned` item here.
 
-_Last updated: 2026-07-24._
+_Last updated: 2026-09-14. Cross-track priority order (features + ops, ranked for reviewer impact) lives in [portfolio-audit.md](portfolio-audit.md)._
 
 ## How to use this file (session bootstrap)
 
@@ -30,7 +30,7 @@ _Last updated: 2026-07-24._
    batched, weekly volume only (hundreds of calls max). Client-side: BYOK, feature must
    degrade gracefully to nothing when no key present. Free-tier data may be used for
    provider training — never send user PII by default; warn in UI where user pastes text (F9).
-6. **Stock Observable defaults.** No custom CSS / fill overrides; `theme: "dashboard"`.
+6. **Stock Observable defaults.** No new custom CSS / fill overrides; `theme: "dashboard"`. The two existing exceptions (sticky `filterCard` inline style, the nav click-listener in `observablehq.config.js` `head`) are grandfathered per ADR-024/026 — don't add a third without an ADR.
 7. **Every new data page** must be added to `observablehq.config.js` `pages` AND
    `site/scripts/smoke.mjs` `DATA_PAGES` (hardcoded list), and pass
    `npm run build && npm run smoke`.
@@ -39,8 +39,8 @@ _Last updated: 2026-07-24._
 
 | ID | Feature | Status | Effort | Value | Depends on |
 |----|---------|--------|--------|-------|------------|
-| F1 | Trends page (weekly time series) | in-progress | S | ★★★★★ | — |
-| F2 | Market-pulse KPI strip w/ WoW deltas | planned | S | ★★★★ | F1 |
+| F1 | Trends page (weekly time series) | shipped | S | ★★★★★ | — |
+| F2 | Market-pulse KPI strip w/ WoW deltas | shipped | S | ★★★★ | F1 |
 | F3 | Posting lifetime (demand-tightness proxy) | planned | S-M | ★★★★★ | loader cols |
 | F4 | Skill-salary premium + co-occurrence | planned | M | ★★★★★ | — |
 | F5 | LLM ISCO fallback (build-time Gemini) | planned | S-M | ★★★★ | — |
@@ -51,7 +51,10 @@ _Last updated: 2026-07-24._
 | F10 | Eurostat benchmark overlay (revival) | idea | M-L | ★★★ | adapter revival |
 | F11 | Title canonicalization via embeddings | idea | M | ★★ | F5 |
 
-## F1 — Trends page `[in-progress]`
+## F1 — Trends page `[shipped]`
+
+_Shipped 2026-07-25, PR #37 (`49eb80b`). All acceptance criteria met (page live,
+nav + smoke lists, CSV export, build+smoke green)._
 
 **What:** `/trends` — continuous weekly series over the accumulated snapshot: posting
 volume by country, median €p50, salary-disclosure rate, arrangement share, top-skill
@@ -64,23 +67,40 @@ compare.md does. Guard weekly medians with `HAVING COUNT(salary) >= 3`.
 **Done when:** page live, in nav + smoke list, CSV export of the weekly aggregate table,
 build+smoke green.
 
-## F2 — Market-pulse KPI strip `[planned]`
+## F2 — Market-pulse KPI strip `[shipped]`
 
-**What:** 4-5 KPI cards on Overview (or top of /trends): latest complete week vs prior —
-volume, median salary, remote share, disclosure rate, (later: median lifetime F3).
-WoW delta arrows, reusing compare.md's `deltaSub` pattern (extract to component).
+_Shipped 2026-09-14, PR #49. Components: `site/src/components/deltaSub.js` (delta
+sub-line; Compare + Trends consume it) and `site/src/components/marketPulse.js`
+(`derivePulse` + four-card strip; Overview + Trends consume it). Complete-bucket
+guard: the bucket (week or month) containing the newest `posted_at` is excluded,
+cutoff computed over the unfiltered snapshot so the reference period is stable under
+filters — Overview and Trends therefore show identical numbers. Median-lifetime card
+deferred to F3._
+
+**What:** four KPI cards ("Market pulse") on Overview and Trends: latest complete week
+(or month, on Trends) vs the one before — postings, median €p50, disclosure rate,
+remote share of classified — with WoW delta arrows via the shared `deltaSub`.
 **Why:** one-glance market state; cheap once F1 lands.
-**Done when:** KPI strip renders with correct deltas; partial-week guard documented.
+**Done when:** KPI strip renders with correct deltas on Overview; `deltaSub` is a
+shared component (compare + trends refactored onto it); partial-week guard documented;
+build+smoke green.
 
 ## F3 — Posting lifetime `[planned]`
+
+_Semantics validated 2026-09-14 on the live release (5,847 rows): 59% of postings
+seen in ≥2 weekly runs; lifetime median 7 d, p90 35 d, max 120 d; quantised to
+7-day steps with ±1 d cron jitter → bucket to weeks. 1,001 rows right-censored
+(last_seen = snapshot date). Fetch-window dropout is indistinguishable from close —
+caveat, not blocker._
 
 **What:** `last_seen_at - first_seen_at` = days a posting stayed live. Distributions +
 weekly median by ISCO major × country. Proxy for time-to-fill / demand tightness.
 **Why:** unique differentiator — columns already accumulate (ADR-020), nobody publishes
 this free.
-**Blocked by:** loader must ship both columns (constraint 2). Validate semantics first:
-`last_seen_at` only advances while a posting re-appears in the fetch window — confirm
-against the accumulation audit item in open-questions.md before charting.
+**Blocked by:** loader must ship both columns (constraint 2). Semantics validated
+2026-09-14 (note above; open-questions "Accumulation audit" resolved) — the one caveat
+to carry into copy: `last_seen_at` only advances while a posting re-appears in the fetch
+window, so dropping out of the top-N is indistinguishable from the ad closing.
 **Done when:** loader ships cols; lifetime section (on /trends or own page) with
 right-censoring caveat (postings still live at snapshot date).
 
