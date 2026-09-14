@@ -9,7 +9,7 @@
 import puppeteer from "puppeteer";
 import http from "node:http";
 import {mkdir, readFile} from "node:fs/promises";
-import {extname, join, resolve} from "node:path";
+import {extname, join, resolve, sep} from "node:path";
 
 const PORT = 4174;
 const BASE = "/jobmarket_analyzer/";
@@ -36,7 +36,8 @@ async function staticServer(root, port, basePrefix) {
       if (basePrefix && p.startsWith(basePrefix)) p = p.slice(basePrefix.length - 1);
       if (p === "/" || p === "") p = "/index.html";
       if (!extname(p)) p = `${p}.html`;
-      const full = join(absRoot, p);
+      const full = resolve(absRoot, "." + p);
+      if (!full.startsWith(absRoot + sep)) { res.writeHead(403).end("forbidden"); return; } // stay inside dist/
       try {
         const data = await readFile(full);
         res.writeHead(200, {"content-type": MIMES[extname(full)] ?? "application/octet-stream"});
