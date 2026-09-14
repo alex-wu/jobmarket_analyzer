@@ -26,7 +26,7 @@ _Last updated: 2026-09-14._
 - Dashboard: 8 pages (Overview, Trends, Geography, Work Arrangement, Skills & Roles, Compare Periods, Quality & Coverage, Methodology), live on GitHub Pages. Firefox is the recommended browser (upstream duckdb-wasm #1658 affects Chromium-on-Windows). Trends (F1) shipped 2026-07-25 via PR #37.
 - **F2 merged 2026-09-14 via PR #49** (squash): shared `deltaSub` + `marketPulse` components, "Market pulse" strip on Overview and Trends (latest *complete* week/month vs prior — identical numbers on both pages), snapshot-count fix (`accumulated_row_count`, not the fresh weekly `row_count`), coverage banner de-staled, plus the 2026-09-13 portfolio audit + docs sweep. `main` @ `7d9a033` after the same-day Dependabot merges (actions/checkout v7, actions/setup-node v7, astral-sh/setup-uv 10.1.0, puppeteer 25.10 → Chrome 152; Pages smoke green on that commit).
 - **Repo hygiene (2026-09-14):** only `main` + `feat/readme-hero-attribution` exist, locally and on GitHub; 0 open PRs. Old phase branches were deleted; the P3/P4 branch histories (ATS adapters, benchmarks — shelved by ADR-017) survive as tags `archive/p3-ats-adapters` and `archive/p4-benchmarks-isco-hn`. The adapter code itself is still on `main` under `src/jobpipe/sources/` and `src/jobpipe/benchmarks/`, disabled via preset config.
-- **Active branch for the next session: `feat/readme-hero-attribution`** (= `main` + this docs commit). Scope = audit #1 README hero + repo metadata and #14 Adzuna attribution footer. Reuse it for that work; open one PR when both land.
+- **Audit #1 + #14 landed 2026-09-14 on `feat/readme-hero-attribution`** (PR open at time of writing): README hero (pitch, trust bullets, two screenshots under `docs/img/`, mermaid flow), GitHub description + topics fixed, footer attribution "The Adzuna API" + link. Screenshots regenerate with `cd site && npm run build && npm run screenshots`. Next branch: `feat/widen-countries` for audit #2.
 - 2026-09-13 audit: local gate green (ruff, format, mypy strict, 374 pytest); docs re-aligned with code (README page count, `llm.py` cutoff docstring); [portfolio-audit.md](portfolio-audit.md) added as the priority order.
 - Schema v3; active preset `config/runs/data_analyst_eu.yaml` (gb + es, weekly, 180-day accumulation window). `gate.min_total_rows: 80` still uncalibrated against the 18 real manifests.
 
@@ -55,10 +55,10 @@ git fetch --prune && git branch -a                      # expect: main + feat/re
 
 **Authoritative order: [portfolio-audit.md](portfolio-audit.md)** (ranked #1–#18 by value/effort for a reviewer). Detail lives in [open-questions.md](open-questions.md) (ops/quality) and [feature-roadmap.md](feature-roadmap.md) (F-numbered features). Sprint A, in order:
 
-1. **#1 README hero + repo metadata** — screenshot/GIF, 3-line pitch, live link above fold, inline architecture diagram; fix the GitHub repo description (still says "overlay official salary benchmarks" — shelved by ADR-017) and add topics.
+1. ~~**#1 README hero + repo metadata**~~ — shipped 2026-09-14.
 2. **#2 Widen preset to 7 countries** — `countries: [gb, de, fr, nl, es, it, pl]` in `data_analyst_eu.yaml`; raise `max_results`; recalibrate `gate.min_total_rows` from the 18 real manifests. Let one Monday cron run before building insight pages on it.
 3. ~~**#4 Finish F2**~~ — merged 2026-09-14 (PR #49).
-4. **#14 Adzuna attribution footer** — footer reads "Data: Adzuna"; terms want "The Adzuna API" + link. One edit in `site/observablehq.config.js`.
+4. ~~**#14 Adzuna attribution footer**~~ — shipped 2026-09-14 (rest of the #14 ops bundle still open).
 
 Then Sprint B (#3 findings page, #5 posting lifetime, #6 AI brief, #9 Chrome retry) — see the audit.
 
