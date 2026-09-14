@@ -17,8 +17,7 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 ### Pipeline & quality gate
 
 - **Artifact correctness gate.** Post-publish validation of the released parquet + manifest: schema version matches, row count sane vs prior week, schema-validate the published file, coverage rates within expected bands. The manifest's `accumulated_row_count` is the input signal.
-- **Gate `min_total_rows` calibration.** The threshold is still a documented guess; ground it against the fresh-delta row counts of the published weekly manifests (7+ weeks of real data now exist).
-- **Accumulation audit on real data.** Verify the dated-release union dedupes as intended over multiple weeks (`first_seen_at`/`last_seen_at` drift), now that enough weekly releases exist.
+- **Gate `min_total_rows` calibration.** The threshold is still a documented guess; ground it against the fresh-delta row counts of the published weekly manifests (18 weekly manifests now exist).
 - **`salary_min_eur == 0` rows.** Adzuna emits a small number of zero-floored salaries; decide whether the dashboard surfaces or hides them.
 - **ISCO match-rate watch.** Fuzzy match rate hovers near the ~60% quality bar (cutoff already lowered 88 → 85). If it stays below on future runs, the LLM-fallback path (descoped by ADR-013) becomes load-bearing. The cheaper first lever is extending the ISCO label snapshot with missing English titles ("Analytics Engineer", "BI Developer" — ADR-021).
 
@@ -35,6 +34,7 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 
 ## Resolved
 
+- **Accumulation audit on real data** (2026-09-14) — checked on the 5,847-row `latest-data_analyst_eu` release (18 weekly runs): `posting_id` unique after the union; `first_seen_at`/`last_seen_at` populated on every row; 59% of rows seen in ≥2 runs; lifetime (`last_seen − first_seen`) median 7 d, p90 35 d, max 120 d, quantised to 7-day steps with ±1 d cron jitter; 1,001 rows right-censored (`last_seen` = snapshot date). Semantics hold; they feed F3 in feature-roadmap.md. Residual caveat: a posting dropping out of the fetch window looks identical to the ad closing.
 - **Pipeline hardening for unattended runs** (2026-07-21) — credential scrubbing extended to wrapped errors/tracebacks and root handlers; retry restricted to 5xx/429/transport (previously dead code); NaT `posted_at` rows quarantined instead of aborting; truncation warnings; failure now files a GitHub issue; manifest carries `accumulated_row_count`. See CHANGELOG.
 - **Schema v3** (2026-05-29, ADR-025) — dropped dead-weight columns, added ternary `work_arrangement`, salary rounding, `/details/` fetcher off by default.
 - **Dashboard v2** (2026-07-20, ADR-026) — choropleth geography, arrangement page + global filter, skills surface, CSV export everywhere.

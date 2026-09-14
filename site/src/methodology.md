@@ -26,7 +26,7 @@ flowchart LR
 
 A weekly cron in GitHub Actions runs the pipeline; the dashboard is rebuilt and pushed to GitHub Pages by `deploy-pages`. No server, no API key in the browser.
 
-The dashboard itself is eight pages (Overview, Trends, Geography, Work Arrangement, Skills &amp; Roles, Compare Periods, Quality &amp; Coverage, and this one). Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a table of the current selection with one-click CSV export. Compare Periods is the exception: it replaces the shared filter card with its own two period selectors, since its charts contrast two time slices rather than one filtered view, and it has no export table.
+The dashboard itself is eight pages (Overview, Trends, Geography, Work Arrangement, Skills &amp; Roles, Compare Periods, Quality &amp; Coverage, and this one). Overview and Trends open with a market-pulse strip that compares the latest <em>complete</em> week (or month) with the one before; the still-filling current bucket is excluded so both pages report the same figures. Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a table of the current selection with one-click CSV export. Compare Periods is the exception: it replaces the shared filter card with its own two period selectors, since its charts contrast two time slices rather than one filtered view, and it has no export table.
 
 ## ESCO skills tagger
 

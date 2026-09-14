@@ -5,7 +5,7 @@ Product-feature backlog for the dashboard and the applied-AI layer. Complements
 work queue for pipeline correctness); this file tracks **new user-facing capability**.
 New session? Start at [bootstrap.md](bootstrap.md), then pick the top `planned` item here.
 
-_Last updated: 2026-09-13. Cross-track priority order (features + ops, ranked for reviewer impact) lives in [portfolio-audit.md](portfolio-audit.md)._
+_Last updated: 2026-09-14. Cross-track priority order (features + ops, ranked for reviewer impact) lives in [portfolio-audit.md](portfolio-audit.md)._
 
 ## How to use this file (session bootstrap)
 
@@ -69,17 +69,17 @@ build+smoke green.
 
 ## F2 — Market-pulse KPI strip `[shipped]`
 
-_Shipped 2026-09-14 on `feat/market-pulse-overview` (`c485893`). `deltaSub` lives in
-`site/src/components/deltaSub.js`; compare + trends consume it. Partial-week guard:
-the week containing the newest `posted_at` is excluded, cutoff computed over the
-unfiltered snapshot so the reference week is stable under filters. Median-lifetime
-card deferred to F3._
+_Shipped 2026-09-14, PR #49. Components: `site/src/components/deltaSub.js` (delta
+sub-line; Compare + Trends consume it) and `site/src/components/marketPulse.js`
+(`derivePulse` + four-card strip; Overview + Trends consume it). Complete-bucket
+guard: the bucket (week or month) containing the newest `posted_at` is excluded,
+cutoff computed over the unfiltered snapshot so the reference period is stable under
+filters — Overview and Trends therefore show identical numbers. Median-lifetime card
+deferred to F3._
 
-**What:** 4-5 KPI cards on Overview (or top of /trends): latest complete week vs prior —
-volume, median salary, remote share, disclosure rate, (later: median lifetime F3).
-WoW delta arrows, reusing the `deltaSub` pattern now duplicated in compare.md and
-trends.md — **extract it to `site/src/components/` first**, then consume from all
-three pages.
+**What:** four KPI cards ("Market pulse") on Overview and Trends: latest complete week
+(or month, on Trends) vs the one before — postings, median €p50, disclosure rate,
+remote share of classified — with WoW delta arrows via the shared `deltaSub`.
 **Why:** one-glance market state; cheap once F1 lands.
 **Done when:** KPI strip renders with correct deltas on Overview; `deltaSub` is a
 shared component (compare + trends refactored onto it); partial-week guard documented;
@@ -97,9 +97,10 @@ caveat, not blocker._
 weekly median by ISCO major × country. Proxy for time-to-fill / demand tightness.
 **Why:** unique differentiator — columns already accumulate (ADR-020), nobody publishes
 this free.
-**Blocked by:** loader must ship both columns (constraint 2). Validate semantics first:
-`last_seen_at` only advances while a posting re-appears in the fetch window — confirm
-against the accumulation audit item in open-questions.md before charting.
+**Blocked by:** loader must ship both columns (constraint 2). Semantics validated
+2026-09-14 (note above; open-questions "Accumulation audit" resolved) — the one caveat
+to carry into copy: `last_seen_at` only advances while a posting re-appears in the fetch
+window, so dropping out of the top-N is indistinguishable from the ad closing.
 **Done when:** loader ships cols; lifetime section (on /trends or own page) with
 right-censoring caveat (postings still live at snapshot date).
 

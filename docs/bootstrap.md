@@ -2,7 +2,7 @@
 
 Single entry point for the next working session (human or AI agent) and for anyone picking the project up cold. Read this first; everything else is linked from here.
 
-_Last updated: 2026-09-13._
+_Last updated: 2026-09-14._
 
 ---
 
@@ -24,9 +24,10 @@ _Last updated: 2026-09-13._
 - End-to-end automation is live and unattended: Monday 06:00 UTC cron (`refresh.yml`) → fetch/normalise/publish/gate → dated + `latest-data_analyst_eu` releases → Pages rebuild via `workflow_run`. A red run files a `refresh failed: preset {id}` GitHub issue.
 - Weekly cron green every week since 2026-06-08; latest run 2026-09-14 (18 dated releases). The hardened pipeline (PR #33) has now run 8 times without incident; no `refresh failed:` issues exist. Latest manifest: schema v3, `row_count` 1,001 fresh / `accumulated_row_count` 5,847 over 180 days, ISCO fuzzy 550 / none 451 (55%).
 - Dashboard: 8 pages (Overview, Trends, Geography, Work Arrangement, Skills & Roles, Compare Periods, Quality & Coverage, Methodology), live on GitHub Pages. Firefox is the recommended browser (upstream duckdb-wasm #1658 affects Chromium-on-Windows). Trends (F1) shipped 2026-07-25 via PR #37.
-- **F2 shipped 2026-09-14** on `feat/market-pulse-overview` (unpushed, no PR yet): shared `deltaSub` component, Overview "Market pulse" strip (latest complete week vs prior), plus a fix for snapshot counts that compared accumulated rows to the fresh weekly `row_count`. Branch also carries the 2026-09-13 docs commits. **Next: open the PR and squash-merge to close the 7-week branch.**
+- **F2 merged 2026-09-14 via PR #49** (squash): shared `deltaSub` + `marketPulse` components, "Market pulse" strip on Overview and Trends (latest *complete* week/month vs prior — identical numbers on both pages), snapshot-count fix (`accumulated_row_count`, not the fresh weekly `row_count`), coverage banner de-staled, plus the 2026-09-13 portfolio audit + docs sweep. The pre-rebase remote branch `feat/market-pulse-overview` is stale — delete it, don't resume it.
+- **Active branch for the next session: `feat/readme-hero-attribution`** (cut from `main` after #49). Scope = audit #1 README hero + repo metadata and #14 Adzuna attribution footer. Nothing committed on it yet.
 - 2026-09-13 audit: local gate green (ruff, format, mypy strict, 374 pytest); docs re-aligned with code (README page count, `llm.py` cutoff docstring); [portfolio-audit.md](portfolio-audit.md) added as the priority order.
-- Schema v3; active preset `config/runs/data_analyst_eu.yaml` (gb + es, weekly, 180-day accumulation window). `gate.min_total_rows: 80` still uncalibrated against the 17 real manifests.
+- Schema v3; active preset `config/runs/data_analyst_eu.yaml` (gb + es, weekly, 180-day accumulation window). `gate.min_total_rows: 80` still uncalibrated against the 18 real manifests.
 
 ## First checks for the next session
 
@@ -46,8 +47,8 @@ If the run is red, a `refresh failed:` issue should already exist — start ther
 **Authoritative order: [portfolio-audit.md](portfolio-audit.md)** (ranked #1–#18 by value/effort for a reviewer). Detail lives in [open-questions.md](open-questions.md) (ops/quality) and [feature-roadmap.md](feature-roadmap.md) (F-numbered features). Sprint A, in order:
 
 1. **#1 README hero + repo metadata** — screenshot/GIF, 3-line pitch, live link above fold, inline architecture diagram; fix the GitHub repo description (still says "overlay official salary benchmarks" — shelved by ADR-017) and add topics.
-2. **#2 Widen preset to 7 countries** — `countries: [gb, de, fr, nl, es, it, pl]` in `data_analyst_eu.yaml`; raise `max_results`; recalibrate `gate.min_total_rows` from the 17 real manifests. Let one Monday cron run before building insight pages on it.
-3. ~~**#4 Finish F2**~~ — shipped 2026-09-14; only the PR + squash-merge remain.
+2. **#2 Widen preset to 7 countries** — `countries: [gb, de, fr, nl, es, it, pl]` in `data_analyst_eu.yaml`; raise `max_results`; recalibrate `gate.min_total_rows` from the 18 real manifests. Let one Monday cron run before building insight pages on it.
+3. ~~**#4 Finish F2**~~ — merged 2026-09-14 (PR #49).
 4. **#14 Adzuna attribution footer** — footer reads "Data: Adzuna"; terms want "The Adzuna API" + link. One edit in `site/observablehq.config.js`.
 
 Then Sprint B (#3 findings page, #5 posting lifetime, #6 AI brief, #9 Chrome retry) — see the audit.

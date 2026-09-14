@@ -7,14 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Overview market-pulse KPI strip (F2, 2026-09-14)
+### Added — market-pulse KPI strip on Overview + Trends (F2, 2026-09-14, PR #49)
 - Overview gains a "Market pulse" strip: latest *complete* week vs the week
   before (postings, median €p50, disclosure rate, remote share) with
   week-over-week arrows. The week containing the newest posting is excluded
   as partial; the cutoff is computed over the unfiltered snapshot so the
   reference week does not move when filters change.
-- `site/src/components/deltaSub.js`: shared delta sub-line helper; Compare
-  and Trends refactored onto it (duplicate function removed from both).
+- Trends' existing strip adopts the same complete-bucket rule (week or
+  month) — it previously compared the still-filling current bucket, so the
+  two pages disagreed under the same label. Charts still plot the partial
+  bucket.
+- `site/src/components/deltaSub.js` (delta sub-line; Compare + Trends
+  refactored onto it) and `site/src/components/marketPulse.js`
+  (`derivePulse` + four-card strip; Overview + Trends consume it).
 
 ### Fixed — snapshot counts and coverage banner (2026-09-14)
 - Overview header, Overview + Quality "Postings" cards compared the live
