@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Overview market-pulse KPI strip (F2, 2026-09-14)
+- Overview gains a "Market pulse" strip: latest *complete* week vs the week
+  before (postings, median €p50, disclosure rate, remote share) with
+  week-over-week arrows. The week containing the newest posting is excluded
+  as partial; the cutoff is computed over the unfiltered snapshot so the
+  reference week does not move when filters change.
+- `site/src/components/deltaSub.js`: shared delta sub-line helper; Compare
+  and Trends refactored onto it (duplicate function removed from both).
+
+### Fixed — snapshot counts and coverage banner (2026-09-14)
+- Overview header, Overview + Quality "Postings" cards compared the live
+  accumulated count against the manifest's fresh weekly `row_count`
+  ("5,842 of 1,001 in snapshot"). Now use `accumulated_row_count` with
+  `row_count` fallback; header reads "5,847 postings (1,001 new this week)".
+- Coverage banner de-staled: fresh fetch labelled as such, accumulation
+  window shown, pre-schema-v2 claims ("work_arrangement / skills not
+  captured", "~99% disclose salary") and a dead docs link removed.
+
 ### Added — portfolio audit + docs re-alignment (2026-09-13)
 - `docs/portfolio-audit.md`: every roadmap + ops item ranked #1–#18 by
   value / effort / complexity for a reviewer, with a standout checklist and a

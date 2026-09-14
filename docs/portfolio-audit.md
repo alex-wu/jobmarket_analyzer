@@ -19,7 +19,7 @@ The engineering already exceeds most analytics portfolios: unattended weekly pip
 | Accumulated corpus | 5,527 postings | 180-day window; ~980 fresh/week. Thin for cross-country claims. |
 | Country coverage | 2 of 7 | GB + ES active. Other five are a one-line YAML edit. |
 | ISCO match rate | 55% fuzzy | 45% of rows untagged → "Unclassified" on every page. |
-| Idle time | 7 weeks | No commits 2026-07-25 → 2026-09-13; F2 branch open, unfinished. |
+| Idle time | 7 weeks | No commits 2026-07-25 → 2026-09-13. F2 shipped 2026-09-14 on the branch; PR pending. |
 | Repo signals | 0 stars, 2 topics | No screenshot. Description still promises benchmark overlays shelved by ADR-017. |
 | Dashboard | 8 pages | Charts, filters, CSV, choropleth. No narrative findings page. |
 
@@ -55,7 +55,7 @@ Effort: **S** < 4h · **M** 4–12h · **L** > 12h (for someone who knows the co
 | 1 | **README hero + repo metadata** — screenshot/GIF, 3-line pitch, live link above fold, inline architecture diagram, fix GitHub description + topics | ★★★★★ | S · 2h | Low | Decides whether anyone reads further. Description still advertises shelved benchmark overlays. Surface the rigor ("17 weeks unattended, 374 tests, mypy strict, 26 ADRs") on the first screen. |
 | 2 | **Widen to 7 countries** — `gb de fr nl es it pl` in preset YAML; recalibrate `gate.min_total_rows` | ★★★★★ | S · 1h + 1 cron | Low | Triples corpus growth; makes choropleth + every cross-country chart real. Quota safe (~105 calls/wk vs 250/day). Watch cross-language tagger noise on DE/FR/IT/PL. |
 | 3 | **Findings page** — "What the data says": 5–7 written findings, each with chart + caveat, dated | ★★★★★ | M · 6h | Low | Biggest gap. Turns a dashboard into an analysis. Candidates: ES vs GB disclosure gap; remote share by ISCO; SQL/Python co-demand; salary spread by country; posting churn. |
-| 4 | **Finish F2 KPI strip** — extract `deltaSub`, Overview market-pulse cards, close branch | ★★★ | S · 3h | Low | Open WIP branch for 7 weeks looks abandoned. Overview needs a one-glance summary anyway. |
+| 4 | ~~**Finish F2 KPI strip**~~ — shipped 2026-09-14, see below; PR + merge pending | ★★★ | S · 3h | Low | Open WIP branch for 7 weeks looks abandoned. Overview needs a one-glance summary anyway. |
 
 ### Tier 2 — differentiators
 
@@ -148,4 +148,4 @@ Re-score when an item ships (move it to a "Shipped" list at the bottom with date
 
 ## Shipped from this list
 
-_(none yet)_
+- **#4 F2 KPI strip** — 2026-09-14, `c485893` + `52b5165` on `feat/market-pulse-overview` (PR pending). Shared `deltaSub`, Overview Market pulse strip, snapshot-count fix.

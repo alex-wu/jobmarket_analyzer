@@ -40,7 +40,7 @@ _Last updated: 2026-09-13. Cross-track priority order (features + ops, ranked fo
 | ID | Feature | Status | Effort | Value | Depends on |
 |----|---------|--------|--------|-------|------------|
 | F1 | Trends page (weekly time series) | shipped | S | ★★★★★ | — |
-| F2 | Market-pulse KPI strip w/ WoW deltas | in-progress | S | ★★★★ | F1 |
+| F2 | Market-pulse KPI strip w/ WoW deltas | shipped | S | ★★★★ | F1 |
 | F3 | Posting lifetime (demand-tightness proxy) | planned | S-M | ★★★★★ | loader cols |
 | F4 | Skill-salary premium + co-occurrence | planned | M | ★★★★★ | — |
 | F5 | LLM ISCO fallback (build-time Gemini) | planned | S-M | ★★★★ | — |
@@ -67,9 +67,13 @@ compare.md does. Guard weekly medians with `HAVING COUNT(salary) >= 3`.
 **Done when:** page live, in nav + smoke list, CSV export of the weekly aggregate table,
 build+smoke green.
 
-## F2 — Market-pulse KPI strip `[in-progress]`
+## F2 — Market-pulse KPI strip `[shipped]`
 
-_Branch `feat/market-pulse-overview` (started 2026-07-25)._
+_Shipped 2026-09-14 on `feat/market-pulse-overview` (`c485893`). `deltaSub` lives in
+`site/src/components/deltaSub.js`; compare + trends consume it. Partial-week guard:
+the week containing the newest `posted_at` is excluded, cutoff computed over the
+unfiltered snapshot so the reference week is stable under filters. Median-lifetime
+card deferred to F3._
 
 **What:** 4-5 KPI cards on Overview (or top of /trends): latest complete week vs prior —
 volume, median salary, remote share, disclosure rate, (later: median lifetime F3).
@@ -82,6 +86,12 @@ shared component (compare + trends refactored onto it); partial-week guard docum
 build+smoke green.
 
 ## F3 — Posting lifetime `[planned]`
+
+_Semantics validated 2026-09-14 on the live release (5,847 rows): 59% of postings
+seen in ≥2 weekly runs; lifetime median 7 d, p90 35 d, max 120 d; quantised to
+7-day steps with ±1 d cron jitter → bucket to weeks. 1,001 rows right-censored
+(last_seen = snapshot date). Fetch-window dropout is indistinguishable from close —
+caveat, not blocker._
 
 **What:** `last_seen_at - first_seen_at` = days a posting stayed live. Distributions +
 weekly median by ISCO major × country. Proxy for time-to-fill / demand tightness.
