@@ -45,7 +45,7 @@ function fmtDate(v) {
 <small>
 ${manifest.preset_id.replaceAll("_", " ")} preset · weekly snapshot ·
 as of <strong>${fmtDate(manifest.generated_at)}</strong> ·
-<strong>${manifest.postings.row_count.toLocaleString()}</strong> postings ·
+<strong>${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()}</strong> postings (${manifest.postings.row_count.toLocaleString()} new this week) ·
 <strong>${Object.keys(manifest.postings.country_counts).length}</strong> countries ·
 pipeline <code>${manifest.pipeline_version}</code>
 </small>
@@ -124,7 +124,7 @@ ${pulse == null
 ## Key figures
 
 <div class="grid grid-cols-4">
-  ${kpiCard("Postings", live.n.toLocaleString(), `of ${manifest.postings.row_count.toLocaleString()} in snapshot`)}
+  ${kpiCard("Postings", live.n.toLocaleString(), `of ${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()} in snapshot`)}
   ${kpiCard("With salary", live.n ? `${Math.round((live.n_salary / live.n) * 100)}%` : "—", `${live.n_salary.toLocaleString()} disclose €p50`)}
   ${kpiCard("ISCO-tagged", live.n ? `${Math.round((live.n_isco / live.n) * 100)}%` : "—", "rapidfuzz cutoff 85")}
   ${kpiCard("Date span", fmtDate(allDates.lo), `→ ${fmtDate(allDates.hi)}`)}

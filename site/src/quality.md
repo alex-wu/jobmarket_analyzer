@@ -58,7 +58,7 @@ const pct = (num, den) => den > 0 ? `${Math.round((num / den) * 100)}%` : "—";
 ```
 
 <div class="grid grid-cols-4">
-  ${kpiCard("Postings", coverage.n.toLocaleString(), `of ${manifest.postings.row_count.toLocaleString()} in snapshot`)}
+  ${kpiCard("Postings", coverage.n.toLocaleString(), `of ${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()} in snapshot`)}
   ${kpiCard("Salary disclosed", pct(coverage.n_salary, coverage.n), `${coverage.n_salary.toLocaleString()} of ${coverage.n.toLocaleString()} rows`)}
   ${kpiCard("ISCO-tagged", pct(coverage.n_isco, coverage.n), "rapidfuzz cutoff 85")}
   ${kpiCard("Salary imputed", pct(coverage.n_imputed, coverage.n_salary), `${coverage.n_imputed.toLocaleString()} of ${coverage.n_salary.toLocaleString()} salaried`)}
