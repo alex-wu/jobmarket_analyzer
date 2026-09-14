@@ -10,6 +10,7 @@ import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
 import {kpiCard} from "./components/kpiCard.js";
+import {deltaSub} from "./components/deltaSub.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {dataTable} from "./components/dataTable.js";
@@ -102,24 +103,17 @@ const buckets = Array.from(await db.query(`
 ```js
 const latest = buckets.at(-1);
 const prior = buckets.at(-2);
-// Delta sub-line vs the prior bucket: "prior: X · ▲ move".
-function deltaSub(a, b, {kind, fmt = String}) {
-  if (a == null || b == null) return a == null ? "no prior bucket" : `prior: ${fmt(a)}`;
-  const arrow = b > a ? "▲" : b < a ? "▼" : "＝";
-  const move = kind === "pp"
-    ? `${(b - a) >= 0 ? "+" : ""}${((b - a) * 100).toFixed(1)} pp`
-    : a === 0 ? "n/a" : `${(b - a) >= 0 ? "+" : ""}${Math.round(((b - a) / a) * 100)}%`;
-  return `prior: ${fmt(a)} · ${arrow} ${move}`;
-}
+// Delta sub-line vs the prior bucket (shared component).
+const delta = (a, b, opts) => deltaSub(a, b, {...opts, missing: "no prior bucket"});
 ```
 
 ${latest == null
   ? html`<div class="warning" label="No postings">Nothing matches the current filter — widen the selection.</div>`
   : html`<div class="grid grid-cols-4">
-      ${kpiCard(`Postings — ${bucketLabel(latest.bucket)}`, latest.n.toLocaleString(), deltaSub(prior?.n, latest.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
-      ${kpiCard(`Median salary`, fmtK(latest.med_salary), deltaSub(prior?.med_salary, latest.med_salary, {kind: "pct", fmt: fmtK}))}
-      ${kpiCard(`Disclose salary`, fmtPct(latest.disclosure), deltaSub(prior?.disclosure, latest.disclosure, {kind: "pp", fmt: fmtPct}))}
-      ${kpiCard(`Remote (of classified)`, fmtPct(latest.remote_share), deltaSub(prior?.remote_share, latest.remote_share, {kind: "pp", fmt: fmtPct}))}
+      ${kpiCard(`Postings — ${bucketLabel(latest.bucket)}`, latest.n.toLocaleString(), delta(prior?.n, latest.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
+      ${kpiCard(`Median salary`, fmtK(latest.med_salary), delta(prior?.med_salary, latest.med_salary, {kind: "pct", fmt: fmtK}))}
+      ${kpiCard(`Disclose salary`, fmtPct(latest.disclosure), delta(prior?.disclosure, latest.disclosure, {kind: "pp", fmt: fmtPct}))}
+      ${kpiCard(`Remote (of classified)`, fmtPct(latest.remote_share), delta(prior?.remote_share, latest.remote_share, {kind: "pp", fmt: fmtPct}))}
     </div>`}
 
 <small>The latest bucket is usually still filling (weekly ingestion) — read its deltas as provisional. Median salary needs ≥3 disclosed <code>€p50</code> in a bucket; remote share is among arrangement-classified postings.</small>
