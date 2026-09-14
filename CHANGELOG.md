@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — tooling and repo hygiene (2026-09-14)
+- Dependabot majors merged: `actions/checkout` v7, `actions/setup-node` v7,
+  `astral-sh/setup-uv` 10.1.0, `puppeteer` 25.10 (smoke now drives Chrome 152;
+  verified locally in a worktree and by the Pages smoke step).
+- Branch cleanup: stale phase/feature branches and PR #14 (superseded loader
+  fix) removed; P3/P4 branch histories preserved as `archive/*` tags. Only
+  `main` and the active feature branch remain.
+
 ### Added — market-pulse KPI strip on Overview + Trends (F2, 2026-09-14, PR #49)
 - Overview gains a "Market pulse" strip: latest *complete* week vs the week
   before (postings, median €p50, disclosure rate, remote share) with

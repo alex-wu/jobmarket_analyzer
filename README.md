@@ -102,7 +102,7 @@ Picking the project up for a working session? Start at [docs/bootstrap.md](docs/
 - Hardening for unattended runs: credential scrubbing across wrapped errors, real retry semantics (5xx/429/transport only), quarantine of malformed rows, gate command.
 - CI/CD: CodeQL, Dependabot (grouped weekly, auto-merge patch+minor), OpenSSF Scorecard, actionlint, branch protection.
 
-**Next** (details in [docs/open-questions.md](docs/open-questions.md)):
+**Next** (priority order in [docs/portfolio-audit.md](docs/portfolio-audit.md); ops detail in [docs/open-questions.md](docs/open-questions.md)):
 
 - [ ] Adzuna attribution wording — footer says "Data: Adzuna"; terms want "The Adzuna API" + link (ToS hygiene).
 - [ ] Post-publish artifact correctness gate + `min_total_rows` calibration against real weekly manifests.

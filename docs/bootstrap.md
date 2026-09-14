@@ -24,8 +24,9 @@ _Last updated: 2026-09-14._
 - End-to-end automation is live and unattended: Monday 06:00 UTC cron (`refresh.yml`) → fetch/normalise/publish/gate → dated + `latest-data_analyst_eu` releases → Pages rebuild via `workflow_run`. A red run files a `refresh failed: preset {id}` GitHub issue.
 - Weekly cron green every week since 2026-06-08; latest run 2026-09-14 (18 dated releases). The hardened pipeline (PR #33) has now run 8 times without incident; no `refresh failed:` issues exist. Latest manifest: schema v3, `row_count` 1,001 fresh / `accumulated_row_count` 5,847 over 180 days, ISCO fuzzy 550 / none 451 (55%).
 - Dashboard: 8 pages (Overview, Trends, Geography, Work Arrangement, Skills & Roles, Compare Periods, Quality & Coverage, Methodology), live on GitHub Pages. Firefox is the recommended browser (upstream duckdb-wasm #1658 affects Chromium-on-Windows). Trends (F1) shipped 2026-07-25 via PR #37.
-- **F2 merged 2026-09-14 via PR #49** (squash): shared `deltaSub` + `marketPulse` components, "Market pulse" strip on Overview and Trends (latest *complete* week/month vs prior — identical numbers on both pages), snapshot-count fix (`accumulated_row_count`, not the fresh weekly `row_count`), coverage banner de-staled, plus the 2026-09-13 portfolio audit + docs sweep. The pre-rebase remote branch `feat/market-pulse-overview` is stale — delete it, don't resume it.
-- **Active branch for the next session: `feat/readme-hero-attribution`** (cut from `main` after #49). Scope = audit #1 README hero + repo metadata and #14 Adzuna attribution footer. Nothing committed on it yet.
+- **F2 merged 2026-09-14 via PR #49** (squash): shared `deltaSub` + `marketPulse` components, "Market pulse" strip on Overview and Trends (latest *complete* week/month vs prior — identical numbers on both pages), snapshot-count fix (`accumulated_row_count`, not the fresh weekly `row_count`), coverage banner de-staled, plus the 2026-09-13 portfolio audit + docs sweep. `main` @ `7d9a033` after the same-day Dependabot merges (actions/checkout v7, actions/setup-node v7, astral-sh/setup-uv 10.1.0, puppeteer 25.10 → Chrome 152; Pages smoke green on that commit).
+- **Repo hygiene (2026-09-14):** only `main` + `feat/readme-hero-attribution` exist, locally and on GitHub; 0 open PRs. Old phase branches were deleted; the P3/P4 branch histories (ATS adapters, benchmarks — shelved by ADR-017) survive as tags `archive/p3-ats-adapters` and `archive/p4-benchmarks-isco-hn`. The adapter code itself is still on `main` under `src/jobpipe/sources/` and `src/jobpipe/benchmarks/`, disabled via preset config.
+- **Active branch for the next session: `feat/readme-hero-attribution`** (= `main` + this docs commit). Scope = audit #1 README hero + repo metadata and #14 Adzuna attribution footer. Reuse it for that work; open one PR when both land.
 - 2026-09-13 audit: local gate green (ruff, format, mypy strict, 374 pytest); docs re-aligned with code (README page count, `llm.py` cutoff docstring); [portfolio-audit.md](portfolio-audit.md) added as the priority order.
 - Schema v3; active preset `config/runs/data_analyst_eu.yaml` (gb + es, weekly, 180-day accumulation window). `gate.min_total_rows: 80` still uncalibrated against the 18 real manifests.
 
@@ -41,6 +42,14 @@ gh release download latest-data_analyst_eu -p manifest.json -D /tmp/check --clob
 ```
 
 If the run is red, a `refresh failed:` issue should already exist — start there.
+
+Then confirm the repo is still tidy (expected: last Pages run green, no open PRs other than fresh Dependabot ones, two branches):
+
+```bash
+gh run list --workflow=pages.yml --limit 1              # expect: completed / success
+gh pr list --state open                                 # expect: empty or dependabot/* only
+git fetch --prune && git branch -a                      # expect: main + feat/readme-hero-attribution
+```
 
 ## Prioritised backlog
 
@@ -60,7 +69,9 @@ Then Sprint B (#3 findings page, #5 posting lifetime, #6 AI brief, #9 Chrome ret
   uv run ruff check . && uv run ruff format --check . && uv run mypy --strict src/jobpipe && uv run pytest -q
   ```
 - **Site changes:** `cd site && npm run build && npm run smoke`. `npm run build` alone is insufficient (cell JS doesn't execute at build time). `site/scripts/smoke.mjs` has a **hardcoded page list** (`DATA_PAGES`) — adding a dashboard page means adding it there too.
-- Squash-merge only; conventional-commit prefixes; no force-push to `main`. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+- Squash-merge only; conventional-commit prefixes; no force-push to `main`. One branch per unit of work, deleted on merge (`gh pr merge --squash --delete-branch`). Don't rebase a branch that is already pushed — `git merge origin/main` instead; if a push is blocked, stop and report rather than pushing under a new name. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **Smoke needs a browser:** puppeteer pins a Chrome build (25.x → Chrome 152). If `npm run smoke` fails with `Could not find Chrome`, run `cd site && npx puppeteer browsers install chrome` once. Dependabot may bump puppeteer majors — the Pages workflow's smoke step is the real test; run the worktree/local smoke before merging one.
+- **Data loader cache:** Framework caches loader output under `site/src/.observablehq/cache/`; swapping the sample parquet in `data/gh_databuild_samples/` does not invalidate it — `npm run clean` before `npm run build`, or the dashboard silently shows the old data.
 - Windows dev quirk: single-file pytest runs can hit a numpy re-import error — clear `__pycache__` and run a broader selection (documented in CONTRIBUTING).
 - Postings `country` values are UPPERCASE ISO2 (`GB`/`ES`) while preset YAML and Adzuna URLs use lowercase — normalise case on any new join (this silently emptied the first choropleth).
 
