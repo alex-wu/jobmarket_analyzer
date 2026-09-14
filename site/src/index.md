@@ -11,7 +11,7 @@ import {html} from "npm:htl";
 import {coverageNote} from "./components/coverageNote.js";
 import {dataTable} from "./components/dataTable.js";
 import {kpiCard} from "./components/kpiCard.js";
-import {deltaSub} from "./components/deltaSub.js";
+import {marketPulse, derivePulse} from "./components/marketPulse.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {whereClause, andClause} from "./components/filters.js";
@@ -97,29 +97,17 @@ const pulseWeeks = Array.from(await db.query(`
   GROUP BY 1
   ORDER BY 1 DESC
   LIMIT 2
-`)).map((r) => ({
-  ...r,
-  med_salary: r.n_salary >= 3 ? r.med_salary : null,
-  disclosure: r.n > 0 ? r.n_salary / r.n : null,
-  remote_share: r.n_arr > 0 ? r.n_remote / r.n_arr : null
-}));
+`)).map(derivePulse);
 const pulse = pulseWeeks[0];
-const pulsePrior = pulseWeeks[1];
-const fmtK = (v) => (v == null ? "—" : `€${Math.round(v / 1000)}k`);
-const fmtPct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
-const wow = (a, b, opts) => deltaSub(a, b, {...opts, label: "prior wk", missing: "no prior week"});
 ```
 
-${pulse == null
-  ? html`<div class="warning" label="No complete week">No postings in a complete week for the current filter — widen the selection.</div>`
-  : html`<div class="grid grid-cols-4">
-      ${kpiCard(`Postings — wk of ${fmtDate(pulse.wk)}`, pulse.n.toLocaleString(), wow(pulsePrior?.n, pulse.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
-      ${kpiCard("Median salary", fmtK(pulse.med_salary), wow(pulsePrior?.med_salary, pulse.med_salary, {kind: "pct", fmt: fmtK}))}
-      ${kpiCard("Disclose salary", fmtPct(pulse.disclosure), wow(pulsePrior?.disclosure, pulse.disclosure, {kind: "pp", fmt: fmtPct}))}
-      ${kpiCard("Remote (of classified)", fmtPct(pulse.remote_share), wow(pulsePrior?.remote_share, pulse.remote_share, {kind: "pp", fmt: fmtPct}))}
-    </div>`}
+${marketPulse(pulse, pulseWeeks[1], {
+  periodLabel: pulse ? `wk of ${fmtDate(pulse.wk)}` : "",
+  priorLabel: "prior wk",
+  emptyText: "No postings in a complete week for the current filter — widen the selection."
+})}
 
-<small>Latest <em>complete</em> week (Mon–Sun by <code>posted_at</code>) vs the week before; the newest, still-filling week is excluded. Median salary needs ≥3 disclosed <code>€p50</code>; remote share is among arrangement-classified postings. The <a href="./trends">Trends</a> page shows the full path.</small>
+<small>Latest <em>complete</em> week (Mon–Sun by <code>posted_at</code>) vs the week before; the newest, still-filling week is excluded. Median salary needs ≥3 disclosed <code>€p50</code>; remote share is among arrangement-classified postings. The <a href="./trends">Trends</a> page shows the same strip plus the full path.</small>
 
 ## Key figures
 

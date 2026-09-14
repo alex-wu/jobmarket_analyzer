@@ -9,8 +9,7 @@ import * as Plot from "npm:@observablehq/plot";
 import * as Inputs from "npm:@observablehq/inputs";
 import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
-import {kpiCard} from "./components/kpiCard.js";
-import {deltaSub} from "./components/deltaSub.js";
+import {marketPulse, derivePulse} from "./components/marketPulse.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
 import {dataTable} from "./components/dataTable.js";
@@ -90,33 +89,31 @@ const buckets = Array.from(await db.query(`
   ${andClause(where)} posted_at IS NOT NULL
   GROUP BY 1
   ORDER BY 1
-`)).map((r) => ({
-  ...r,
-  med_salary: r.n_salary >= 3 ? r.med_salary : null,
-  disclosure: r.n > 0 ? r.n_salary / r.n : null,
-  remote_share: r.n_arr > 0 ? r.n_remote / r.n_arr : null
-}));
+`)).map(derivePulse);
 ```
 
 ## Market pulse
 
 ```js
-const latest = buckets.at(-1);
-const prior = buckets.at(-2);
-// Delta sub-line vs the prior bucket (shared component).
-const delta = (a, b, opts) => deltaSub(a, b, {...opts, missing: "no prior bucket"});
+// Same rule as Overview: the bucket containing the newest posting in the
+// snapshot is still filling, so the strip compares the latest *complete*
+// bucket with the one before. Cutoff is over the unfiltered snapshot so the
+// reference bucket does not move with filters. Charts below still plot the
+// partial bucket.
+const cutoff = await db.queryRow(`SELECT ${periodExpr.replace("posted_at::TIMESTAMP", "MAX(posted_at)::TIMESTAMP")} AS b FROM postings`);
+const cutoffMs = +new Date(cutoff.b);
+const complete = buckets.filter((b) => +new Date(b.bucket) < cutoffMs);
+const latest = complete.at(-1);
+const prior = complete.at(-2);
 ```
 
-${latest == null
-  ? html`<div class="warning" label="No postings">Nothing matches the current filter — widen the selection.</div>`
-  : html`<div class="grid grid-cols-4">
-      ${kpiCard(`Postings — ${bucketLabel(latest.bucket)}`, latest.n.toLocaleString(), delta(prior?.n, latest.n, {kind: "pct", fmt: (v) => v.toLocaleString()}))}
-      ${kpiCard(`Median salary`, fmtK(latest.med_salary), delta(prior?.med_salary, latest.med_salary, {kind: "pct", fmt: fmtK}))}
-      ${kpiCard(`Disclose salary`, fmtPct(latest.disclosure), delta(prior?.disclosure, latest.disclosure, {kind: "pp", fmt: fmtPct}))}
-      ${kpiCard(`Remote (of classified)`, fmtPct(latest.remote_share), delta(prior?.remote_share, latest.remote_share, {kind: "pp", fmt: fmtPct}))}
-    </div>`}
+${marketPulse(latest, prior, {
+  periodLabel: latest ? bucketLabel(latest.bucket) : "",
+  priorLabel: "prior",
+  emptyText: "No postings in a complete " + granularity + " for the current filter — widen the selection."
+})}
 
-<small>The latest bucket is usually still filling (weekly ingestion) — read its deltas as provisional. Median salary needs ≥3 disclosed <code>€p50</code> in a bucket; remote share is among arrangement-classified postings.</small>
+<small>Latest <em>complete</em> ${granularity} vs the one before — the newest, still-filling bucket is excluded here (it is still plotted in the charts below). Same numbers as the Overview strip at week granularity. Median salary needs ≥3 disclosed <code>€p50</code> in a bucket; remote share is among arrangement-classified postings.</small>
 
 ## Volume & pay
 
