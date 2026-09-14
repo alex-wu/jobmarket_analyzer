@@ -1,14 +1,39 @@
 # jobmarket_analyzer
 
-> Modular, free-tier job-market intelligence pipeline. Weekly Adzuna ingest across EU countries (gb + es today, wider EU expansion planned), normalised into Parquet, accumulated into a rolling 6-month corpus, visualised on a static GitHub Pages dashboard.
+**Weekly EU job-market intelligence with no backend.** A GitHub Actions cron ingests Adzuna postings, normalises them to EUR / ISCO-08 / ESCO skills, accumulates a rolling 6-month Parquet corpus on GitHub Releases, and serves an eight-page DuckDB-WASM dashboard from GitHub Pages — running unattended since May 2026.
 
-![CI](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/ci.yml/badge.svg)
-![Pages](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)
-![CodeQL](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/codeql.yml/badge.svg)
+[![CI](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/ci.yml)
+[![Pages](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml/badge.svg)](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/pages.yml)
+[![CodeQL](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/codeql.yml/badge.svg)](https://github.com/alex-wu/jobmarket_analyzer/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alex-wu/jobmarket_analyzer/badge)](https://scorecard.dev/viewer/?uri=github.com/alex-wu/jobmarket_analyzer)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-**Status:** v1 live and running unattended. Dashboard at <https://alex-wu.github.io/jobmarket_analyzer/>. v1 ships **Adzuna-only** ([ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)), multi-country (gb, es active; 7-country EU expansion planned) on a **weekly** Monday 06:00 UTC cron with `workflow_dispatch` for on-demand runs. Each preset produces a distinctly named `latest-{preset_id}.parquet` accumulated from the immutable dated archive ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming), [ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)). ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / OECD / Eurostat) remain in the codebase, shelved by preset config until the multi-country unified merge proves stable end-to-end — see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Pipeline runs on Node 24 actions, Dependabot (weekly grouped npm + pip + actions), CodeQL (Python + JS), OpenSSF Scorecard, actionlint, and Dependabot auto-merge for patch+minor. Branch protection on `main` requires `test` + CodeQL checks. Day-to-day operations: [docs/operations.md](docs/operations.md). CI/CD reference: [docs/ci-cd-practices.md](docs/ci-cd-practices.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
+**▶ Live dashboard: <https://alex-wu.github.io/jobmarket_analyzer/>**
+
+[![Overview page — market-pulse strip, key figures, salary histogram and weekly volume](docs/img/overview.png)](https://alex-wu.github.io/jobmarket_analyzer/)
+
+- **Free tier end to end.** Adzuna free API (~30 calls/week of a 250/day quota), GitHub Actions, Releases as CDN, Pages as host. No server, no database, no paid services.
+- **Every number is reproducible.** Weekly runs write immutable dated Releases; the `latest` dataset is a pure function over the last 180 days of them. Charts query the Parquet in your browser via DuckDB-WASM.
+- **Built to be trusted.** 374 tests, `mypy --strict`, ruff, CodeQL, OpenSSF Scorecard, quality gate on every run, 26 architecture decision records, a red run files an issue.
+
+```mermaid
+flowchart LR
+    cron[GitHub Actions weekly cron] --> pipe[Python pipeline: fetch, normalise, publish]
+    adzuna[Adzuna API] --> pipe
+    pipe --> dated[(Dated Release: immutable weekly parquet)]
+    dated --> accum[Accumulate: union last 180 days, dedupe by posting_id]
+    accum --> latest[(latest Release: parquet + manifest)]
+    latest --> build[Observable Framework build]
+    build --> pages[GitHub Pages: DuckDB-WASM dashboard]
+```
+
+[![Trends page — weekly postings and median salary by country](docs/img/trends.png)](https://alex-wu.github.io/jobmarket_analyzer/trends)
+
+---
+
+## Status
+
+v1 live and running unattended. v1 ships **Adzuna-only** ([ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)), multi-country (gb, es active; 7-country EU expansion planned) on a **weekly** Monday 06:00 UTC cron with `workflow_dispatch` for on-demand runs. Each preset produces a distinctly named `latest-{preset_id}.parquet` accumulated from the immutable dated archive ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming), [ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)). ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / OECD / Eurostat) remain in the codebase, shelved by preset config until the multi-country unified merge proves stable end-to-end — see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Pipeline runs on Node 24 actions, Dependabot (weekly grouped npm + pip + actions), CodeQL (Python + JS), OpenSSF Scorecard, actionlint, and Dependabot auto-merge for patch+minor. Branch protection on `main` requires `test` + CodeQL checks. Day-to-day operations: [docs/operations.md](docs/operations.md). CI/CD reference: [docs/ci-cd-practices.md](docs/ci-cd-practices.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
 
 **v1 preset:** `data_analyst_eu` — data-analyst roles across gb + es (7-country EU expansion planned). The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography today means a YAML file, a matrix entry in `refresh.yml`, and un-hardcoding `PRESET_ID` in `pages.yml` + `site/src/data/postings.parquet.js` (to be simplified when the multi-preset switcher lands, [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)). Presets run in parallel via GitHub Actions matrix; each produces its own `latest-{preset_id}.parquet`.
 
@@ -102,12 +127,13 @@ Picking the project up for a working session? Start at [docs/bootstrap.md](docs/
 - Hardening for unattended runs: credential scrubbing across wrapped errors, real retry semantics (5xx/429/transport only), quarantine of malformed rows, gate command.
 - CI/CD: CodeQL, Dependabot (grouped weekly, auto-merge patch+minor), OpenSSF Scorecard, actionlint, branch protection.
 
-**Next** (details in [docs/open-questions.md](docs/open-questions.md)):
+**Next** (priority order in [docs/portfolio-audit.md](docs/portfolio-audit.md); ops detail in [docs/open-questions.md](docs/open-questions.md)):
 
-- [ ] Adzuna attribution wording — footer says "Data: Adzuna"; terms want "The Adzuna API" + link (ToS hygiene).
+- [x] Adzuna attribution wording — dashboard footer now reads "The Adzuna API" + link (ToS hygiene).
 - [ ] Post-publish artifact correctness gate + `min_total_rows` calibration against real weekly manifests.
 - [ ] Dashboard preset switcher — the loader still hardcodes `data_analyst_eu` ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
-- [ ] Second preset (e.g. `software_developer_eu`), README hero screenshot, first tagged release.
+- [ ] Widen to 7 countries, then a findings page (audit #2, #3).
+- [ ] Second preset (e.g. `software_developer_eu`), first tagged release.
 
 ---
 
