@@ -38,7 +38,15 @@ Older dated releases are immutable snapshots and are not patched.
 ## Supply-chain controls
 
 - Release assets are signed keyless via Sigstore cosign; each asset ships a
-  `<asset>.sigstore.json` bundle. Verify with
-  `cosign verify-blob --bundle <asset>.sigstore.json --certificate-identity-regexp 'github.com/alex-wu/jobmarket_analyzer/' --certificate-oidc-issuer https://token.actions.githubusercontent.com <asset>`.
+  `<asset>.sigstore.json` bundle. The signing identity is pinned to the
+  `refresh` and `sign-releases-backfill` workflows on `main`. Verify with:
+
+  ```sh
+  cosign verify-blob \
+    --bundle <asset>.sigstore.json \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+    --certificate-identity-regexp '^https://github\.com/alex-wu/jobmarket_analyzer/\.github/workflows/(refresh|sign-releases-backfill)\.yml@refs/heads/main$' \
+    <asset>
+  ```
 - GitHub Actions are pinned to full commit SHAs; Dependabot keeps them current.
 - CodeQL, OpenSSF Scorecard, actionlint and Dependabot alerts run continuously.

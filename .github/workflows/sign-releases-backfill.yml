@@ -27,6 +27,7 @@ jobs:
       id-token: write   # cosign keyless
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}   # no checkout step, so gh needs this explicitly
       LIMIT: ${{ inputs.limit }}
     steps:
       - name: Install cosign
