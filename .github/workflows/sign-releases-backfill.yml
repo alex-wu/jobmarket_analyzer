@@ -1,0 +1,56 @@
+name: sign-releases-backfill
+
+# One-shot, manual: retro-sign release assets that predate the cosign step in
+# refresh.yml. Idempotent — skips any asset that already has a companion
+# `<asset>.sigstore.json` bundle. OpenSSF Scorecard Signed-Releases inspects
+# the 5 most recent releases, so the default limit covers that with margin.
+# Safe to delete this workflow once every release in the lookback window is
+# signed by refresh.yml itself.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many most-recent releases to backfill"
+        required: false
+        default: "10"
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write   # gh release upload
+      id-token: write   # cosign keyless
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LIMIT: ${{ inputs.limit }}
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign unsigned assets
+        run: |
+          set -euo pipefail
+          WORK="$(mktemp -d)"
+          gh release list --limit "$LIMIT" --json tagName --jq '.[].tagName' \
+            | while read -r tag; do
+                [ -z "$tag" ] && continue
+                echo "== $tag"
+                mapfile -t assets < <(gh release view "$tag" --json assets --jq '.assets[].name')
+                for name in "${assets[@]}"; do
+                  case "$name" in *.sigstore.json) continue ;; esac
+                  if printf '%s\n' "${assets[@]}" | grep -qx "${name}.sigstore.json"; then
+                    echo "   $name: already signed"
+                    continue
+                  fi
+                  mkdir -p "$WORK/$tag"
+                  gh release download "$tag" -p "$name" -D "$WORK/$tag/" --clobber
+                  cosign sign-blob --yes --bundle "$WORK/$tag/${name}.sigstore.json" "$WORK/$tag/$name"
+                  gh release upload "$tag" "$WORK/$tag/${name}.sigstore.json"
+                  echo "   $name: signed + uploaded"
+                done
+              done

@@ -9,14 +9,19 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+# Top-level read-only; the job escalates only what it needs (OpenSSF
+# Scorecard Token-Permissions scores 0 for any top-level write).
 permissions:
-  contents: write   # required for `gh release upload/create`
-  issues: write     # failure-alert step files an issue on red cron runs
+  contents: read
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write   # `gh release upload/create`
+      issues: write     # failure-alert step files an issue on red cron runs
+      id-token: write   # cosign keyless (Sigstore OIDC) release signing
     strategy:
       fail-fast: false
       matrix:
@@ -36,10 +41,10 @@ jobs:
       PRESET: ${{ matrix.preset }}
       ACCUMULATE_WINDOW_DAYS: "180"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.1.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -119,6 +124,24 @@ jobs:
           fi
           cp "$LATEST" "$STAGE/"
           echo "stage=$STAGE" >> "$GITHUB_OUTPUT"
+          ls -la "$STAGE"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign bundle assets (Sigstore keyless)
+        # One `<asset>.sigstore.json` bundle per file, written next to the
+        # asset so the upload steps below ship them together. OpenSSF
+        # Scorecard Signed-Releases looks for these in the last 5 releases.
+        # Keyless: identity = this workflow's OIDC token; no key material
+        # stored. Verify locally:
+        #   cosign verify-blob --bundle latest-X.parquet.sigstore.json         #     --certificate-identity-regexp 'github.com/alex-wu/jobmarket_analyzer/'         #     --certificate-oidc-issuer https://token.actions.githubusercontent.com         #     latest-X.parquet
+        run: |
+          set -euo pipefail
+          STAGE="${{ steps.stage.outputs.stage }}"
+          find "$STAGE" -type f ! -name '*.sigstore.json' -print0             | while IFS= read -r -d '' f; do
+                cosign sign-blob --yes --bundle "${f}.sigstore.json" "$f"
+              done
           ls -la "$STAGE"
 
       - name: Upload to latest release (re-clobbered)

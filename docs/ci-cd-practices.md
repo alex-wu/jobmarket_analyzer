@@ -91,19 +91,24 @@ enumeration is queued per ADR-019.
 2. `permissions:` block declared at workflow OR job level — default to `read-all` or `contents: read` and escalate only where needed.
 3. `concurrency:` group set; cancel-in-progress for fast-feedback workflows, no-cancel for deploys + uploads.
 4. `timeout-minutes:` on every job.
-5. Actions pinned to a major-version tag (`@v6`), not `@main` or `@latest` — or to an exact `vX.Y.Z` where the publisher offers no major tag (`astral-sh/setup-uv`, `ossf/scorecard-action`). Dependabot will keep them fresh.
+5. Actions pinned to a full commit SHA with a trailing `# vX.Y.Z` comment (`uses: actions/checkout@3d3c42e… # v7.0.1`). Dependabot bumps the SHA and the comment together.
 6. Secrets via `${{ secrets.X }}`, never hardcoded. Reference `GITHUB_TOKEN` only for write actions; for read-only data, omit it.
 7. Long-running shell blocks: `set -euo pipefail` at the top.
 8. If touching `.github/workflows/**`, the `lint-workflows` job will gate it.
 
 ## Action version policy
 
-- **Major tag (`@v6`)** for `actions/*` + `github/*`. **Exact `vX.Y.Z`** for `astral-sh/setup-uv` and `ossf/scorecard-action`, which publish no floating major tag. Dependabot opens a PR per bump; auto-merge handles patch + minor.
-- **No `@main` / no `@latest`** — unpinned actions are a supply-chain risk and a Scorecard penalty.
-- **SHA pinning** is overkill at this scale. Revisit if:
-  - OpenSSF Scorecard drops below 7
-  - The project tags `v1.0.0` and starts to be reused externally
-  - A third-party action is added (i.e. anything outside `actions/`, `github/`, `ossf/`, `astral-sh/`, `dependabot/`)
+- **Full commit SHA + version comment** for every action: `uses: owner/repo@<40-hex-sha> # vX.Y.Z`. Adopted 2026-09-15 for OpenSSF Scorecard Pinned-Dependencies (tag pins score 0; a tag can be moved, a SHA cannot). Dependabot (`github-actions` ecosystem) rewrites the SHA and the comment in one PR; auto-merge handles patch + minor.
+- **No `@vN` / `@main` / `@latest`** — resolve a new action's SHA with `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha` and record the exact tag in the comment.
+- `uv sync --frozen` (lockfile) and `npm install` (deliberately no lockfile, see `pages.yml`) are the remaining non-SHA installs; Scorecard flags the npm one. Accepted trade-off until the lockfile policy changes.
+
+## Release signing
+
+`refresh.yml` signs every staged asset with Sigstore cosign (keyless, OIDC
+identity = the workflow) and uploads a `<asset>.sigstore.json` bundle next to
+it. Scorecard Signed-Releases checks the 5 most recent releases, so a fresh
+repo (or one with pre-signing releases still in the window) needs the manual
+`sign-releases-backfill` workflow once. Verification recipe in `SECURITY.md`.
 
 ## When to escalate the security stack
 
