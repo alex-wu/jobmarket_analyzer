@@ -8,7 +8,7 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 
 ### Data & upstream
 
-- **Adzuna ToS attribution.** Adzuna's terms restrict organisational republishing of aggregates without written consent; personal research is permitted with attribution ("The Adzuna API" + link). The footer already reads "Data: Adzuna"; action: change the wording to "The Adzuna API" + link; consider requesting written consent given the fork-friendly public posture.
+- **Adzuna written consent.** Attribution wording is fixed (see Resolved). Adzuna's terms still restrict organisational republishing of aggregates without written consent; personal research is permitted with attribution. Decide whether to request consent given the fork-friendly public posture.
 - **`/details/{id}` is undocumented upstream.** The work-arrangement fetcher's endpoint is absent from Adzuna's official OpenAPI spec and could vanish without notice — one more reason it ships opt-in and off (ADR-025).
 - **`raw_payload` in the public asset.** The full Adzuna JSON per row ships inside `latest-*.parquet`. It's both size bloat and additional ToS surface. Decide keep/drop.
 - **Spanish keyword dictionary is thin.** `work_arrangement` coverage is markedly lower for ES than GB. Cheap win: extend the Spanish keyword table (`100% remoto`, `presencial obligatorio`, …); the test suite already covers the table-driven shape.
@@ -34,6 +34,7 @@ What the project knows it hasn't solved yet. ADRs in [DECISIONS.md](../DECISIONS
 
 ## Resolved
 
+- **Adzuna attribution footer** (2026-09-14) — dashboard footer now reads "The Adzuna API" with a link to developer.adzuna.com, matching the terms' attribution form. One edit in `site/observablehq.config.js`.
 - **Accumulation audit on real data** (2026-09-14) — checked on the 5,847-row `latest-data_analyst_eu` release (18 weekly runs): `posting_id` unique after the union; `first_seen_at`/`last_seen_at` populated on every row; 59% of rows seen in ≥2 runs; lifetime (`last_seen − first_seen`) median 7 d, p90 35 d, max 120 d, quantised to 7-day steps with ±1 d cron jitter; 1,001 rows right-censored (`last_seen` = snapshot date). Semantics hold; they feed F3 in feature-roadmap.md. Residual caveat: a posting dropping out of the fetch window looks identical to the ad closing.
 - **Pipeline hardening for unattended runs** (2026-07-21) — credential scrubbing extended to wrapped errors/tracebacks and root handlers; retry restricted to 5xx/429/transport (previously dead code); NaT `posted_at` rows quarantined instead of aborting; truncation warnings; failure now files a GitHub issue; manifest carries `accumulated_row_count`. See CHANGELOG.
 - **Schema v3** (2026-05-29, ADR-025) — dropped dead-weight columns, added ternary `work_arrangement`, salary rounding, `/details/` fetcher off by default.
