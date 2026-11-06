@@ -16,7 +16,7 @@ export default {
   sidebar: true,
   toc: true,
   footer:
-    'Data: Adzuna. Source: <a href="https://github.com/alex-wu/jobmarket_analyzer">github.com/alex-wu/jobmarket_analyzer</a>',
+    'Data: <a href="https://developer.adzuna.com/">The Adzuna API</a>. Source: <a href="https://github.com/alex-wu/jobmarket_analyzer">github.com/alex-wu/jobmarket_analyzer</a>',
   head: `<link rel="icon" href="data:,">
 <script>document.addEventListener("click",function(e){
   var a=e.target.closest("a[href]"); if(!a) return;
