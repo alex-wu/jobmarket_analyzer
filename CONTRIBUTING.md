@@ -87,7 +87,7 @@ One PR per coherent change. Each PR: code + tests + README/CHANGELOG delta where
 
 ## Adding things
 
-- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.parquet.js` (both currently pin `data_analyst_eu`). Multi-preset auto-discovery is queued per [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming); until it lands this is the honest procedure.
+- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Add `preset_id` to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.db.js` (both currently pin `data_analyst_eu`). Multi-preset auto-discovery is queued per [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming); until it lands this is the honest procedure.
 - **New source adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable pattern survives; walkthrough at [docs/adding-a-source.md](docs/adding-a-source.md) is the reactivation path.
 - **New benchmark adapter** — **post-v1 only** per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Follows the same Protocol pattern as sources, under `src/jobpipe/benchmarks/` (see the note in [docs/adding-a-source.md](docs/adding-a-source.md)).
 - **New role / geography**: add a YAML under `config/runs/` (plus the workflow/loader touch-points above).

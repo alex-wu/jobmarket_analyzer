@@ -9,7 +9,7 @@ name: pages
 # into the same path the local data loader reads from
 # (data/gh_databuild_samples/), so local dev and CI builds run identical bytes.
 # Multi-preset enumeration is queued — until then this matches the single
-# PRESET_ID hardcoded in site/src/data/postings.parquet.js.
+# PRESET_ID hardcoded in site/src/data/postings.db.js.
 
 on:
   push:

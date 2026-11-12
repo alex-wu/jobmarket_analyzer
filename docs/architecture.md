@@ -59,7 +59,7 @@ Shelved infrastructure (in tree, `enabled: false` in active presets, can return 
 | FX | `src/jobpipe/fx.py` | ECB daily reference CSV → EUR conversion. |
 | DuckDB I/O | `src/jobpipe/duckdb_io.py` | Partitioned/flat Parquet export; **`export_accumulated()`** unions dated archive within a window and computes `first_seen_at` / `last_seen_at` per `posting_id`. Manifest writer. |
 | CLI | `src/jobpipe/cli.py` | `jobpipe fetch \| normalise \| publish \| gate \| validate` Typer commands. Installs the URL-credential scrub filter on httpx/httpcore loggers per [ADR-015](../DECISIONS.md#adr-015--httpx-credential-redaction-filter-on-the-cli-logger). |
-| Configs | `config/runs/{preset_id}.yaml` | Run presets (what to fetch). Adding a role/geo = new YAML + new matrix entry in `refresh.yml`, plus (until the switcher lands) un-hardcoding the preset in `pages.yml` and `site/src/data/postings.parquet.js`. |
+| Configs | `config/runs/{preset_id}.yaml` | Run presets (what to fetch). Adding a role/geo = new YAML + new matrix entry in `refresh.yml`, plus (until the switcher lands) un-hardcoding the preset in `pages.yml` and `site/src/data/postings.db.js`. |
 | Archived presets | `config/runs/_archived/` | Pre-pivot presets retained for historical reference. |
 | Test fixtures | `tests/fixtures/<adapter>/` (sources), `tests/fixtures/benchmarks/<adapter>/` | Hand-built trimmed JSON samples driving `httpx.MockTransport` unit tests. |
 | Refresh workflow | `.github/workflows/refresh.yml` | Weekly Monday 06:00 UTC cron + `workflow_dispatch`. Matrix over presets. Per-preset concurrency group. Per-preset release tags. |
@@ -140,7 +140,7 @@ Per [ADR-019](../DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-nam
 - Concurrency group `refresh-${{ matrix.preset }}` serialises same-preset runs (no race against `latest-{preset_id}`), allows cross-preset parallelism.
 - Release tag scheme: `latest-{preset_id}` (moving), `data-{preset_id}-YYYY-MM-DD` (immutable).
 - Asset names: `latest-{preset_id}.parquet`, `manifest.json` (preset-aware via the release tag namespace).
-- Adding a preset **today**: copy a YAML in `config/runs/`, add `preset_id` to the matrix list in `refresh.yml`, and un-hardcode the preset in `.github/workflows/pages.yml` (`PRESET_ID` env) and `site/src/data/postings.parquet.js` (`PRESET_ID` const) — both currently pin `data_analyst_eu`. To be simplified when multi-preset enumeration + the dashboard switcher land (queued per ADR-019).
+- Adding a preset **today**: copy a YAML in `config/runs/`, add `preset_id` to the matrix list in `refresh.yml`, and un-hardcode the preset in `.github/workflows/pages.yml` (`PRESET_ID` env) and `site/src/data/postings.db.js` (`PRESET_ID` const) — both currently pin `data_analyst_eu`. To be simplified when multi-preset enumeration + the dashboard switcher land (queued per ADR-019).
 
 ## Deploy
 

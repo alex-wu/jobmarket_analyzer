@@ -81,7 +81,7 @@ parallelism. Release tag scheme: `latest-{preset_id}` (moving),
 Adding a preset: append `preset_id` to `strategy.matrix.preset`, push. Next
 weekly cron (or `workflow_dispatch`) runs it. The dashboard side is NOT yet
 automatic — `pages.yml` hardcodes `PRESET_ID: data_analyst_eu` and downloads
-only that release, and `site/src/data/postings.parquet.js` pins the same
+only that release, and `site/src/data/postings.db.js` pins the same
 constant; both need un-hardcoding for a new preset to surface. Multi-preset
 enumeration is queued per ADR-019.
 

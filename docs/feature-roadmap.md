@@ -19,7 +19,7 @@ _Last updated: 2026-09-14. Cross-track priority order (features + ops, ranked fo
 1. **No backend.** Static Observable Framework site + in-browser SQLite (sql.js, ADR-027). Anything dynamic is
    either (a) computed at weekly build time and shipped as static JSON/parquet, or
    (b) computed client-side, optionally with a **user-supplied** LLM key (BYOK).
-2. **Browser parquet is a column subset.** `site/src/data/postings.parquet.js` SELECTs
+2. **Browser database is a column subset.** `site/src/data/postings.db.js` SELECTs
    a fixed list; `first_seen_at`/`last_seen_at`, `contract_type`, `contract_time`,
    `adzuna_category`, `description`, `location_area` are **not shipped** today. Features
    needing them must extend the loader (and mind asset size / ToS surface).
