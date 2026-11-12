@@ -7,14 +7,15 @@ title: Compare Periods
 ```js
 import * as Plot from "npm:@observablehq/plot";
 import * as Inputs from "npm:@observablehq/inputs";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, periodColumn} from "./components/db.js";
 import {kpiCard} from "./components/kpiCard.js";
 import {deltaSub} from "./components/deltaSub.js";
 import {expandable} from "./components/expand.js";
 import {iscoMajorLabel} from "./components/isco.js";
+import {escape as sqlEscape} from "./components/filters.js";
 
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 ```
 
 Pick two time slices of the snapshot and see how the market moved between them:
@@ -36,14 +37,15 @@ const granularity = view(Inputs.radio(["quarter", "month", "week"], {label: "Gra
 ```
 
 ```js
-const periodExpr = `date_trunc('${granularity}', posted_at::TIMESTAMP)::DATE`;
+const periodExpr = periodColumn(granularity);
+// Period ids stay 'YYYY-MM-DD' strings here (select values + SQL literals).
 const buckets = Array.from(await db.query(`
-  SELECT ${periodExpr}::VARCHAR AS bucket, COUNT(*)::INT AS n
+  SELECT ${periodExpr} AS bucket, COUNT(*) AS n
   FROM postings
   WHERE posted_at IS NOT NULL
   GROUP BY 1
   ORDER BY 1
-`));
+`, {dates: []}));
 ```
 
 ```js
@@ -73,8 +75,8 @@ const periodB = view(Inputs.select(bucketIds, {
 ```js
 const labelA = bucketLabel(periodA);
 const labelB = bucketLabel(periodB);
-const inPeriods = `${periodExpr} IN (DATE '${periodA}', DATE '${periodB}')`;
-const periodCase = `CASE WHEN ${periodExpr} = DATE '${periodA}' THEN 'A' ELSE 'B' END`;
+const inPeriods = `${periodExpr} IN ('${sqlEscape(periodA)}', '${sqlEscape(periodB)}')`;
+const periodCase = `CASE WHEN ${periodExpr} = '${sqlEscape(periodA)}' THEN 'A' ELSE 'B' END`;
 ```
 
 ${periodA === periodB
@@ -86,11 +88,11 @@ ${periodA === periodB
 ```js
 const kpiRows = Array.from(await db.query(`
   SELECT ${periodCase} AS period,
-         COUNT(*)::INT AS n,
-         COUNT(salary_annual_eur_p50)::INT AS n_salary,
-         MEDIAN(salary_annual_eur_p50) AS med_salary,
-         COUNT(work_arrangement)::INT AS n_arr,
-         COUNT(*) FILTER (WHERE work_arrangement = 'remote')::INT AS n_remote
+         COUNT(*) AS n,
+         COUNT(salary_annual_eur_p50) AS n_salary,
+         median(salary_annual_eur_p50) AS med_salary,
+         COUNT(work_arrangement) AS n_arr,
+         COUNT(*) FILTER (WHERE work_arrangement = 'remote') AS n_remote
   FROM postings
   WHERE posted_at IS NOT NULL AND ${inPeriods}
   GROUP BY 1
@@ -121,12 +123,9 @@ const delta = (a, b, opts) => deltaSub(a, b, {...opts, label: labelA});
 
 ```js
 const skillCounts = Array.from(await db.query(`
-  SELECT period, skill, COUNT(*)::INT AS n
-  FROM (
-    SELECT ${periodCase} AS period, unnest(skills) AS skill
-    FROM postings
-    WHERE posted_at IS NOT NULL AND ${inPeriods}
-  )
+  SELECT ${periodCase} AS period, skill, COUNT(*) AS n
+  FROM posting_skills JOIN postings ON postings.id = posting_skills.posting_id
+  WHERE posted_at IS NOT NULL AND ${inPeriods}
   GROUP BY 1, 2
 `));
 ```
@@ -193,7 +192,7 @@ ${topMovers.length === 0
 const iscoRows = Array.from(await db.query(`
   SELECT ${periodCase} AS period,
          CASE WHEN isco_code IS NULL THEN NULL ELSE SUBSTR(isco_code, 1, 1) END AS isco_major,
-         COUNT(*)::INT AS n
+         COUNT(*) AS n
   FROM postings
   WHERE posted_at IS NOT NULL AND ${inPeriods}
   GROUP BY 1, 2
@@ -209,7 +208,7 @@ const iscoRows = Array.from(await db.query(`
 const arrRows = Array.from(await db.query(`
   SELECT ${periodCase} AS period,
          COALESCE(work_arrangement, 'unknown') AS arrangement,
-         COUNT(*)::INT AS n
+         COUNT(*) AS n
   FROM postings
   WHERE posted_at IS NOT NULL AND ${inPeriods}
   GROUP BY 1, 2
@@ -263,8 +262,8 @@ function mixChart(rows, {y, width, height = 300, xLabel = "Share of period's pos
 const salaryRows = Array.from(await db.query(`
   SELECT ${periodCase} AS period,
          country,
-         COUNT(salary_annual_eur_p50)::INT AS n_sal,
-         MEDIAN(salary_annual_eur_p50) AS med
+         COUNT(salary_annual_eur_p50) AS n_sal,
+         median(salary_annual_eur_p50) AS med
   FROM postings
   WHERE posted_at IS NOT NULL AND country IS NOT NULL AND ${inPeriods}
   GROUP BY 1, 2

@@ -6,8 +6,8 @@ title: Overview
 
 ```js
 import * as Plot from "npm:@observablehq/plot";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, loadBootstrap} from "./components/db.js";
 import {coverageNote} from "./components/coverageNote.js";
 import {dataTable} from "./components/dataTable.js";
 import {kpiCard} from "./components/kpiCard.js";
@@ -18,19 +18,11 @@ import {whereClause, andClause} from "./components/filters.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 ```
 
 ```js
-const countries = Array.from(
-  await db.query(`SELECT DISTINCT country FROM postings WHERE country IS NOT NULL ORDER BY 1`),
-  (r) => r.country
-);
-const iscoPresent = Array.from(
-  await db.query(`SELECT DISTINCT isco_major FROM postings WHERE isco_major IS NOT NULL ORDER BY 1`),
-  (r) => r.isco_major
-);
-const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+const {countries, iscoPresent, allDates} = await loadBootstrap(db);
 ```
 
 ```js
@@ -50,13 +42,7 @@ as of <strong>${fmtDate(manifest.generated_at)}</strong> ·
 pipeline <code>${manifest.pipeline_version}</code>
 </small>
 
-A no-backend, browser-side dashboard. Parquet ships from a GitHub Release; charts run in-browser via DuckDB-WASM. Filter once at the top — every chart re-flows.
-
-<div class="tip" label="Browser note">
-
-**Firefox is recommended.** Chromium-based browsers on Windows can intermittently fail to load the data with `TProtocolException: Invalid data` — an upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm bug (#1658)</a>, open since March 2024; Firefox is unaffected. If charts stall in Chrome/Edge, hard-refresh (`Ctrl+Shift+R`) or switch to Firefox — see the [troubleshooting notes](./methodology#troubleshooting).
-
-</div>
+A no-backend, browser-side dashboard. Parquet ships from a GitHub Release; the build turns it into a small SQLite database and charts run in-browser on SQLite (WebAssembly). Filter once at the top — every chart re-flows.
 
 ```js
 const filters = view(filterCard({countries, iscoPresent, dateBounds: [allDates.lo, allDates.hi], presets}));
@@ -68,9 +54,9 @@ const where = whereClause(filters);
 
 ```js
 const live = await db.queryRow(`
-  SELECT COUNT(*)::INT AS n,
-         COUNT(salary_annual_eur_p50)::INT AS n_salary,
-         COUNT(isco_code)::INT AS n_isco
+  SELECT COUNT(*) AS n,
+         COUNT(salary_annual_eur_p50) AS n_salary,
+         COUNT(isco_code) AS n_isco
   FROM postings ${where}
 `);
 display(coverageNote(manifest, {n: live.n, nSalary: live.n_salary, nIsco: live.n_isco}));
@@ -85,15 +71,15 @@ display(coverageNote(manifest, {n: live.n, nSalary: live.n_salary, nIsco: live.n
 // the reference week is stable while filters change. Medians on <3 disclosed
 // salaries are suppressed as noise.
 const pulseWeeks = Array.from(await db.query(`
-  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
-         COUNT(*)::INT AS n,
-         COUNT(salary_annual_eur_p50)::INT AS n_salary,
-         MEDIAN(salary_annual_eur_p50) AS med_salary,
-         COUNT(work_arrangement)::INT AS n_arr,
-         COUNT(*) FILTER (WHERE work_arrangement = 'remote')::INT AS n_remote
+  SELECT posted_week AS wk,
+         COUNT(*) AS n,
+         COUNT(salary_annual_eur_p50) AS n_salary,
+         median(salary_annual_eur_p50) AS med_salary,
+         COUNT(work_arrangement) AS n_arr,
+         COUNT(*) FILTER (WHERE work_arrangement = 'remote') AS n_remote
   FROM postings
   ${andClause(where)} posted_at IS NOT NULL
-    AND posted_at::TIMESTAMP < (SELECT date_trunc('week', MAX(posted_at)::TIMESTAMP) FROM postings)
+    AND posted_week < (SELECT MAX(posted_week) FROM postings)
   GROUP BY 1
   ORDER BY 1 DESC
   LIMIT 2
@@ -146,9 +132,9 @@ function salaryHistogram(width, height = 260) {
 
 ```js
 const weekly = Array.from(await db.query(`
-  SELECT date_trunc('week', posted_at::TIMESTAMP)::DATE AS wk,
+  SELECT posted_week AS wk,
          country,
-         COUNT(*)::INT AS n
+         COUNT(*) AS n
   FROM postings
   ${andClause(where)} posted_at IS NOT NULL AND country IS NOT NULL
   GROUP BY 1, 2
@@ -191,7 +177,7 @@ function weeklyChart(width, height = 280) {
       )}
 </div>
 
-<small>Week buckets are <code>date_trunc('week', posted_at)</code>; the first and last weeks are usually partial.</small>
+<small>Week buckets are ISO weeks (Monday start, UTC) of <code>posted_at</code>; the first and last weeks are usually partial.</small>
 
 ## Recent postings
 

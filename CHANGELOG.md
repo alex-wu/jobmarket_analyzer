@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — browser SQL engine: SQLite replaces DuckDB-WASM (ADR-027, 2026-11-12)
+- Dashboard queries now run on SQLite (Framework's built-in sql.js client)
+  instead of DuckDB-WASM, removing the intermittent Chromium-on-Windows
+  data-load failure (upstream duckdb-wasm #1658). The "Firefox is
+  recommended" note and the troubleshooting section are gone.
+- Build-time loader `site/src/data/postings.db.js` converts the release
+  parquet into a SQLite file (`postings` + `posting_skills`, pre-computed
+  week / month / quarter buckets, UTC text timestamps).
+  `site/src/components/db.js` is the single client entry point.
+- WebAssembly runtime shrinks from ~36–40 MB to ~0.7 MB.
+- `npm run parity` proves the ported queries return the same results as the
+  original DuckDB SQL (84 query × filter cases).
+- Smoke test: `SMOKE_BROWSER=firefox` option; filter / CSV / choropleth
+  interaction checks now also run against the built `dist/`.
+
 ### Added — market-pulse KPI strip on Overview + Trends (F2, 2026-09-14, PR #49)
 - Overview gains a "Market pulse" strip: latest *complete* week vs the week
   before (postings, median €p50, disclosure rate, remote share) with

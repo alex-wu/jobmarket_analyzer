@@ -38,7 +38,7 @@ All three publish under permissive open-data terms allowing redistribution with 
 This project depends on the following open-source software (full list in `pyproject.toml` / `uv.lock`). Notable redistributables:
 
 - **DuckDB** — MIT
-- **DuckDB-WASM** — MIT
+- **sql.js** — MIT (bundles **SQLite**, public domain)
 - **Observable Framework** — Apache-2.0
 - **pandera** — MIT
 - **rapidfuzz** — MIT

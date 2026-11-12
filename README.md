@@ -59,7 +59,7 @@ For the day-to-day local-dev / refresh / push loops, see [docs/operations.md](do
 
 ## Architecture (one-liner)
 
-GitHub Actions weekly cron + matrix over presets → Python pipeline (`uv` env) → archive (dated Releases) → accumulate (pure-function union of last 180 days) → `latest-{preset_id}` Release as CDN → Observable Framework site (DuckDB-WASM; preset switcher queued) → GitHub Pages.
+GitHub Actions weekly cron + matrix over presets → Python pipeline (`uv` env) → archive (dated Releases) → accumulate (pure-function union of last 180 days) → `latest-{preset_id}` Release as CDN → Observable Framework site (in-browser SQLite; preset switcher queued) → GitHub Pages.
 
 Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectural decisions: [DECISIONS.md](DECISIONS.md).
 

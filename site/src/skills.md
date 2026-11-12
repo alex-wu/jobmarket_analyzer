@@ -7,8 +7,8 @@ title: Skills & Roles
 ```js
 import * as Plot from "npm:@observablehq/plot";
 import * as Inputs from "npm:@observablehq/inputs";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, loadBootstrap} from "./components/db.js";
 import {barChart} from "./components/barChart.js";
 import {dataTable} from "./components/dataTable.js";
 import {heatmap} from "./components/heatmap.js";
@@ -19,24 +19,16 @@ import {iscoMajorLabel} from "./components/isco.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 ```
 
 ```js
-const countries = Array.from(
-  await db.query(`SELECT DISTINCT country FROM postings WHERE country IS NOT NULL ORDER BY 1`),
-  (r) => r.country
-);
-const iscoPresent = Array.from(
-  await db.query(`SELECT DISTINCT isco_major FROM postings WHERE isco_major IS NOT NULL ORDER BY 1`),
-  (r) => r.isco_major
-);
-const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+const {countries, iscoPresent, allDates} = await loadBootstrap(db);
 // Options for the page-scoped Role/title filter. Unfiltered on purpose: the
 // select lives inside the filter card, so deriving options from the other
 // filters would be circular.
 const topTitles = Array.from(
-  await db.query(`SELECT title FROM postings WHERE title IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 25`),
+  await db.query(`SELECT title FROM postings WHERE title IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC, 1 LIMIT 25`),
   (r) => r.title
 );
 ```
@@ -62,21 +54,22 @@ const whereT = !filters.title || filters.title === "(all)"
 
 ```js
 const titles = Array.from(await db.query(`
-  SELECT title, COUNT(*)::INT AS n
+  SELECT title, COUNT(*) AS n
   FROM postings
   ${andClause(where)} title IS NOT NULL
   GROUP BY 1
-  ORDER BY 2 DESC
+  ORDER BY 2 DESC, 1
   LIMIT 15
 `));
 ```
 
 ```js
 const skillRows = Array.from(await db.query(`
-  SELECT skill, COUNT(*)::INT AS n
-  FROM (SELECT unnest(skills) AS skill FROM postings ${whereT})
+  SELECT skill, COUNT(*) AS n
+  FROM posting_skills JOIN postings ON postings.id = posting_skills.posting_id
+  ${whereT}
   GROUP BY 1
-  ORDER BY 2 DESC
+  ORDER BY 2 DESC, 1
   LIMIT 25
 `));
 ```
@@ -104,7 +97,7 @@ const skillRows = Array.from(await db.query(`
 const iscoMix = Array.from(
   await db.query(`
     SELECT COALESCE(isco_major, '∅') AS isco_major,
-           COUNT(*)::INT AS n
+           COUNT(*) AS n
     FROM postings ${whereT}
     GROUP BY 1
     ORDER BY 2 DESC
@@ -118,8 +111,8 @@ const heatRows = Array.from(
   await db.query(`
     SELECT country,
            isco_major,
-           quantile_cont(salary_annual_eur_p50, 0.5) AS p50,
-           COUNT(salary_annual_eur_p50)::INT AS n
+           median(salary_annual_eur_p50) AS p50,
+           COUNT(salary_annual_eur_p50) AS n
     FROM postings
     ${andClause(whereT)} salary_annual_eur_p50 IS NOT NULL AND isco_major IS NOT NULL
     GROUP BY 1, 2

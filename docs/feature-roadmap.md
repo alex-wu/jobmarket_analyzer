@@ -16,7 +16,7 @@ _Last updated: 2026-09-14. Cross-track priority order (features + ops, ranked fo
 
 ## Hard constraints (apply to every feature)
 
-1. **No backend.** Static Observable Framework site + DuckDB-WASM. Anything dynamic is
+1. **No backend.** Static Observable Framework site + in-browser SQLite (sql.js, ADR-027). Anything dynamic is
    either (a) computed at weekly build time and shipped as static JSON/parquet, or
    (b) computed client-side, optionally with a **user-supplied** LLM key (BYOK).
 2. **Browser parquet is a column subset.** `site/src/data/postings.parquet.js` SELECTs
@@ -108,7 +108,7 @@ right-censoring caveat (postings still live at snapshot date).
 
 **What:** on /skills: (a) **skill-salary premium** — median €p50 for postings with skill X
 vs ISCO-major baseline, ≥N disclosed guard; (b) **co-occurrence** — top skill pairs
-("know X → also asked: Y"), from `unnest(skills)` self-join in DuckDB-WASM.
+("know X → also asked: Y"), from a `posting_skills` self-join in the in-browser SQLite database.
 **Why:** top job-seeker question ("what is Python worth"); pure SQL over shipped data.
 **Notes:** premium is confounded (seniority/role mix) — label as descriptive, not causal.
 **Done when:** both charts on /skills with disclosure-count guards + caveat copy.
@@ -142,12 +142,12 @@ computed numbers; instruct: no numbers not present in input).
 ## F7 — "Ask the data" NL→SQL chat `[planned]`
 
 **What:** page/panel: user question → Gemini (BYOK, key in localStorage, never sent to
-us) generates DuckDB SQL against the `postings` schema (embedded in prompt) → executes
-in the already-loaded DuckDB-WASM → table + auto chart. Show the SQL; read-only.
+us) generates SQLite SQL against the `postings` schema (embedded in prompt) → executes
+in the already-loaded SQLite database → table + auto chart. Show the SQL; read-only.
 **Why:** flagship applied-AI BI feature; perfect no-backend fit — the query engine
 already runs in the visitor's browser.
 **Notes:** guard: single SELECT statement only (reject DDL/DML by parse), LIMIT cap,
-error → show SQL + DuckDB error for manual fix. Degrade: without key, panel shows
+error → show SQL + SQLite error for manual fix. Degrade: without key, panel shows
 "bring your own free AI Studio key" instructions + canned example queries that run
 locally. Model: `gemini-2.5-flash` BYOK.
 **Done when:** page live; works with key; useful without key; smoke covers no-key path.

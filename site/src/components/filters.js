@@ -69,8 +69,8 @@ export function whereClause({country, iscoMajor, arrangement, salary, dates}) {
     if (salary.lo != null) parts.push(`(salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 >= ${+salary.lo})`);
     if (salary.hi != null) parts.push(`(salary_annual_eur_p50 IS NULL OR salary_annual_eur_p50 <= ${+salary.hi})`);
   }
-  if (dates && dates.from) parts.push(`posted_at >= TIMESTAMP '${toIso(dates.from)}'`);
-  if (dates && dates.to)   parts.push(`posted_at <= TIMESTAMP '${toIso(dates.to)}'`);
+  if (dates && dates.from) parts.push(`posted_at >= '${toIso(dates.from)}'`);
+  if (dates && dates.to)   parts.push(`posted_at <= '${toIso(dates.to)}'`);
   return parts.length ? `WHERE ${parts.join(" AND ")}` : "";
 }
 
@@ -86,7 +86,10 @@ export function escape(s) {
 }
 
 function toIso(d) {
-  return new Date(d).toISOString().slice(0, 19).replace("T", " ");
+  // posted_at is fixed-width UTC text 'YYYY-MM-DD HH:MM:SS.ffffff' (see
+  // data/postings.db.js); a same-width literal compares exactly like a
+  // timestamp. Whole seconds, as before.
+  return `${new Date(d).toISOString().slice(0, 19).replace("T", " ")}.000000`;
 }
 
 export {ALL};

@@ -11,7 +11,7 @@ const MIMES = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".json": "application/json",
-  ".parquet": "application/octet-stream",
+  ".db": "application/octet-stream",
   ".wasm": "application/wasm",
   ".svg": "image/svg+xml",
   ".png": "image/png"
@@ -38,6 +38,9 @@ async function staticServer(root, port, basePrefix) {
   });
 }
 
+// Requests injected by local tooling on the test machine (not by the site).
+const IGNORED_HOSTS = new Set(["local.adguard.org"]);
+
 function attachListeners(page) {
   const consoleErrors = [];
   const pageErrors = [];
@@ -46,7 +49,10 @@ function attachListeners(page) {
     if (msg.type() === "error") consoleErrors.push(msg.text());
   });
   page.on("pageerror", (err) => pageErrors.push(`${err.name}: ${err.message}`));
-  page.on("requestfailed", (req) => failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`));
+  page.on("requestfailed", (req) => {
+    if (IGNORED_HOSTS.has(new URL(req.url()).hostname)) return;
+    failedRequests.push(`${req.method()} ${req.url()} — ${req.failure()?.errorText}`);
+  });
   return {consoleErrors, pageErrors, failedRequests};
 }
 
@@ -94,7 +100,15 @@ const phase = (process.env.SMOKE_PHASE ?? "all").toLowerCase();
 const runDev = phase === "all" || phase === "dev";
 const runDist = phase === "all" || phase === "dist";
 
-const browser = await puppeteer.launch({headless: true, args: ["--no-sandbox"]});
+// SMOKE_BROWSER selects the engine: "chrome" (default) or "firefox"
+// (one-time setup: `npx puppeteer browsers install firefox`).
+const browserName = (process.env.SMOKE_BROWSER ?? "chrome").toLowerCase();
+const browser = await puppeteer.launch({
+  browser: browserName,
+  headless: true,
+  args: browserName === "chrome" ? ["--no-sandbox"] : []
+});
+console.log(`--- browser: ${browserName} (${await browser.version()}) ---`);
 let total = 0;
 
 // ---------- Phase 1: dev server, every data page ----------
@@ -107,14 +121,19 @@ if (runDev) {
     total += issues;
     await page.close();
   }
+  await interactionChecks((path) => `${devOrigin}${path}`);
+}
 
+// Interaction checks (filter change, narrow viewport, CSV export, choropleth).
+// Run against the dev server and against the static dist/ build.
+async function interactionChecks(urlFor) {
   // Phase 1b: filter interaction on /
   {
     console.log("\n=== / filter interaction ===");
     const page = await browser.newPage();
     await page.setViewport({width: 1280, height: 900});
     const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
-    await page.goto(`${devOrigin}/`, {waitUntil: "networkidle0", timeout: 30000});
+    await page.goto(urlFor("/"), {waitUntil: "networkidle0", timeout: 30000});
     await new Promise((r) => setTimeout(r, 1500));
     // change the first select (Country)
     const changed = await page.evaluate(() => {
@@ -144,7 +163,7 @@ if (runDev) {
 
   // Phase 1c: narrow viewport
   {
-    const {page, issues} = await checkPage(browser, `${devOrigin}/`, {viewport: {width: 375, height: 667}, label: "/ @ 375px"});
+    const {page, issues} = await checkPage(browser, urlFor("/"), {viewport: {width: 375, height: 667}, label: "/ @ 375px"});
     total += issues;
     await page.close();
   }
@@ -157,7 +176,7 @@ if (runDev) {
     const page = await browser.newPage();
     await page.setViewport({width: 1280, height: 900});
     const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
-    await page.goto(`${devOrigin}${path}`, {waitUntil: "networkidle0", timeout: 30000});
+    await page.goto(urlFor(path), {waitUntil: "networkidle0", timeout: 30000});
     await new Promise((r) => setTimeout(r, 2000));
     const csv = await page.evaluate(async () => {
       return await new Promise((resolve) => {
@@ -199,7 +218,7 @@ if (runDev) {
     const page = await browser.newPage();
     await page.setViewport({width: 1280, height: 900});
     const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
-    await page.goto(`${devOrigin}/geography`, {waitUntil: "networkidle0", timeout: 30000});
+    await page.goto(urlFor("/geography"), {waitUntil: "networkidle0", timeout: 30000});
     await new Promise((r) => setTimeout(r, 1500));
     const paths = await page.evaluate(() => document.querySelectorAll("figure svg path").length);
     const filled = await page.evaluate(() =>
@@ -249,6 +268,7 @@ if (runDist) {
     total += issues;
     await page.close();
   }
+  await interactionChecks((path) => `http://127.0.0.1:4173/jobmarket_analyzer${path}`);
   distSrv.close();
 }
 

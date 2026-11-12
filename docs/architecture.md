@@ -130,7 +130,7 @@ The window filter is applied on the release-tag date in the directory name (`run
 - **Window:** 180 days, matches existing `normalise.since_days` floor.
 - **Retention:** archive forever (no `cleanup.yml`). GH Releases on public repos have no published storage cap; ~1.3 GB/yr per preset.
 - **Recoverability:** `latest-{preset_id}` is reproducible from the archive at any time. A corrupt or accidentally-deleted `latest-{preset_id}` release is one CLI invocation away from restoration.
-- **Payload discipline:** a fully-grown accumulated parquet (150-250 MB projected) cannot ship via DuckDB-WASM cold-load; the site's build-time data loader projects only the columns the dashboard uses, keeping the browser payload small.
+- **Payload discipline:** a fully-grown accumulated parquet (150-250 MB projected) cannot ship to the browser whole; the site's build-time data loader (parquet → SQLite, ADR-027) projects only the columns the dashboard uses, keeping the browser payload small.
 
 ## Multi-preset parallelism
 

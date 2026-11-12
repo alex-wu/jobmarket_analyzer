@@ -20,7 +20,7 @@ flowchart LR
   D -->|plus isco_code| E[skills_tagger ESCO Pillar B Aho-Corasick]
   E -->|plus skills| F[(parquet flat layout)]
   F -->|gh release upload| G[GitHub Releases latest preset parquet]
-  G -->|FileAttachment| H[DuckDB-WASM browser]
+  G -->|FileAttachment| H[SQLite WASM browser]
   H --> I[Observable Plot]
 ```
 
@@ -115,28 +115,21 @@ The original spec called for `experience_level`, `work_arrangement`, and detaile
 
 ## Why the data re-loads on every page
 
-Observable Framework uses standard `<a href>` navigation, not SPA routing — clicking a sidebar link is a full HTTP page load. Each navigation creates a fresh DuckDB-WASM client and re-attaches the parquet. In practice this is cheap on revisits: the browser HTTP-caches the `.wasm` runtime and the `.parquet` file, and modern Chromium and Firefox cache compiled WebAssembly per-origin. First page hit pays the parse cost; subsequent pages (and refreshes) hit warm caches.
+Observable Framework uses standard `<a href>` navigation, not SPA routing — clicking a sidebar link is a full HTTP page load. Each navigation opens a fresh SQLite (sql.js) client and re-fetches the database file. In practice this is cheap on revisits: the browser HTTP-caches the `.wasm` runtime (under 1 MB) and the `.db` file, and modern Chromium and Firefox cache compiled WebAssembly per-origin. First page hit pays the parse cost; subsequent pages (and refreshes) hit warm caches.
 
 There is no in-memory hand-off between pages. SPA routing was considered and rejected — it would mean abandoning Framework's documented routing model. Filter state IS preserved across navigation via URL search params — see the address bar after touching any filter.
 
-The dashboard uses `DuckDBClient.of({postings: FileAttachment(...)})` in JS cells rather than Framework's frontmatter `sql:` registration + fenced ` ```sql id= ``` ` blocks. Both are canonical patterns per the Observable docs; we use `DuckDBClient` because our chart queries compose WHERE clauses from filter state in JS (e.g. `${andClause(where)}`), and fenced `sql id=` blocks parameter-bind `${...}` interpolations rather than text-substituting them — a SQL-injection safety feature that doesn't fit dynamic SQL-fragment composition. Per the Observable docs: "DuckDBClient is required if you need greater control, including dynamic table registration."
+## In-browser SQL engine
 
-The Edge-on-Windows `TProtocolException` is upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm bug #1658</a> (open since 2024-03-04); migrating between the two patterns does not fix it. See the troubleshooting note below.
+Charts query a SQLite database in the browser (Framework's built-in `SQLiteDatabaseClient`, i.e. sql.js — SQLite compiled to a single WebAssembly file, no workers or extensions). The site build converts the release parquet into that database: a `postings` table plus a `posting_skills` table (one row per posting × skill), with timestamps stored as UTC text and week / month / quarter buckets pre-computed, so the browser only runs portable SQL. Medians use a small registered aggregate with the same linear-interpolation definition as before.
 
-## Troubleshooting
+Queries run from JS cells (`db.query(string)`) rather than Framework's fenced SQL blocks because chart queries compose WHERE clauses from filter state (e.g. `${andClause(where)}`), and fenced blocks parameter-bind `${...}` interpolations rather than text-substituting them.
 
-**`Error: Invalid Error: TProtocolException: Invalid data`** in the browser — this is client-side cache state in Chromium-based browsers (Chrome/Edge) on Windows, not a data-writer bug: upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm #1658</a>, open since 2024-03-04. Firefox is unaffected — it is the recommended browser for this dashboard. Headless smoke tests and desktop DuckDB read the same parquet cleanly. Fix:
-
-1. Use Firefox — the bug does not reproduce there.
-2. In Chrome/Edge: hard-refresh the page (`Ctrl+Shift+R` / `Cmd+Shift+R`).
-3. If it persists: DevTools → Application → Storage → "Clear site data".
-4. Reload.
-
-Do not modify the data pipeline to "fix" this — the writer is innocent.
+Earlier versions used DuckDB-WASM, which intermittently failed to load data in Chromium-based browsers on Windows (upstream <a href="https://github.com/duckdb/duckdb-wasm/issues/1658" target="_blank" rel="noopener">duckdb-wasm #1658</a>). The SQLite backend replaced it (ADR-027); every dashboard query was checked to return identical results, and the site is smoke-tested in both Chromium and Firefox.
 
 ## Tech stack
 
-Observable Framework (shell + reactive runtime) · DuckDB-WASM (in-browser SQL on the parquet) · Observable Plot (charts, stock marks only) · Pandera strict-mode (upstream `PostingSchema` validation) · GitHub Actions (weekly cron + pages deploy) · `@duckdb/node-api` (build-time loader transform).
+Observable Framework (shell + reactive runtime) · SQLite via sql.js (in-browser SQL) · Observable Plot (charts, stock marks only) · Pandera strict-mode (upstream `PostingSchema` validation) · GitHub Actions (weekly cron + pages deploy) · `@duckdb/node-api` + `node:sqlite` (build-time parquet → SQLite loader).
 
 ## Refresh the local sample
 
