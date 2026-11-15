@@ -10,7 +10,7 @@
 
 **Status:** v1 live and running unattended. Dashboard at <https://alex-wu.github.io/jobmarket_analyzer/>. v1 ships **Adzuna-only** ([ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation)), multi-country (gb, es active; 7-country EU expansion planned) on a **weekly** Monday 06:00 UTC cron with `workflow_dispatch` for on-demand runs. Each preset produces a distinctly named `latest-{preset_id}.parquet` accumulated from the immutable dated archive ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming), [ADR-020](DECISIONS.md#adr-020--accumulated-dataset-via-pure-function-recompute)). ATS adapters (Greenhouse / Lever / Ashby / Personio) and benchmark adapters (CSO / OECD / Eurostat) remain in the codebase, shelved by preset config until the multi-country unified merge proves stable end-to-end — see [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). Pipeline runs on Node 24 actions, Dependabot (weekly grouped npm + pip + actions), CodeQL (Python + JS), OpenSSF Scorecard, actionlint, and Dependabot auto-merge for patch+minor. Branch protection on `main` requires `test` + CodeQL checks. Day-to-day operations: [docs/operations.md](docs/operations.md). CI/CD reference: [docs/ci-cd-practices.md](docs/ci-cd-practices.md). Architecture: [DECISIONS.md](DECISIONS.md) + [docs/architecture.md](docs/architecture.md).
 
-**v1 preset:** `data_analyst_eu` — data-analyst roles across gb + es (7-country EU expansion planned). The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography today means a YAML file, a matrix entry in `refresh.yml`, and un-hardcoding `PRESET_ID` in `pages.yml` + `site/src/data/postings.parquet.js` (to be simplified when the multi-preset switcher lands, [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)). Presets run in parallel via GitHub Actions matrix; each produces its own `latest-{preset_id}.parquet`.
+**v1 preset:** `data_analyst_eu` — data-analyst roles across gb + es (7-country EU expansion planned). The pipeline is preset-driven — `config/runs/*.yaml` declare what gets ingested. Adding a new role/geography today means a YAML file, a matrix entry in `refresh.yml`, and un-hardcoding `PRESET_ID` in `pages.yml` + `site/src/data/postings.db.js` (to be simplified when the multi-preset switcher lands, [ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)). Presets run in parallel via GitHub Actions matrix; each produces its own `latest-{preset_id}.parquet`.
 
 ---
 
@@ -59,7 +59,7 @@ For the day-to-day local-dev / refresh / push loops, see [docs/operations.md](do
 
 ## Architecture (one-liner)
 
-GitHub Actions weekly cron + matrix over presets → Python pipeline (`uv` env) → archive (dated Releases) → accumulate (pure-function union of last 180 days) → `latest-{preset_id}` Release as CDN → Observable Framework site (DuckDB-WASM; preset switcher queued) → GitHub Pages.
+GitHub Actions weekly cron + matrix over presets → Python pipeline (`uv` env) → archive (dated Releases) → accumulate (pure-function union of last 180 days) → `latest-{preset_id}` Release as CDN → Observable Framework site (in-browser SQLite; preset switcher queued) → GitHub Pages.
 
 Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectural decisions: [DECISIONS.md](DECISIONS.md).
 
@@ -67,7 +67,7 @@ Full dataflow diagram: [docs/architecture.md](docs/architecture.md). Architectur
 
 ## Extending
 
-- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Then add it to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.parquet.js` (both pin `data_analyst_eu` today). To be simplified when multi-preset enumeration + the dashboard switcher land ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
+- **New preset (role / geography)** — copy `config/runs/data_analyst_eu.yaml`, change `preset_id`, `keywords`, `countries`. Then add it to `strategy.matrix.preset` in `.github/workflows/refresh.yml`, and un-hardcode `PRESET_ID` in `.github/workflows/pages.yml` and `site/src/data/postings.db.js` (both pin `data_analyst_eu` today). To be simplified when multi-preset enumeration + the dashboard switcher land ([ADR-019](DECISIONS.md#adr-019--multi-preset-latest-preset_id-release-naming)).
 - **New source adapter** — out of scope for v1 per [ADR-017](DECISIONS.md#adr-017--scope-cut-to-adzuna-only-post-v1-stabilisation). The pluggable adapter pattern ([ADR-008](DECISIONS.md#adr-008--pluggable-adapter-pattern-sources--benchmarks)) survives — see [docs/adding-a-source.md](docs/adding-a-source.md) for the post-v1 pattern. Reactivation criteria documented in ADR-017.
 - **New benchmark adapter** — same status; follows the same Protocol pattern under `src/jobpipe/benchmarks/` (see the note in [docs/adding-a-source.md](docs/adding-a-source.md)).
 

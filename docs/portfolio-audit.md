@@ -30,14 +30,14 @@ The engineering already exceeds most analytics portfolios: unattended weekly pip
 - **Taxonomy grounding.** ESCO/ISCO-08 occupations + Pillar B skills via Aho-Corasick. Domain literacy, not keyword counting.
 - **Decision trail.** 26 ADRs incl. superseded ones; honest known-limitations doc; Quality page.
 - **Security + CI hygiene.** Credential scrubbing, CodeQL, Scorecard, Dependabot auto-merge, strict typing gate before tests.
-- **No-backend BI.** DuckDB-WASM in browser, URL-persisted filters, stock Framework idiom. Free to host, fast to fork.
+- **No-backend BI.** SQL in the browser (SQLite since ADR-027), URL-persisted filters, stock Framework idiom. Free to host, fast to fork.
 
 ### Holding it back
 
 - **No visual first impression.** README opens with badges + paragraph. No hero screenshot/GIF, no inline diagram.
 - **Charts without conclusions.** Analytics portfolios are judged on insight communication. Nothing states what the data says.
 - **Thin data.** Two countries, three keywords. Geography and country comparisons can't carry weight yet.
-- **"Use Firefox" banner.** Most reviewers open Chrome. A visible browser caveat reads as broken, whatever the upstream cause (duckdb-wasm #1658).
+- **"Use Firefox" banner** *(resolved 2026-11-12, ADR-027 — browser engine moved to SQLite, banner removed).* Most reviewers open Chrome. A visible browser caveat reads as broken, whatever the upstream cause (duckdb-wasm #1658).
 - **Pluggability unproven.** Preset system is the core claim; one preset exists and the loader hardcodes it.
 - **Applied-AI layer is all roadmap.** `llm.py` is a stub. F5/F6/F7 are where the "AI" would come from.
 - **Stale surface.** Repo description, `pipeline_version 0.0.1`, no tagged release, open WIP branch.
@@ -63,9 +63,9 @@ Effort: **S** < 4h · **M** 4–12h · **L** > 12h (for someone who knows the co
 |---|---|---|---|---|---|
 | 5 | **F3 Posting lifetime** — `last_seen − first_seen`; distribution + weekly median by ISCO × country; right-censoring caveat | ★★★★★ | M · 6h | Medium | Unique metric only the accumulation architecture produces. Semantics validated 2026-09-14 (median lifetime 7 d, p90 35 d, 1,001 censored). Ship loader cols first. The "why did you build it that way" talking point. |
 | 6 | **F6 Weekly AI market brief** — build-time Gemini over aggregates only → `brief.json`; graceful absence | ★★★★ | M · 5h | Medium | Cheapest credible applied-AI feature. Hallucination-bounded by construction (input = own numbers). Good guardrails story. |
-| 7 | **F7 Ask-the-data NL→SQL** — BYOK Gemini → DuckDB SQL → runs in browser; single-SELECT guard; canned queries without key | ★★★★★ | M · 10h | High | Flagship. No-backend fit is elegant: query engine already in visitor's browser. Needs SQL parse guard, LIMIT cap, no-key path in smoke. |
+| 7 | **F7 Ask-the-data NL→SQL** — BYOK Gemini → SQL (SQLite dialect since ADR-027) → runs in browser; single-SELECT guard; canned queries without key | ★★★★★ | M · 10h | High | Flagship. No-backend fit is elegant: query engine already in visitor's browser. Needs SQL parse guard, LIMIT cap, no-key path in smoke. |
 | 8 | **F5 ISCO match uplift** — step 1: extend label snapshot with missing titles (ADR-021); step 2: Gemini fallback on residual | ★★★★ | M · 6h | Medium | 45% untagged is the most visible data-quality weakness. Cheap lever first, measure, then LLM. Add `llm` slice to Quality page. |
-| 9 | **Chrome reliability** — bump duckdb-wasm, auto-retry on `TProtocolException`, drop banner if fixed | ★★★★ | S–M · 3h | Unknown | Upstream bug #1658, but the banner is ours. Check newer duckdb-wasm; else silent retry-once-then-reload beats telling reviewers to switch browsers. Not an architectural pivot. |
+| 9 | ~~**Chrome reliability**~~ (done 2026-11-12: DuckDB-WASM replaced by SQLite, ADR-027) — bump duckdb-wasm, auto-retry on `TProtocolException`, drop banner if fixed | ★★★★ | S–M · 3h | Unknown | Upstream bug #1658, but the banner is ours. Check newer duckdb-wasm; else silent retry-once-then-reload beats telling reviewers to switch browsers. Not an architectural pivot. |
 | 10 | **F4 Skill economics** — skill-salary premium vs ISCO baseline; co-occurrence pairs | ★★★★ | M · 6h | Medium | Answers the job-seeker question directly. Pure SQL over shipped data. Label descriptive, not causal. |
 
 ### Tier 3 — proof and reach

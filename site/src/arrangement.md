@@ -6,8 +6,8 @@ title: Work Arrangement
 
 ```js
 import * as Plot from "npm:@observablehq/plot";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, loadBootstrap} from "./components/db.js";
 import {dataTable} from "./components/dataTable.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
@@ -15,7 +15,7 @@ import {whereClause, andClause} from "./components/filters.js";
 
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 
 // Fixed category order + stable colours across every chart on this page.
 const ORDER = ["remote", "hybrid", "onsite", "unknown"];
@@ -23,15 +23,7 @@ const color = {domain: ORDER, legend: true};
 ```
 
 ```js
-const countries = Array.from(
-  await db.query(`SELECT DISTINCT country FROM postings WHERE country IS NOT NULL ORDER BY 1`),
-  (r) => r.country
-);
-const iscoPresent = Array.from(
-  await db.query(`SELECT DISTINCT isco_major FROM postings WHERE isco_major IS NOT NULL ORDER BY 1`),
-  (r) => r.isco_major
-);
-const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+const {countries, iscoPresent, allDates} = await loadBootstrap(db);
 ```
 
 ```js
@@ -44,7 +36,7 @@ const where = whereClause(filters);
 
 ```js
 const cov = await db.queryRow(`
-  SELECT COUNT(*)::INT AS total, COUNT(work_arrangement)::INT AS classified
+  SELECT COUNT(*) AS total, COUNT(work_arrangement) AS classified
   FROM postings ${where}
 `);
 const covPct = cov.total > 0 ? Math.round((cov.classified / cov.total) * 100) : 0;
@@ -67,7 +59,7 @@ unknown share** so the sparse coverage stays visible.
 
 ```js
 const overall = Array.from(await db.query(`
-  SELECT COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*)::INT AS n
+  SELECT COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*) AS n
   FROM postings ${where}
   GROUP BY 1
 `));
@@ -101,8 +93,8 @@ function overallChart(width, height = 260) {
 
 ```js
 const byCountry = Array.from(await db.query(`
-  SELECT country, COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*)::INT AS n,
-         COUNT(*)::DOUBLE / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
+  SELECT country, COALESCE(work_arrangement, 'unknown') AS arrangement, COUNT(*) AS n,
+         CAST(COUNT(*) AS REAL) / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
   FROM postings
   ${andClause(where)} country IS NOT NULL
   GROUP BY 1, 2
@@ -168,8 +160,8 @@ mix. With so few classified rows, treat small countries with caution.
 
 ```js
 const classified = Array.from(await db.query(`
-  SELECT country, work_arrangement AS arrangement, COUNT(*)::INT AS n,
-         COUNT(*)::DOUBLE / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
+  SELECT country, work_arrangement AS arrangement, COUNT(*) AS n,
+         CAST(COUNT(*) AS REAL) / SUM(COUNT(*)) OVER (PARTITION BY country) AS share
   FROM postings
   ${andClause(where)} country IS NOT NULL AND work_arrangement IS NOT NULL
   GROUP BY 1, 2

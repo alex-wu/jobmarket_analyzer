@@ -343,3 +343,26 @@ When a decision changes, mark the old entry `Superseded` (or `Amended by ADR-0NN
 - The role filter is deliberately not URL-persisted and its options deliberately unfiltered (deriving them from other filters would create a reactive cycle).
 
 ---
+
+---
+
+## ADR-027 · Browser SQL engine: SQLite (sql.js) replaces DuckDB-WASM
+
+**Status:** Accepted, 2026-11-12. Supersedes the in-browser engine choice in ADR-002; ADR-024's `db.query(string)` pattern is retained.
+
+**Context:** DuckDB-WASM intermittently failed to load the parquet in Chromium-based browsers on Windows (`TProtocolException`, upstream duckdb-wasm #1658, open since 2024-03). The only mitigation was a "use Firefox" banner, which reads as a broken dashboard. The runtime was also heavy (~36–40 MB wasm plus extensions) for a ~6k-row dataset.
+
+**Decision:** Run the dashboard's SQL on SQLite through Framework's built-in `SQLiteDatabaseClient` (sql.js): one ~0.7 MB wasm, no workers, no extensions, no in-browser parquet reader.
+1. `site/src/data/postings.db.js` (build time, Node) reads the release parquet with `@duckdb/node-api` and writes a SQLite file with `node:sqlite`. DuckDB keeps doing everything dialect-sensitive — `date_trunc` week/month/quarter buckets, UTC text timestamps, `unnest(skills)` into a `posting_skills` table — with `TimeZone` pinned to UTC.
+2. `site/src/components/db.js` is the single client entry point: opens the database, registers a `median` aggregate (linear interpolation, same as DuckDB `MEDIAN` / `quantile_cont(x, 0.5)`), converts text dates / 0-1 booleans back to JS `Date` / boolean by column name, and exposes `periodColumn(granularity)`.
+3. Page queries are ported to portable SQL (no `::` casts, `date_trunc`, `unnest`, typed literals).
+
+**Alternatives rejected:** PGlite (closer dialect but ~10× heavier and unproven under Framework's `npm:` asset resolution); retry-on-error around DuckDB-WASM (hides, does not remove, the failure); pre-aggregated JSON (loses ad-hoc filter composition).
+
+**Consequences:**
+- `npm run parity` (`site/scripts/parity.mjs`) runs the original DuckDB SQL and the ported SQLite SQL side by side across filter variants and fails on any difference — run it after touching the loader, `db.js`, or a page query.
+- Smoke test gains `SMOKE_BROWSER=firefox` and runs the filter / CSV / map interaction checks against the built site, not only the dev server.
+- The data file grows (~0.23 MB parquet → ~1.75 MB SQLite) while the engine shrinks by ~40 MB; net first-load payload drops by an order of magnitude.
+- SQLite has no list, date, or boolean types: new list-valued columns need a child table in the loader, and new date/boolean result columns must be added to the conversion lists in `db.js` (or passed per query).
+- New aggregates beyond SQLite's built-ins must be registered in `db.js` and mirrored in the parity script.
+- DuckDB remains in the Python pipeline and the build-time loader; only the browser engine changed.

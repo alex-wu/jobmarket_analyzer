@@ -7,8 +7,8 @@ title: Trends
 ```js
 import * as Plot from "npm:@observablehq/plot";
 import * as Inputs from "npm:@observablehq/inputs";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, loadBootstrap, periodColumn} from "./components/db.js";
 import {marketPulse, derivePulse} from "./components/marketPulse.js";
 import {filterCard} from "./components/filterCard.js";
 import {expandable} from "./components/expand.js";
@@ -16,7 +16,7 @@ import {dataTable} from "./components/dataTable.js";
 import {whereClause, andClause} from "./components/filters.js";
 
 const presets = await FileAttachment("data/presets.json").json();
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 ```
 
 Continuous view of the accumulated snapshot: how volume, pay, disclosure,
@@ -33,15 +33,7 @@ collection artefact, not a market move. The first and last buckets are usually p
 </div>
 
 ```js
-const countries = Array.from(
-  await db.query(`SELECT DISTINCT country FROM postings WHERE country IS NOT NULL ORDER BY 1`),
-  (r) => r.country
-);
-const iscoPresent = Array.from(
-  await db.query(`SELECT DISTINCT isco_major FROM postings WHERE isco_major IS NOT NULL ORDER BY 1`),
-  (r) => r.isco_major
-);
-const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+const {countries, iscoPresent, allDates} = await loadBootstrap(db);
 ```
 
 ```js
@@ -59,7 +51,7 @@ const filters = view(filterCard({
 ```js
 const where = whereClause(filters);
 const granularity = filters.granularity;
-const periodExpr = `date_trunc('${granularity}', posted_at::TIMESTAMP)::DATE`;
+const periodExpr = periodColumn(granularity);
 ```
 
 ```js
@@ -78,13 +70,13 @@ const fmtPct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 // table need. Medians on <3 disclosed salaries are suppressed as noise.
 const buckets = Array.from(await db.query(`
   SELECT ${periodExpr} AS bucket,
-         COUNT(*)::INT AS n,
-         COUNT(salary_annual_eur_p50)::INT AS n_salary,
-         MEDIAN(salary_annual_eur_p50) AS med_salary,
-         COUNT(work_arrangement)::INT AS n_arr,
-         COUNT(*) FILTER (WHERE work_arrangement = 'remote')::INT AS n_remote,
-         COUNT(*) FILTER (WHERE work_arrangement = 'hybrid')::INT AS n_hybrid,
-         COUNT(*) FILTER (WHERE work_arrangement = 'onsite')::INT AS n_onsite
+         COUNT(*) AS n,
+         COUNT(salary_annual_eur_p50) AS n_salary,
+         median(salary_annual_eur_p50) AS med_salary,
+         COUNT(work_arrangement) AS n_arr,
+         COUNT(*) FILTER (WHERE work_arrangement = 'remote') AS n_remote,
+         COUNT(*) FILTER (WHERE work_arrangement = 'hybrid') AS n_hybrid,
+         COUNT(*) FILTER (WHERE work_arrangement = 'onsite') AS n_onsite
   FROM postings
   ${andClause(where)} posted_at IS NOT NULL
   GROUP BY 1
@@ -100,9 +92,9 @@ const buckets = Array.from(await db.query(`
 // bucket with the one before. Cutoff is over the unfiltered snapshot so the
 // reference bucket does not move with filters. Charts below still plot the
 // partial bucket.
-const cutoff = await db.queryRow(`SELECT ${periodExpr.replace("posted_at::TIMESTAMP", "MAX(posted_at)::TIMESTAMP")} AS b FROM postings`);
-const cutoffMs = +new Date(cutoff.b);
-const complete = buckets.filter((b) => +new Date(b.bucket) < cutoffMs);
+const cutoff = await db.queryRow(`SELECT MAX(${periodExpr}) AS bucket FROM postings`);
+const cutoffMs = +cutoff.bucket;
+const complete = buckets.filter((b) => +b.bucket < cutoffMs);
 const latest = complete.at(-1);
 const prior = complete.at(-2);
 ```
@@ -119,7 +111,7 @@ ${marketPulse(latest, prior, {
 
 ```js
 const volumeRows = Array.from(await db.query(`
-  SELECT ${periodExpr} AS bucket, country, COUNT(*)::INT AS n
+  SELECT ${periodExpr} AS bucket, country, COUNT(*) AS n
   FROM postings
   ${andClause(where)} posted_at IS NOT NULL AND country IS NOT NULL
   GROUP BY 1, 2
@@ -130,8 +122,8 @@ const volumeRows = Array.from(await db.query(`
 ```js
 const salaryTrendRows = Array.from(await db.query(`
   SELECT ${periodExpr} AS bucket, country,
-         COUNT(salary_annual_eur_p50)::INT AS n_sal,
-         MEDIAN(salary_annual_eur_p50) AS med
+         COUNT(salary_annual_eur_p50) AS n_sal,
+         median(salary_annual_eur_p50) AS med
   FROM postings
   ${andClause(where)} posted_at IS NOT NULL AND country IS NOT NULL
   GROUP BY 1, 2
@@ -260,12 +252,9 @@ function arrangementChart(width, height = 300) {
 
 ```js
 const skillBucketRows = Array.from(await db.query(`
-  SELECT bucket, skill, COUNT(*)::INT AS n
-  FROM (
-    SELECT ${periodExpr} AS bucket, unnest(skills) AS skill
-    FROM postings
-    ${andClause(where)} posted_at IS NOT NULL
-  )
+  SELECT ${periodExpr} AS bucket, skill, COUNT(*) AS n
+  FROM posting_skills JOIN postings ON postings.id = posting_skills.posting_id
+  ${andClause(where)} posted_at IS NOT NULL
   GROUP BY 1, 2
 `));
 ```

@@ -63,7 +63,11 @@ npm run build && npm run smoke
 
 - `all` (default) — dev server + dist (the local-dev case).
 - `dev` — dev server only.
-- `dist` — static `dist/` only (used by CI in `pages.yml`).
+- `dist` — static `dist/` only (used by CI in `pages.yml`). Includes the filter / CSV / choropleth interaction checks.
+
+`SMOKE_BROWSER=firefox` runs the same checks in Firefox (one-time setup: `npx puppeteer browsers install firefox`); default is `chrome`.
+
+After touching `site/src/data/postings.db.js`, `site/src/components/db.js`, or any page query, also run `npm run parity` — it executes the original DuckDB SQL and the ported SQLite SQL side by side and fails on any difference (ADR-027).
 
 ---
 

@@ -6,8 +6,8 @@ title: Geography
 
 ```js
 import * as Inputs from "npm:@observablehq/inputs";
-import {DuckDBClient} from "npm:@observablehq/duckdb";
 import {html} from "npm:htl";
+import {openDb, loadBootstrap} from "./components/db.js";
 import {choropleth} from "./components/choropleth.js";
 import {dataTable} from "./components/dataTable.js";
 import {filterCard} from "./components/filterCard.js";
@@ -17,19 +17,11 @@ import {whereClause, andClause} from "./components/filters.js";
 const manifest = await FileAttachment("data/manifest.json").json();
 const presets = await FileAttachment("data/presets.json").json();
 const europe = await FileAttachment("data/europe.json").json();
-const db = await DuckDBClient.of({postings: FileAttachment("data/postings.parquet")});
+const db = await openDb();
 ```
 
 ```js
-const countries = Array.from(
-  await db.query(`SELECT DISTINCT country FROM postings WHERE country IS NOT NULL ORDER BY 1`),
-  (r) => r.country
-);
-const iscoPresent = Array.from(
-  await db.query(`SELECT DISTINCT isco_major FROM postings WHERE isco_major IS NOT NULL ORDER BY 1`),
-  (r) => r.isco_major
-);
-const allDates = await db.queryRow(`SELECT MIN(posted_at) AS lo, MAX(posted_at) AS hi FROM postings WHERE posted_at IS NOT NULL`);
+const {countries, iscoPresent, allDates} = await loadBootstrap(db);
 ```
 
 ```js
@@ -55,8 +47,8 @@ const metric = view(Inputs.select(
 ```js
 const byCountry = Array.from(await db.query(`
   SELECT country,
-         COUNT(*)::INT AS n,
-         quantile_cont(salary_annual_eur_p50, 0.5) AS p50
+         COUNT(*) AS n,
+         median(salary_annual_eur_p50) AS p50
   FROM postings
   ${andClause(where)} country IS NOT NULL
   GROUP BY 1
