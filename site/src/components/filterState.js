@@ -16,7 +16,9 @@ export function readFromURL() {
     salaryHi: intOrU("salary_hi"),
     dateFrom: dateOrU("date_from"),
     dateTo: dateOrU("date_to"),
-    preset: p.get("preset") ?? undefined
+    preset: p.get("preset") ?? undefined,
+    // Repeated param (skill=SQL&skill=Python): ESCO labels contain commas.
+    skills: p.getAll("skill")
   };
 }
 
@@ -42,6 +44,13 @@ export function writeToURL(filters, defaults) {
   setOrDel("date_to", isoDay(t), !t || sameDay(t, defaults.dateToBound));
 
   setOrDel("preset", filters.preset, !filters.preset || filters.preset === defaults.presetDefault);
+
+  // Only pages whose filter UI offers skills (chipFilterBar) own this param;
+  // elsewhere it is left untouched so it survives a round trip.
+  if (filters.skills !== undefined) {
+    p.delete("skill");
+    for (const s of filters.skills) p.append("skill", s);
+  }
 
   const qs = p.toString();
   const next = `${window.location.pathname}${qs ? "?" + qs : ""}${window.location.hash}`;

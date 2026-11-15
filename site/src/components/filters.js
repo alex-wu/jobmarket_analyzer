@@ -58,8 +58,12 @@ export function dateRange(dates, def) {
 
 // Compose a SQL WHERE clause from the four filter values.
 // Returns a string starting with "WHERE" (or "" if no filters active).
-export function whereClause({country, iscoMajor, arrangement, salary, dates}) {
+export function whereClause({country, iscoMajor, arrangement, salary, dates, skills}) {
   const parts = [];
+  // A posting must mention every selected skill.
+  for (const s of skills ?? []) {
+    parts.push(`postings.id IN (SELECT posting_id FROM posting_skills WHERE skill = '${escape(s)}')`);
+  }
   if (country && country !== ALL) parts.push(`country = '${escape(country)}'`);
   if (iscoMajor && iscoMajor !== ALL) parts.push(`isco_major = '${escape(iscoMajor)}'`);
   if (arrangement && arrangement !== ALL) {

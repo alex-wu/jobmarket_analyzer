@@ -1,0 +1,97 @@
+/* Page stylesheet for pages that use the chip filter bar (ADR-028).
+   The imports reproduce `theme: "dashboard"` (air + near-midnight + alt + wide)
+   exactly as Framework composes it; everything below is scoped to .chip-bar
+   and uses theme variables only, so light and dark both follow the theme. */
+@import url("observablehq:default.css");
+@import url("observablehq:theme-air.css") (prefers-color-scheme: light);
+@import url("observablehq:theme-near-midnight.css") (prefers-color-scheme: dark);
+@import url("observablehq:theme-alt.css");
+@import url("observablehq:theme-wide.css");
+
+.chip-bar {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.chip-bar-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--theme-foreground-faintest);
+}
+
+/* Inputs.radio / Inputs.checkbox rendered as chips. The native input stays in
+   the DOM (focusable, keyboard-operable); only its box is visually hidden. */
+.chips {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.chips form {
+  width: auto;
+  max-width: none;
+  margin: 0;
+  align-items: flex-start;
+}
+
+.chips form > label {
+  padding-top: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--theme-foreground-muted);
+}
+
+.chips form > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chips form > div label {
+  position: relative;
+  margin: 0;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid var(--theme-foreground-faintest);
+  border-left: 3px solid var(--theme-foreground-faint);
+  border-radius: 6px;
+  background: var(--theme-background);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chips form > div label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.chips form > div label small {
+  margin-left: 0.4rem;
+  color: var(--theme-foreground-muted);
+}
+
+.chips form > div label:hover {
+  border-color: var(--theme-foreground-muted);
+}
+
+.chips form > div label:has(input:checked) {
+  border-color: var(--theme-foreground-focus);
+  background: color-mix(in srgb, var(--theme-foreground-focus) 14%, var(--theme-background));
+  font-weight: 600;
+}
+
+.chips form > div label:has(input:focus-visible) {
+  outline: 2px solid var(--theme-foreground-focus);
+  outline-offset: 2px;
+}
+
+.chips form > div label:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}

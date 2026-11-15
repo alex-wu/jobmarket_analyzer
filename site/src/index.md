@@ -204,7 +204,7 @@ ${dataTable(recent, {
     company: "Company",
     country: "Country",
     salary_annual_eur_p50: "€p50",
-    salary_imputed: "Imputed?",
+    salary_imputed: "Adzuna estimate?",
     posted_at: "Posted"
   },
   format: {
@@ -215,5 +215,5 @@ ${dataTable(recent, {
       ? html`<a href="${recent[i].posting_url}" target="_blank" rel="noopener">${t}</a>`
       : t
   },
-  width: {country: 70, salary_annual_eur_p50: 80, salary_imputed: 70, posted_at: 100}
+  width: {country: 70, salary_annual_eur_p50: 80, salary_imputed: 120, posted_at: 100}
 })}
