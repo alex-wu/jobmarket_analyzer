@@ -136,6 +136,12 @@ def validate_preset(path: Path) -> list[str]:
                 except Exception as exc:
                     issues.append(f"benchmark {name!r}: invalid config — {exc}")
 
+    floor = (preset.get("normalise") or {}).get("salary_floor_eur")
+    if floor is not None and (
+        isinstance(floor, bool) or not isinstance(floor, int | float) or floor < 0
+    ):
+        issues.append("'normalise.salary_floor_eur' must be a non-negative number")
+
     publish_block = preset.get("publish")
     if publish_block is not None:
         if not isinstance(publish_block, dict):
@@ -362,6 +368,12 @@ def find_latest_raw(preset_id: str, out_root: Path) -> Path:
     )
 
 
+def _salary_floor(preset: dict[str, Any]) -> float | None:
+    """``normalise.salary_floor_eur`` from the preset, or ``None`` when unset."""
+    value = (preset.get("normalise") or {}).get("salary_floor_eur")
+    return None if value is None else float(value)
+
+
 def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
     """Top-level entry point for the ``jobpipe normalise`` CLI command.
 
@@ -380,6 +392,7 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
     skills = skills_loader.load_skills()
     normalise_cfg = preset.get("normalise", {})
     since_days = normalise_cfg.get("since_days")
+    salary_floor_eur = _salary_floor(preset)
     focus_isco = preset.get("isco_focus") or None
 
     # work_arrangement enrichment (Cluster 3): when enabled, read prior-week
@@ -400,6 +413,7 @@ def run_normalise(preset_path: Path, out_root: Path = Path("data")) -> Path:
         skills_df=skills,
         focus_isco=focus_isco,
         since_days=since_days,
+        salary_floor_eur=salary_floor_eur,
         work_arrangement_lookup=wa_lookup,
     )
     logger.info(
@@ -526,6 +540,7 @@ def run_publish(
             out_root,
             preset_id,
             int(accumulate_window_days),
+            salary_floor_eur=_salary_floor(preset),
         )
         # manifest.postings.row_count deliberately measures the FRESH weekly
         # fetch (that is what the gate thresholds calibrate against). Record
@@ -557,6 +572,8 @@ def _accumulate_into_latest(
     out_root: Path,
     preset_id: str,
     window_days: int,
+    *,
+    salary_floor_eur: float | None = None,
 ) -> None:
     """Glob the dated archive within ``window_days``, accumulate into ``fresh_latest``.
 
@@ -602,7 +619,9 @@ def _accumulate_into_latest(
         return
 
     tmp_out = fresh_latest.with_suffix(".parquet.tmp")
-    duckdb_io.export_accumulated([*archived, fresh_latest], tmp_out, preset_id)
+    duckdb_io.export_accumulated(
+        [*archived, fresh_latest], tmp_out, preset_id, salary_floor_eur=salary_floor_eur
+    )
     tmp_out.replace(fresh_latest)
     logger.info(
         "publish: rewrote %s with %d archived snapshots + fresh fetch",

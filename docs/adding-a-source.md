@@ -84,7 +84,7 @@ class MyBoardAdapter:
                 "salary_max_eur": None,
                 "salary_period": None,
                 "salary_annual_eur_p50": None,
-                "salary_imputed": None,  # set by normalise.py when p50 is derived
+                "salary_imputed": None,  # True only if the source estimated the salary itself
                 "posted_at": j["posted_at"],
                 "ingested_at": now,
                 "posting_url": j["url"],

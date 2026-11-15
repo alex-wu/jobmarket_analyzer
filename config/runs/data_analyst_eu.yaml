@@ -68,6 +68,15 @@ benchmarks:
 
 normalise:
   since_days: 180
+  # Salary floor (ADR-029). Adzuna gives salary_min / salary_max without a
+  # pay period and every value is treated as annual, so ads quoting a day
+  # rate, hourly rate or monthly salary arrive as "annual" salaries of a few
+  # euros to a few thousand. Below this many EUR per year the salary is
+  # blanked (the posting is kept). Applied at normalise and again when the
+  # accumulated corpus is rebuilt, so already-archived rows are cleaned too.
+  # 10,000 sits in an empty gap of the 2026-11 corpus: 38 salaries below
+  # EUR 3,600, none between 3,600 and 12,400. Remove the key to disable.
+  salary_floor_eur: 10000
   # Work-arrangement enrichment (schema v3, ADR-025).
   # The tagger ALWAYS runs against the truncated 500-char description
   # from /search — that's free.
