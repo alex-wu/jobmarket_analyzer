@@ -28,6 +28,7 @@ import duckdb
 import pandas as pd
 
 from jobpipe import __version__
+from jobpipe.schemas import SALARY_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,8 @@ def export_accumulated(
     dated_paths: list[Path],
     out: Path,
     preset_id: str,
+    *,
+    salary_floor_eur: float | None = None,
 ) -> int:
     """Recompute the moving ``latest-{preset_id}.parquet`` from dated snapshots.
 
@@ -209,6 +212,12 @@ def export_accumulated(
     that fall inside the accumulation window, GROUP BY ``posting_id`` and
     derive ``first_seen_at`` / ``last_seen_at`` from MIN/MAX of historical
     ``ingested_at`` (or the prior accumulation's first/last when re-running).
+
+    ``salary_floor_eur`` re-applies the normalise-time salary floor
+    (:func:`jobpipe.normalise.apply_salary_floor`) to every snapshot before
+    grouping. Archived snapshots are immutable and may predate the floor;
+    without this, ``ANY_VALUE`` would resurrect a below-floor salary that the
+    fresh fetch had blanked.
 
     Returns the row count of the accumulated frame. Raises :class:`PublishError`
     if the input list is empty (caller decides whether that is fatal).
@@ -224,6 +233,15 @@ def export_accumulated(
         f"ANY_VALUE({col}) AS {col}" for col in _ACCUMULATE_ANY_VALUE_COLS
     )
 
+    if salary_floor_eur is None:
+        floor_sql = ""
+    else:
+        below = f"salary_annual_eur_p50 < {float(salary_floor_eur)!r}"
+        blanked = ", ".join(
+            f"CASE WHEN {below} THEN NULL ELSE {col} END AS {col}" for col in SALARY_COLUMNS
+        )
+        floor_sql = f"REPLACE ({blanked})"
+
     out.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(":memory:")
     try:
@@ -237,7 +255,8 @@ def export_accumulated(
             f"""
             COPY (
                 WITH archive AS (
-                    SELECT * FROM read_parquet([{paths_sql}], union_by_name=true)
+                    SELECT * {floor_sql}
+                    FROM read_parquet([{paths_sql}], union_by_name=true)
                 )
                 SELECT
                     posting_id,

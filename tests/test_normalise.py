@@ -200,3 +200,50 @@ def test_run_defaults_to_committed_label_snapshot_when_none_passed() -> None:
     out = normalise.run(df, RATES)
     assert out.loc[0, "isco_code"] == "2511"
     assert out.loc[0, "isco_match_method"] == "fuzzy"
+
+
+def test_salary_floor_blanks_salary_but_keeps_posting() -> None:
+    # 650 GBP "annual" is a day rate mislabelled by the source.
+    df = pd.DataFrame(
+        [
+            _row(0),
+            _row(1, salary_min_eur=600.0, salary_max_eur=700.0, salary_annual_eur_p50=650.0),
+        ]
+    )
+    out = normalise.run(df, RATES, labels_df=LABELS, salary_floor_eur=10_000)
+
+    assert len(out) == 2
+    kept = out[out["posting_id"] == "posting-0000"].iloc[0]
+    blanked = out[out["posting_id"] == "posting-0001"].iloc[0]
+    assert kept["salary_annual_eur_p50"] > 10_000
+    assert kept["salary_imputed"] is False or kept["salary_imputed"] == False  # noqa: E712
+    for col in (
+        "salary_min_eur",
+        "salary_max_eur",
+        "salary_period",
+        "salary_annual_eur_p50",
+        "salary_imputed",
+    ):
+        assert pd.isna(blanked[col]), col
+    PostingSchema.validate(out, lazy=True)
+
+
+def test_salary_floor_is_off_by_default() -> None:
+    df = pd.DataFrame(
+        [_row(0, salary_min_eur=600.0, salary_max_eur=700.0, salary_annual_eur_p50=650.0)]
+    )
+    out = normalise.run(df, RATES, labels_df=LABELS)
+    assert out["salary_annual_eur_p50"].iloc[0] == pytest.approx(650.0 / RATES["GBP"], abs=0.01)
+
+
+def test_salary_floor_keeps_missing_and_at_floor_salaries() -> None:
+    df = pd.DataFrame(
+        [
+            _row(0, salary_min_eur=None, salary_max_eur=None, salary_annual_eur_p50=None),
+            _row(1, country="ES", salary_min_eur=10_000.0, salary_max_eur=10_000.0),
+        ]
+    )
+    out = normalise.apply_salary_floor(normalise._recompute_p50(df), 10_000)
+    assert pd.isna(out["salary_annual_eur_p50"].iloc[0])
+    assert out["salary_period"].iloc[0] == "annual"
+    assert out["salary_annual_eur_p50"].iloc[1] == 10_000.0

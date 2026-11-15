@@ -6,6 +6,7 @@ export default {
   pages: [
     {name: "Overview", path: "/"},
     {name: "Trends", path: "/trends"},
+    {name: "Salary Distribution", path: "/distribution"},
     {name: "Geography", path: "/geography"},
     {name: "Work Arrangement", path: "/arrangement"},
     {name: "Skills & Roles", path: "/skills"},

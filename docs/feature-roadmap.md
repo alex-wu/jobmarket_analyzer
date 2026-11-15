@@ -41,6 +41,7 @@ _Last updated: 2026-09-14. Cross-track priority order (features + ops, ranked fo
 |----|---------|--------|--------|-------|------------|
 | F1 | Trends page (weekly time series) | shipped | S | ★★★★★ | — |
 | F2 | Market-pulse KPI strip w/ WoW deltas | shipped | S | ★★★★ | F1 |
+| — | Salary Distribution page (raincloud, chip filters; ADR-028) | shipped | M | ★★★★ | — |
 | F3 | Posting lifetime (demand-tightness proxy) | planned | S-M | ★★★★★ | loader cols |
 | F4 | Skill-salary premium + co-occurrence | planned | M | ★★★★★ | — |
 | F5 | LLM ISCO fallback (build-time Gemini) | planned | S-M | ★★★★ | — |

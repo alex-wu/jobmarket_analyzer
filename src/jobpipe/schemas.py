@@ -172,3 +172,15 @@ class BenchmarkSchema(pa.DataFrameModel):
     class Config:
         strict = True
         coerce = True
+
+
+# Every salary-describing column of PostingSchema. Blanked together when a
+# salary falls below the preset's floor (normalise.apply_salary_floor and
+# duckdb_io.export_accumulated), so a posting never keeps half a salary.
+SALARY_COLUMNS = (
+    "salary_min_eur",
+    "salary_max_eur",
+    "salary_period",
+    "salary_annual_eur_p50",
+    "salary_imputed",
+)

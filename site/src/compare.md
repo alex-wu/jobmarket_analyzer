@@ -302,4 +302,4 @@ ${salaryRows.length === 0
       (w, h) => salaryChart(w, h)
     )}
 
-<small>Countries appear only with ≥3 disclosed salaries in a period; a country with one bar qualified in only one of the two periods. Imputed salaries are included — see Quality &amp; Coverage for imputation rates.</small>
+<small>Countries appear only with ≥3 disclosed salaries in a period; a country with one bar qualified in only one of the two periods. Salaries estimated by Adzuna (for ads that state none) are included — see Quality &amp; Coverage for imputation rates.</small>

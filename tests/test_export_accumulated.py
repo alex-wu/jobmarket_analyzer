@@ -179,3 +179,53 @@ def test_output_parquet_is_readable_by_duckdb(tmp_path: Path) -> None:
 
     n = duckdb.sql(f"SELECT count(*) FROM '{out.as_posix()}'").fetchone()
     assert n is not None and n[0] == 1
+
+
+def test_salary_floor_cleans_archived_snapshots(tmp_path: Path) -> None:
+    # The archive predates the floor and still holds a day rate as "annual";
+    # the fresh fetch has it blanked. ANY_VALUE must not resurrect it.
+    week1 = datetime(2026, 5, 4, tzinfo=UTC)
+    week2 = week1 + timedelta(days=7)
+    stale = _posting_row("day-rate", ingested_at=week1) | {
+        "salary_min_eur": 600.0,
+        "salary_max_eur": 700.0,
+        "salary_annual_eur_p50": 650.0,
+    }
+    fresh = _posting_row("day-rate", ingested_at=week2) | {
+        "salary_min_eur": None,
+        "salary_max_eur": None,
+        "salary_period": None,
+        "salary_annual_eur_p50": None,
+        "salary_imputed": None,
+    }
+    paths = [
+        _write(tmp_path / "w1" / "latest.parquet", [stale, _posting_row("ok", ingested_at=week1)]),
+        _write(tmp_path / "w2" / "latest.parquet", [fresh, _posting_row("ok", ingested_at=week2)]),
+    ]
+    out = tmp_path / "out.parquet"
+
+    assert export_accumulated(paths, out, "p", salary_floor_eur=10_000) == 2
+
+    df = pd.read_parquet(out).set_index("posting_id")
+    for col in (
+        "salary_min_eur",
+        "salary_max_eur",
+        "salary_period",
+        "salary_annual_eur_p50",
+        "salary_imputed",
+    ):
+        assert pd.isna(df.loc["day-rate", col]), col
+    assert df.loc["ok", "salary_annual_eur_p50"] == 55_000.0
+    assert df.loc["ok", "salary_period"] == "annual"
+
+
+def test_without_salary_floor_archived_salary_is_untouched(tmp_path: Path) -> None:
+    week1 = datetime(2026, 5, 4, tzinfo=UTC)
+    low = _posting_row("day-rate", ingested_at=week1) | {
+        "salary_min_eur": 600.0,
+        "salary_max_eur": 700.0,
+        "salary_annual_eur_p50": 650.0,
+    }
+    out = tmp_path / "out.parquet"
+    export_accumulated([_write(tmp_path / "w1" / "latest.parquet", [low])], out, "p")
+    assert pd.read_parquet(out)["salary_annual_eur_p50"].iloc[0] == 650.0

@@ -53,7 +53,7 @@ const pct = (num, den) => den > 0 ? `${Math.round((num / den) * 100)}%` : "—";
   ${kpiCard("Postings", coverage.n.toLocaleString(), `of ${(manifest.postings.accumulated_row_count ?? manifest.postings.row_count).toLocaleString()} in snapshot`)}
   ${kpiCard("Salary disclosed", pct(coverage.n_salary, coverage.n), `${coverage.n_salary.toLocaleString()} of ${coverage.n.toLocaleString()} rows`)}
   ${kpiCard("ISCO-tagged", pct(coverage.n_isco, coverage.n), "rapidfuzz cutoff 85")}
-  ${kpiCard("Salary imputed", pct(coverage.n_imputed, coverage.n_salary), `${coverage.n_imputed.toLocaleString()} of ${coverage.n_salary.toLocaleString()} salaried`)}
+  ${kpiCard("Salary estimated by Adzuna", pct(coverage.n_imputed, coverage.n_salary), `${coverage.n_imputed.toLocaleString()} of ${coverage.n_salary.toLocaleString()} salaries — ad stated none`)}
 </div>
 
 <small>ESCO skill tags are surfaced on the <a href="/skills">Skills &amp; Roles</a> page.</small>
@@ -120,7 +120,7 @@ ${dataTable(filtered, {
     isco_code: "ISCO code",
     isco_match_method: "Match",
     isco_match_score: "Score",
-    salary_imputed: "Imputed?",
+    salary_imputed: "Adzuna estimate?",
     posted_at: "Posted"
   },
   format: {
@@ -128,7 +128,7 @@ ${dataTable(filtered, {
     salary_imputed: (v) => v ? "yes" : "",
     posted_at: (v) => v == null ? "—" : new Date(v).toLocaleDateString("en-GB", {year: "numeric", month: "short", day: "2-digit"})
   },
-  width: {country: 70, isco_code: 90, isco_match_method: 80, isco_match_score: 70, salary_imputed: 70, posted_at: 100}
+  width: {country: 70, isco_code: 90, isco_match_method: 80, isco_match_score: 70, salary_imputed: 120, posted_at: 100}
 })}
 
 ## Pipeline manifest

@@ -7,6 +7,8 @@ Pipeline:
 2. Recompute ``salary_annual_eur_p50`` as the midpoint of the post-FX
    min/max; the adapter-set value is in native currency and is
    therefore stale after step 1.
+   Then blank salaries below the preset's ``salary_floor_eur`` (see
+   :func:`apply_salary_floor`).
 3. ISCO-08 tagging via rapidfuzz against the static ESCO snapshot
    (P4). The label frame is injected by the caller; when ``None``
    the loader falls back to the committed parquet.
@@ -24,7 +26,7 @@ import pandas as pd
 from jobpipe import dedupe, fx
 from jobpipe.isco import loader as isco_loader
 from jobpipe.isco import tagger as isco_tagger
-from jobpipe.schemas import PostingSchema, inject_accumulation_cols
+from jobpipe.schemas import SALARY_COLUMNS, PostingSchema, inject_accumulation_cols
 from jobpipe.skills import tagger as skills_tagger
 from jobpipe.work_arrangement import tagger as work_arrangement_tagger
 
@@ -39,6 +41,7 @@ def run(
     skills_df: pd.DataFrame | None = None,
     focus_isco: list[str] | None = None,
     since_days: int | None = None,
+    salary_floor_eur: float | None = None,
     work_arrangement_lookup: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Normalise a raw postings DataFrame.
@@ -52,6 +55,9 @@ def run(
     source-agnostic guarantee — adapter-level knobs (e.g. Adzuna's
     ``max_days_old``) are bandwidth optimisations layered on top of it.
 
+    ``salary_floor_eur`` blanks implausibly low annual salaries — see
+    :func:`apply_salary_floor`. ``None`` disables the floor.
+
     Returns a frame validated against ``PostingSchema`` (strict).
     """
     if raw.empty:
@@ -59,6 +65,7 @@ def run(
 
     df = fx.convert_to_eur(raw, rates)
     df = _recompute_p50(df)
+    df = apply_salary_floor(df, salary_floor_eur)
 
     if since_days is not None:
         floor = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=since_days)
@@ -102,4 +109,41 @@ def _recompute_p50(df: pd.DataFrame) -> pd.DataFrame:
     """
     out = df.copy()
     out["salary_annual_eur_p50"] = ((out["salary_min_eur"] + out["salary_max_eur"]) / 2).round(2)
+    return out
+
+
+def apply_salary_floor(df: pd.DataFrame, floor_eur: float | None) -> pd.DataFrame:
+    """Blank the salary of postings whose annual EUR midpoint is below ``floor_eur``.
+
+    Adzuna returns ``salary_min`` / ``salary_max`` with no pay period and the
+    adapter labels every value ``annual``. Ads that quote a day rate, an
+    hourly rate or a monthly salary therefore arrive as "annual" salaries of
+    a few euros to a few thousand. The true period cannot be recovered
+    reliably, so the salary is treated as not stated: every column in
+    :data:`jobpipe.schemas.SALARY_COLUMNS` is set to null and the posting itself is kept (it
+    still counts for volume, skills and work arrangement). The original
+    figures stay in ``raw_payload``.
+
+    ``None`` leaves the frame untouched.
+    """
+    if floor_eur is None:
+        return df
+    below = df["salary_annual_eur_p50"] < floor_eur
+    n_below = int(below.sum())
+    if n_below == 0:
+        return df
+    out = df.copy()
+    for col in SALARY_COLUMNS:
+        if pd.api.types.is_float_dtype(out[col]):
+            out.loc[below, col] = float("nan")
+        else:
+            # bool / str columns: go through object so None is storable.
+            out[col] = out[col].astype(object)
+            out.loc[below, col] = None
+    logger.info(
+        "salary floor: blanked %d of %d salaries below EUR %s per year",
+        n_below,
+        int(df["salary_annual_eur_p50"].notna().sum()),
+        f"{floor_eur:,.0f}",
+    )
     return out

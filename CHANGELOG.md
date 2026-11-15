@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — salary floor (ADR-029, 2026-11-15)
+- New preset setting `normalise.salary_floor_eur` (10,000 in
+  `data_analyst_eu`). A salary whose annual EUR midpoint is below the floor
+  is blanked — all five salary columns set to null — and the posting is
+  kept. Catches day, hourly and monthly rates that Adzuna reports without a
+  pay period and the adapter labels annual (38 of 4,409 salaries).
+- Applied in `normalise.run` and again in `duckdb_io.export_accumulated`, so
+  archived weekly snapshots that predate the floor are cleaned when the
+  accumulated dataset is rebuilt. Unset = no floor (previous behaviour).
+- `jobpipe validate` rejects a negative or non-numeric floor.
+
+### Changed — "imputed" salaries explained (2026-11-15)
+- Dashboard wording: "imputed" is now "Estimated by Adzuna" (the ad stated
+  no salary; Adzuna predicted one), against "Stated in ad". Salary
+  Distribution explains the two kinds at the top of the page; Overview,
+  Quality and Compare labels follow. Methodology gains a "How salaries are
+  handled" section covering both kinds and the floor. The data column is
+  still `salary_imputed`.
+
+### Added — Salary Distribution page + chip filter bar (ADR-028, 2026-11-15)
+- Ninth dashboard page `/distribution`: a raincloud chart of annual salary —
+  density curve, every posting as a dot, and a box plot on one axis. Hover a
+  dot for the posting, click to open it. Dots are coloured by disclosed vs
+  imputed salary and shrink as the selection grows, so no posting is sampled
+  away. Rows can be split by country, work arrangement or ISCO group; the
+  axis can be zoomed to the 1st–99th percentile; imputed salaries can be
+  excluded.
+- Chip-style filter bar (`site/src/components/chipFilters.js`) on the new
+  page only: stock `Inputs.radio` / `Inputs.checkbox` rendered as chips by
+  the page stylesheet `site/src/chips.css`. Same URL parameters as the
+  existing filter card, so filters still carry across pages.
+- New skill filter: chips for the 12 most-mentioned skills (skills found in
+  over half of all postings are left out as too generic). A posting must
+  mention every selected skill. Persisted as repeated `skill=` URL
+  parameters; `whereClause()` accepts an optional `skills` list.
+- Smoke test covers the new page: render, CSV export, a chip click
+  narrowing the selection and reaching the URL.
+
 ### Changed — browser SQL engine: SQLite replaces DuckDB-WASM (ADR-027, 2026-11-12)
 - Dashboard queries now run on SQLite (Framework's built-in sql.js client)
   instead of DuckDB-WASM, removing the intermittent Chromium-on-Windows

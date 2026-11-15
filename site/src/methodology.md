@@ -26,7 +26,22 @@ flowchart LR
 
 A weekly cron in GitHub Actions runs the pipeline; the dashboard is rebuilt and pushed to GitHub Pages by `deploy-pages`. No server, no API key in the browser.
 
-The dashboard itself is eight pages (Overview, Trends, Geography, Work Arrangement, Skills &amp; Roles, Compare Periods, Quality &amp; Coverage, and this one). Overview and Trends open with a market-pulse strip that compares the latest <em>complete</em> week (or month) with the one before; the still-filling current bucket is excluded so both pages report the same figures. Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a table of the current selection with one-click CSV export. Compare Periods is the exception: it replaces the shared filter card with its own two period selectors, since its charts contrast two time slices rather than one filtered view, and it has no export table.
+The dashboard itself is nine pages (Overview, Trends, Salary Distribution, Geography, Work Arrangement, Skills &amp; Roles, Compare Periods, Quality &amp; Coverage, and this one). Overview and Trends open with a market-pulse strip that compares the latest <em>complete</em> week (or month) with the one before; the still-filling current bucket is excluded so both pages report the same figures. Every data page shares the same sticky filter card — preset, country, ISCO group, work arrangement, salary range, date range — persisted in the URL so selections carry across pages, and ends with a table of the current selection with one-click CSV export. Salary Distribution draws every posting with a salary as a dot (coloured by whether the ad stated the salary or Adzuna estimated it — see below) under a density curve and above a box plot; it uses a chip-style version of the same filters and adds skill chips — a posting must mention every selected skill. Compare Periods is the exception: it replaces the shared filter card with its own two period selectors, since its charts contrast two time slices rather than one filtered view, and it has no export table.
+
+## How salaries are handled
+
+Every salary on this site is an **annual figure in euros**: the midpoint of the minimum and maximum Adzuna reports for the posting, converted at European Central Bank reference rates.
+
+There are two kinds, and they should not be read the same way:
+
+- **Stated in ad** — the employer put a salary or salary range in the posting.
+- **Estimated by Adzuna** — the posting gave no salary. Adzuna, the job board this data comes from, predicts one from similar ads and flags it as predicted. The data column is called `salary_imputed`, which is why older text on this site says "imputed". An estimate describes what comparable jobs pay, not what this employer offered.
+
+Roughly four in ten salaries here are estimates. The Salary Distribution page colours the two kinds differently and can leave the estimates out; Quality &amp; Coverage reports the current share. Elsewhere, medians and "with salary" counts include both.
+
+**Salary floor.** Adzuna reports a minimum and maximum without saying what period they cover, and the pipeline treats every figure as annual. Ads that quote a day rate, an hourly rate or a monthly salary therefore arrive looking like annual salaries of a few euros to a few thousand. The pay period cannot be recovered reliably, so any salary below **€10,000 a year** is treated as *not stated*: the posting stays in every count and chart, only its salary is dropped. The floor is the preset setting `normalise.salary_floor_eur`; it is applied when postings are ingested and again each time the accumulated dataset is rebuilt, so earlier weeks are cleaned too. When it was introduced it removed 38 of 4,409 salaries — all under €3,600, with nothing else below €12,400.
+
+Two limits remain. A mislabelled figure above the floor (a very high monthly salary, say) still gets through. And when Adzuna reports a minimum of zero, the midpoint is half the maximum, which understates the salary.
 
 ## ESCO skills tagger
 
@@ -66,6 +81,8 @@ sources:
     enabled: true
     countries: ["gb", "es"]   # active pair; 7-country EU expansion planned
     keywords: ["data analyst", "analytics engineer", "bi analyst"]
+normalise:
+  salary_floor_eur: 10000   # salaries below this are treated as not stated
 publish:
   accumulate_window_days: 180
 ```
@@ -106,6 +123,9 @@ Decision log lives at [`DECISIONS.md`](https://github.com/alex-wu/jobmarket_anal
 | 024 | Filter state persistence via URL search params |
 | 025 | PostingSchema v3 — work_arrangement, dead-weight column drop |
 | 026 | Dashboard v2 — Europe choropleth, page consolidation, CSV export |
+| 027 | Browser SQL engine — SQLite replaces DuckDB-WASM |
+| 028 | Salary Distribution page + chip filter bar |
+| 029 | Salary floor at ingestion and accumulation |
 
 </div>
 

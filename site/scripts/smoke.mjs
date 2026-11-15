@@ -112,7 +112,7 @@ console.log(`--- browser: ${browserName} (${await browser.version()}) ---`);
 let total = 0;
 
 // ---------- Phase 1: dev server, every data page ----------
-const DATA_PAGES = ["/", "/trends", "/geography", "/arrangement", "/skills", "/compare", "/quality", "/methodology"];
+const DATA_PAGES = ["/", "/trends", "/distribution", "/geography", "/arrangement", "/skills", "/compare", "/quality", "/methodology"];
 if (runDev) {
   const devPort = process.env.DEV_PORT ?? "3000";
   const devOrigin = `http://127.0.0.1:${devPort}`;
@@ -171,7 +171,7 @@ async function interactionChecks(urlFor) {
   // Phase 1d: CSV download — every data page must expose a working "⬇ CSV" button.
   // We monkey-patch URL.createObjectURL + anchor.click to capture the CSV text
   // without actually triggering a browser download.
-  for (const path of ["/", "/trends", "/geography", "/arrangement", "/skills", "/quality"]) {
+  for (const path of ["/", "/trends", "/distribution", "/geography", "/arrangement", "/skills", "/quality"]) {
     console.log(`\n=== ${path} CSV download ===`);
     const page = await browser.newPage();
     await page.setViewport({width: 1280, height: 900});
@@ -247,6 +247,44 @@ async function interactionChecks(urlFor) {
     if (filled < 1) { console.log("CHOROPLETH FILL MISSING — no filled country paths"); issues += 1; }
     if (!switched) { console.log("METRIC SELECT NOT FOUND"); issues += 1; }
     if (issues === 0) console.log("OK — map rendered, metric switch clean");
+    else {
+      if (pageErrors.length)     console.log("pageerror:", pageErrors);
+      if (consoleErrors.length)  console.log("console.error:", consoleErrors);
+      if (visible.length)        console.log("visible inspector errors:", visible);
+      if (failedRequests.length) console.log("failed requests:", failedRequests);
+    }
+    total += issues;
+    await page.close();
+  }
+
+  // Phase 1f: /distribution — dots render, a skill chip narrows the selection
+  // and reaches the URL.
+  {
+    console.log("\n=== /distribution chips + dots ===");
+    const page = await browser.newPage();
+    await page.setViewport({width: 1280, height: 900});
+    const {consoleErrors, pageErrors, failedRequests} = attachListeners(page);
+    await page.goto(urlFor("/distribution"), {waitUntil: "networkidle0", timeout: 30000});
+    await new Promise((r) => setTimeout(r, 1500));
+    const countDots = () => page.evaluate(() => document.querySelectorAll("figure svg g[aria-label='dot'] circle").length);
+    const before = await countDots();
+    const chip = await page.evaluate(() => {
+      const input = document.querySelector(".chips input[type=checkbox]");
+      if (!input) return null;
+      input.click();
+      return input.parentElement.textContent.trim();
+    });
+    await new Promise((r) => setTimeout(r, 2500));
+    const after = await countDots();
+    const inUrl = await page.evaluate(() => new URLSearchParams(location.search).has("skill"));
+    console.log(`dots: ${before} → ${after} after chip "${chip}", skill in URL: ${inUrl}`);
+    const visible = await collectVisibleErrors(page);
+    let issues = consoleErrors.length + pageErrors.length + visible.length + failedRequests.length;
+    if (before < 1) { console.log("DOTS MISSING — no postings drawn"); issues += 1; }
+    if (!chip) { console.log("SKILL CHIP NOT FOUND"); issues += 1; }
+    if (chip && !(after > 0 && after < before)) { console.log("CHIP DID NOT NARROW THE SELECTION"); issues += 1; }
+    if (chip && !inUrl) { console.log("SKILL NOT PERSISTED TO URL"); issues += 1; }
+    if (issues === 0) console.log("OK — dots rendered, chip filter narrows and persists");
     else {
       if (pageErrors.length)     console.log("pageerror:", pageErrors);
       if (consoleErrors.length)  console.log("console.error:", consoleErrors);

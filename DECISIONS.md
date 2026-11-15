@@ -366,3 +366,50 @@ When a decision changes, mark the old entry `Superseded` (or `Amended by ADR-0NN
 - SQLite has no list, date, or boolean types: new list-valued columns need a child table in the loader, and new date/boolean result columns must be added to the conversion lists in `db.js` (or passed per query).
 - New aggregates beyond SQLite's built-ins must be registered in `db.js` and mirrored in the parity script.
 - DuckDB remains in the Python pipeline and the build-time loader; only the browser engine changed.
+
+## ADR-028 · Salary Distribution page (raincloud chart) + chip filter bar with a scoped stylesheet
+
+**Status:** Accepted, 2026-11-15. Narrows the "stock Observable only, no custom CSS" rule from the P6 dashboard strategy: one page-level stylesheet is now allowed, for the chip filter bar only.
+
+**Context:** The dashboard showed salary only as a histogram and medians, so individual postings and outliers were invisible, and the 42% of salaries that are imputed could not be told apart in any chart. The dropdown filter card also hides the available options until opened and has no skill filter.
+
+**Decision:**
+1. **New page `/distribution`**, leaving the existing pages untouched. One chart, `site/src/components/distribution.js`: a raincloud plot (density curve + raw observations + box plot per group, on a shared axis), composed from stock Plot marks — `areaY`/`lineY`, `dot`, `rect`, `ruleX`/`ruleY`, `text` — with `fy` facets for the optional split and Plot's own `tip` and pointer interaction. Two parts are hand-written because Plot has no equivalent: a Gaussian kernel density estimate (Silverman bandwidth) and the dot layout.
+2. **Every posting is drawn; none are sampled.** Dots are laid out as a unit histogram: ~16 px bins, each filled as a block several dots wide. Each row uses the largest dot size at which its fullest bin still fits, down to a 2 px pitch, after which the row grows taller. Plot's `dodge` transform (true beeswarm) was rejected: its height is unknown before layout, and salaries heap on round values, which it renders as needles.
+3. **Colour encodes disclosed vs imputed salary** — the one distinction that changes how a cluster or an outlier should be read.
+4. **Click-to-open reads `plot.value`** (the datum under Plot's pointer) rather than an `href` per dot, which would demand a direct hit on a dot that can be 2 px wide.
+5. **Chip filter bar** `site/src/components/chipFilters.js`: stock `Inputs.radio` / `Inputs.checkbox` inside one `Inputs.form`, with the same value shape and URL parameters as `filterCard`, so `whereClause()` and cross-page filter carry-over are unchanged. `site/src/chips.css` is attached through the page's `style:` front matter (Framework's documented mechanism); it re-imports the `dashboard` theme exactly as Framework composes it and adds rules scoped to `.chip-bar`, using theme variables only. The native inputs stay in the DOM, so keyboard and screen-reader behaviour is the browser's.
+6. **Skill chips are automatic**: the 12 most-mentioned skills, excluding any skill present in more than half of all postings. Multiple selected skills are combined with AND. The URL uses repeated `skill=` parameters because ESCO labels contain commas.
+
+**Alternatives rejected:** sampling the dots above a cap (hides most postings and makes outliers unreachable); a curated skill list in the preset YAML (deferred — automatic needs no configuration, at the cost of tagger false positives surfacing as chips); a hand-built chip component with icons (more code to own, accessibility to re-implement, trademark questions for logos); restyling the shared filter card for all pages in the same change (touches six pages at once).
+
+**Consequences:**
+- Two filter UIs coexist until the chip bar is rolled out to the other pages. Those pages ignore the `skill` URL parameter but pass it through untouched.
+- `chips.css` must mirror the theme list in `observablehq.config.js`; changing the site theme means changing both.
+- The chip rules select on the markup `Inputs.radio` / `Inputs.checkbox` emit (`form > div > label > input`) and on `:has()`; an Inputs major-version bump needs a visual check of the chip bar.
+- New page queries are SQLite-only and are not part of `npm run parity`, which compares queries ported from DuckDB.
+- Tagger noise is now user-visible as chips (e.g. "Source (digital game creation systems)"); fixing it belongs in the pipeline, not the page.
+
+## ADR-029 · Salary floor: blank implausibly low annual salaries at ingestion and at accumulation
+
+**Status:** Accepted, 2026-11-15.
+
+**Context:** Adzuna's `/search` returns `salary_min` / `salary_max` with no pay period, and the adapter labels every value `annual`. Ads quoting a day rate (`£650/day` → 758), an hourly rate (17.50) or a monthly salary (2,766) therefore land as annual salaries. In the 2026-11 corpus 38 of 4,409 salaries were below €3,600 and none lay between €3,600 and €12,400. They are not typos, and the period cannot be inferred reliably from the number alone (a 400 could be a day rate or a weekly one), so they cannot be annualised. The dashboard loader only dropped rows with a salary of exactly zero.
+
+**Decision:**
+1. A preset setting `normalise.salary_floor_eur` (10,000 for `data_analyst_eu`; unset means no floor). Below it the salary is **blanked, not the row dropped**: `salary_min_eur`, `salary_max_eur`, `salary_period`, `salary_annual_eur_p50` and `salary_imputed` (`schemas.SALARY_COLUMNS`) all become null. The posting is real and still counts for volume, skills and work arrangement; the source figures remain in `raw_payload`.
+2. Applied in `normalise.run`, after FX conversion and the midpoint recompute, so the comparison is in EUR per year for every source.
+3. Applied again in `duckdb_io.export_accumulated`. Archived weekly snapshots are immutable and predate the floor, and accumulation takes `ANY_VALUE` per posting across snapshots, which would bring a blanked salary back from an older snapshot.
+
+**Alternatives rejected:**
+- *Filter in the Adzuna request* (`salary_min` query parameter): it removes the whole posting, and it also acts on Adzuna's predicted salaries, so it would bias volume counts.
+- *Filter only in the dashboard loader*: every other consumer of the release parquet (CSV exports, forks, notebooks) would still get the bad values.
+- *Guess the period and annualise*: ambiguous ranges overlap; a wrong guess is worse than a missing value.
+- *Drop the row*: loses a valid posting over one bad field.
+- *Tighten `PostingSchema` (`ge=`)*: would fail the whole run instead of cleaning one value.
+
+**Consequences:**
+- The disclosed-salary rate drops slightly (38 postings move from "has salary" to "no salary").
+- The floor is a judgement per preset: 10,000 suits full-time professional roles in GB/ES; a preset covering part-time or low-wage markets needs a lower one.
+- Mislabelled figures above the floor still pass, and a `salary_min` of 0 still halves the midpoint — both noted on the Methodology page; neither is addressed here.
+- The dashboard loader's `salary > 0` row filter is now redundant for data produced after this change but is left in place for older release assets.
